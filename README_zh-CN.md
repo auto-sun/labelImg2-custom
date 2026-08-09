@@ -184,7 +184,8 @@ class_id x1 y1 x2 y2 x3 y3 x4 y4
 
 本项目遵循 MIT License，详见 [`LICENSE`](LICENSE)。
 
-原项目：Chinakook / LabelImg2  
+原项目：Chinakook / LabelImg2
+
 <https://github.com/chinakook/labelImg2>
 
 本仓库是独立修改的派生版本，不代表上游项目的官方发布，也不暗示原作者为本修改版背书。
