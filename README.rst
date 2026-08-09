@@ -1,6 +1,8 @@
 LabelImg2 Custom
 ================
 
+Documentation: English | `简体中文 <README_zh-CN.md>`_
+
 This repository is a modified fork of
 `chinakook/labelImg2 <https://github.com/chinakook/labelImg2>`_, a graphical
 image annotation tool written in Python and PyQt5.
@@ -9,6 +11,29 @@ The original project and this modified version are distributed under the MIT
 License. The original copyright notice and license text are preserved in
 ``LICENSE``. See ``NOTICE.md`` for attribution and ``MODIFICATIONS.md`` for a
 detailed list of changes.
+
+Why this fork is more convenient
+--------------------------------
+
+The custom workflow removes many repeated operations from day-to-day OBB
+annotation:
+
+================================  ============================================
+Common interruption               Improved workflow
+================================  ============================================
+Reopen folders and find progress  Restore the last folder and exact image
+Repeatedly enter drawing mode     ``E`` quickly enters or leaves OBB mode
+Reopen the label editor manually  Open it automatically after drawing a box
+Cycle duplicate initials slowly   Put frequently used matching labels first
+Redraw similar objects            Copy/paste boxes, including across images
+Edit boxes one at a time          Marquee-select and transform a whole group
+Remember separate wheel controls  Resize selected boxes; otherwise zoom image
+Clean old export artefacts        Export only same-name YOLO/OBB label files
+================================  ============================================
+
+The result is a shorter loop: draw an OBB, type a label initial, adjust it,
+save, and move to the next image without repeatedly switching tools or
+reselecting directories.
 
 Main additions
 --------------

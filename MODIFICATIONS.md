@@ -1,5 +1,7 @@
 # Modifications in this fork
 
+[简体中文](MODIFICATIONS_zh-CN.md)
+
 This file summarises the main differences from the upstream
 `chinakook/labelImg2` project.
 

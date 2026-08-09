@@ -1,5 +1,7 @@
 # Attribution Notice
 
+[简体中文](NOTICE_zh-CN.md)
+
 This repository is a modified fork of
 [chinakook/labelImg2](https://github.com/chinakook/labelImg2).
 
