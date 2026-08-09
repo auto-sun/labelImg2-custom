@@ -6,6 +6,9 @@ resources.py
 labelImg.egg-info*
 
 *.pyc
+*.log
+__pycache__/
+.pytest_cache/
 .*.swp
 
 build/

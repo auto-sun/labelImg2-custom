@@ -20,9 +20,11 @@ CURSOR_GRAB = Qt.OpenHandCursor
 class Canvas(QWidget):
     zoomRequest = pyqtSignal(int)
     scrollRequest = pyqtSignal(int, int)
+    panRequest = pyqtSignal(int, int)
     newShape = pyqtSignal(bool)
     selectionChanged = pyqtSignal(bool)
     shapeMoved = pyqtSignal()
+    shapeCopied = pyqtSignal(object)
     drawingPolygon = pyqtSignal(bool)
 
     hideRRect = pyqtSignal(bool)
@@ -39,6 +41,8 @@ class Canvas(QWidget):
     CONTINUECREATE = 2
 
     epsilon = 7.0
+    WHEEL_SHAPE_SCALE_STEP = 1.05
+    MIN_SHAPE_EDGE = 2.0
 
     def __init__(self, *args, **kwargs):
         super(Canvas, self).__init__(*args, **kwargs)
@@ -54,6 +58,21 @@ class Canvas(QWidget):
         self.line = Shape(line_color=self.drawingLineColor)
         self.prevPoint = QPointF()
         self.offsets = QPointF(), QPointF()
+        self._altPressed = False
+        self._panning = False
+        self._panLastPos = QPoint()
+        self._marqueeStart = None
+        self._marqueeEnd = None
+        self._marqueeStartWidget = QPoint()
+        self._marqueeDragging = False
+        self._marqueeAdditive = False
+        self._marqueeBaseSelection = []
+        self._ctrlCopySource = None
+        self._ctrlCopyShape = None
+        self._ctrlCopyStart = QPointF()
+        self._ctrlCopyStartWidget = QPoint()
+        self.contextMenuPos = None
+        self.contextMenuActive = False
         self.scale = 1.0
         self.pixmap = QPixmap()
         
@@ -95,6 +114,10 @@ class Canvas(QWidget):
         self.restoreCursor()
 
     def focusOutEvent(self, ev):
+        self._altPressed = False
+        self._panning = False
+        self._clearMarqueeSelection()
+        self._clearCtrlCopyDrag()
         self.restoreCursor()
 
     def isVisible(self, shape):
@@ -116,6 +139,7 @@ class Canvas(QWidget):
         self.update()
 
     def setEditing(self, value=1):
+        self._clearMarqueeSelection()
         self.mode = value
         if value == self.CREATE or value == self.CONTINUECREATE:  # Create
             self.unHighlight()
@@ -151,7 +175,56 @@ class Canvas(QWidget):
 
     def mouseMoveEvent(self, ev):
         """Update line with last point and current coordinates."""
+        if self._panning and Qt.LeftButton & ev.buttons():
+            current_pos = ev.pos()
+            delta = self._panLastPos - current_pos
+            self._panLastPos = current_pos
+            self.panRequest.emit(delta.x(), delta.y())
+            self.overrideCursor(CURSOR_MOVE)
+            ev.accept()
+            return
+
+        if self._altPressed or bool(ev.modifiers() & Qt.AltModifier):
+            self.overrideCursor(CURSOR_GRAB)
+            ev.accept()
+            return
+
         pos = self.transformPos(ev.pos())
+
+        if self._ctrlCopySource is not None and Qt.LeftButton & ev.buttons():
+            if self._ctrlCopyShape is None:
+                drag_distance = (ev.pos() - self._ctrlCopyStartWidget).manhattanLength()
+                if drag_distance < QApplication.startDragDistance():
+                    self.overrideCursor(CURSOR_GRAB)
+                    ev.accept()
+                    return
+
+                shape = self._ctrlCopySource.copy()
+                self.shapes.append(shape)
+                self.selectShape(shape)
+                self._ctrlCopyShape = shape
+                self.prevPoint = QPointF(self._ctrlCopyStart)
+                self.calculateOffsets(shape, self._ctrlCopyStart)
+                self.shapeCopied.emit(shape)
+
+            self.overrideCursor(CURSOR_MOVE)
+            if self.boundedMoveShape(self._ctrlCopyShape, pos):
+                self.shapeMoved.emit()
+            self.updateLocalScaleMap(pos.x(), pos.y())
+            self.repaint()
+            ev.accept()
+            return
+
+        if self._marqueeStart is not None and Qt.LeftButton & ev.buttons():
+            if ((ev.pos() - self._marqueeStartWidget).manhattanLength() >=
+                    QApplication.startDragDistance()):
+                self._marqueeDragging = True
+            pos = self.transformPos(ev.pos())
+            self._marqueeEnd = self._boundedPixmapPoint(pos)
+            self.overrideCursor(CURSOR_DRAW)
+            self.repaint()
+            ev.accept()
+            return
 
         # Update coordinates in status bar if image is opened
         window = self.parent().window()
@@ -301,7 +374,39 @@ class Canvas(QWidget):
 
 
     def mousePressEvent(self, ev):
+        alt_pressed = self._altPressed or bool(ev.modifiers() & Qt.AltModifier)
+        if ev.button() == Qt.LeftButton and alt_pressed:
+            self._panning = True
+            self._panLastPos = ev.pos()
+            self.overrideCursor(CURSOR_MOVE)
+            ev.accept()
+            return
+
         pos = self.transformPos(ev.pos())
+
+        if (ev.button() == Qt.LeftButton and self.editing() and
+                bool(ev.modifiers() & Qt.ControlModifier)):
+            shape = self._shapeAt(pos)
+            if shape is not None:
+                self._ctrlCopySource = shape
+                self._ctrlCopyShape = None
+                self._ctrlCopyStart = QPointF(pos)
+                self._ctrlCopyStartWidget = QPoint(ev.pos())
+                self.prevPoint = QPointF(pos)
+                self.calculateOffsets(shape, pos)
+                self.overrideCursor(CURSOR_GRAB)
+                ev.accept()
+                return
+
+        if (ev.button() == Qt.LeftButton and self.editing() and
+                not self.outOfPixmap(pos) and self._shapeAt(pos) is None and
+                not self.selectedVertex()):
+            additive = bool(
+                ev.modifiers() & (Qt.ControlModifier | Qt.ShiftModifier)
+            )
+            self._startMarqueeSelection(pos, ev.pos(), additive)
+            ev.accept()
+            return
 
         if ev.button() == Qt.LeftButton:
             if self.drawing():
@@ -318,12 +423,51 @@ class Canvas(QWidget):
             self.repaint()
 
     def mouseReleaseEvent(self, ev):
+        if ev.button() == Qt.LeftButton and self._panning:
+            self._panning = False
+            alt_pressed = self._altPressed or bool(
+                QApplication.keyboardModifiers() & Qt.AltModifier
+            )
+            self.overrideCursor(CURSOR_GRAB if alt_pressed else CURSOR_DEFAULT)
+            ev.accept()
+            return
+
+        if ev.button() == Qt.LeftButton and self._ctrlCopySource is not None:
+            copied = self._ctrlCopyShape is not None
+            pos = self.transformPos(ev.pos())
+            self._clearCtrlCopyDrag()
+            if not copied:
+                # Preserve the existing Ctrl-click multi-selection behaviour.
+                self.selectShapePoint(pos, Qt.ControlModifier)
+                self.prevPoint = pos
+            self.overrideCursor(CURSOR_GRAB if self.selectedShape else CURSOR_DEFAULT)
+            self.repaint()
+            ev.accept()
+            return
+
+        if ev.button() == Qt.LeftButton and self._marqueeStart is not None:
+            if self._marqueeDragging:
+                self._marqueeEnd = self._boundedPixmapPoint(
+                    self.transformPos(ev.pos())
+                )
+                self._finishMarqueeSelection()
+            self._clearMarqueeSelection()
+            self.overrideCursor(CURSOR_GRAB if self.selectedShape else CURSOR_DEFAULT)
+            self.repaint()
+            ev.accept()
+            return
+
         if ev.button() == Qt.RightButton:
             if self.selectedVertex() and self.selectedShape.isRotated:
                 return
             menu = self.menus[bool(self.selectedShapeCopy)]
             self.restoreCursor()
-            menu.exec_(self.mapToGlobal(ev.pos()))
+            self.contextMenuPos = self.transformPos(ev.pos())
+            self.contextMenuActive = True
+            try:
+                menu.exec_(self.mapToGlobal(ev.pos()))
+            finally:
+                self.contextMenuActive = False
             #if not menu.exec_(self.mapToGlobal(ev.pos())) and self.selectedShapeCopy:
             #    # Cancel the move by deleting the shadow copy.
             #    self.selectedShapeCopy = None
@@ -340,6 +484,94 @@ class Canvas(QWidget):
 
             if self.continueDrawing():
                 self.handleClickDrawing(pos)
+
+    def _shapeAt(self, point):
+        for shape in reversed(self.shapes):
+            if self.isVisible(shape) and shape.containsPoint(point):
+                return shape
+        return None
+
+    def _boundedPixmapPoint(self, point):
+        if self.pixmap is None or self.pixmap.isNull():
+            return QPointF(point)
+        return QPointF(
+            min(max(0.0, point.x()), float(self.pixmap.width())),
+            min(max(0.0, point.y()), float(self.pixmap.height()))
+        )
+
+    def _startMarqueeSelection(self, pos, widget_pos, additive=False):
+        self._marqueeStart = QPointF(pos)
+        self._marqueeEnd = QPointF(pos)
+        self._marqueeStartWidget = QPoint(widget_pos)
+        self._marqueeDragging = False
+        self._marqueeAdditive = bool(additive)
+        self._marqueeBaseSelection = (
+            list(self.selectedShapes) if additive else []
+        )
+        self.unHighlight()
+        if not additive:
+            self.deSelectShape()
+        self.overrideCursor(CURSOR_DRAW)
+        self.update()
+
+    def _marqueeRect(self):
+        if self._marqueeStart is None or self._marqueeEnd is None:
+            return QRectF()
+        return QRectF(self._marqueeStart, self._marqueeEnd).normalized()
+
+    def _setSelectedShapes(self, shapes):
+        selected = []
+        for shape in shapes:
+            if (shape in self.shapes and self.isVisible(shape) and
+                    shape not in selected):
+                selected.append(shape)
+
+        selected_set = set(selected)
+        for shape in self.shapes:
+            shape.selected = shape in selected_set
+        self.selectedShapes = selected
+        self.selectedShape = selected[-1] if selected else None
+        self.setHiding(bool(selected))
+        self.selectionChanged.emit(bool(selected))
+        self.update()
+
+    def _finishMarqueeSelection(self):
+        rect = self._marqueeRect()
+        if rect.width() <= 0 or rect.height() <= 0:
+            return
+
+        selection_path = QPainterPath()
+        selection_path.addRect(rect)
+        matched = []
+        for shape in self.shapes:
+            if not self.isVisible(shape) or not shape.points:
+                continue
+            shape_path = shape.makePath()
+            shape_path.closeSubpath()
+            center = (shape.center if shape.center is not None else
+                      shape.boundingRect().center())
+            if (selection_path.contains(center) or
+                    selection_path.intersects(shape_path)):
+                matched.append(shape)
+
+        selected = (self._marqueeBaseSelection + matched
+                    if self._marqueeAdditive else matched)
+        self._setSelectedShapes(selected)
+        self.status.emit("Selected %d Box(es)" % len(self.selectedShapes))
+
+    def _clearMarqueeSelection(self):
+        self._marqueeStart = None
+        self._marqueeEnd = None
+        self._marqueeStartWidget = QPoint()
+        self._marqueeDragging = False
+        self._marqueeAdditive = False
+        self._marqueeBaseSelection = []
+
+    def _clearCtrlCopyDrag(self):
+        self._ctrlCopySource = None
+        self._ctrlCopyShape = None
+        self._ctrlCopyStart = QPointF()
+        self._ctrlCopyStartWidget = QPoint()
 
     def endMove(self, copy=False):
         assert self.selectedShape and self.selectedShapeCopy
@@ -428,16 +660,20 @@ class Canvas(QWidget):
     def selectShapePoint(self, point, modifiers=None):
         """Select the first shape created which contains this point."""
         if modifiers is not None:
-            ctrlPressed = modifiers & Qt.ControlModifier
+            multiSelectPressed = modifiers & (
+                Qt.ControlModifier | Qt.ShiftModifier
+            )
         else:
-            ctrlPressed = QApplication.keyboardModifiers() & Qt.ControlModifier
+            multiSelectPressed = QApplication.keyboardModifiers() & (
+                Qt.ControlModifier | Qt.ShiftModifier
+            )
 
         if self.selectedVertex():  # A vertex is marked for selection.
-            if not ctrlPressed:
+            if not multiSelectPressed:
                 self.deSelectShape()
             index, shape = self.hVertex, self.hShape
             shape.highlightVertex(index, shape.MOVE_VERTEX)
-            if ctrlPressed:
+            if multiSelectPressed:
                 self._addToSelection(shape)
             else:
                 self.selectShape(shape)
@@ -445,7 +681,7 @@ class Canvas(QWidget):
 
         for shape in reversed(self.shapes):
             if self.isVisible(shape) and shape.containsPoint(point):
-                if ctrlPressed:
+                if multiSelectPressed:
                     # Toggle shape in/out of multi-selection
                     if shape in self.selectedShapes:
                         self._removeFromSelection(shape)
@@ -462,7 +698,7 @@ class Canvas(QWidget):
                 return
 
         # Clicked on empty area
-        if not ctrlPressed:
+        if not multiSelectPressed:
             self.deSelectShape()
 
     def _addToSelection(self, shape):
@@ -722,6 +958,89 @@ class Canvas(QWidget):
             return [shape]
         return []
 
+    def pasteShapes(self, templates, target=None, offset=None,
+                    constrainToCanvas=True, avoidExactOverlap=False):
+        if (not templates or self.pixmap is None or self.pixmap.isNull()):
+            return []
+
+        newShapes = [template.copy() for template in templates]
+        allPoints = [point for shape in newShapes for point in shape.points]
+        if not allPoints:
+            return []
+
+        minX = min(point.x() for point in allPoints)
+        maxX = max(point.x() for point in allPoints)
+        minY = min(point.y() for point in allPoints)
+        maxY = max(point.y() for point in allPoints)
+
+        if target is not None:
+            sourceCenter = QPointF((minX + maxX) / 2.0,
+                                   (minY + maxY) / 2.0)
+            delta = target - sourceCenter
+        else:
+            delta = QPointF(offset if offset is not None else QPointF(10, 10))
+
+        def boundedDelta(candidate):
+            candidate = QPointF(candidate)
+            if not constrainToCanvas:
+                return candidate
+            # Keep the pasted group visible without changing size or angle.
+            maxCanvasX = self.pixmap.width() - 1
+            maxCanvasY = self.pixmap.height() - 1
+            if maxX - minX <= maxCanvasX:
+                if minX + candidate.x() < 0:
+                    candidate.setX(-minX)
+                elif maxX + candidate.x() > maxCanvasX:
+                    candidate.setX(maxCanvasX - maxX)
+            if maxY - minY <= maxCanvasY:
+                if minY + candidate.y() < 0:
+                    candidate.setY(-minY)
+                elif maxY + candidate.y() > maxCanvasY:
+                    candidate.setY(maxCanvasY - maxY)
+            return candidate
+
+        def exactlyOverlapsExisting(candidate):
+            tolerance = 0.01
+            for template in newShapes:
+                translated = [point + candidate for point in template.points]
+                for existing in self.shapes:
+                    if len(existing.points) != len(translated):
+                        continue
+                    if all(distance(old - new) <= tolerance
+                           for old, new in zip(existing.points, translated)):
+                        return True
+            return False
+
+        delta = boundedDelta(delta)
+        if avoidExactOverlap and exactlyOverlapsExisting(delta):
+            # Try nearby diagonal positions until the copy is visibly separate.
+            for step in range(1, 101):
+                for shift in ((10 * step, 10 * step),
+                              (-10 * step, 10 * step),
+                              (10 * step, -10 * step),
+                              (-10 * step, -10 * step)):
+                    candidate = boundedDelta(
+                        delta + QPointF(shift[0], shift[1]))
+                    if not exactlyOverlapsExisting(candidate):
+                        delta = candidate
+                        break
+                else:
+                    continue
+                break
+
+        self.deSelectShape()
+        for shape in newShapes:
+            shape.moveBy(delta)
+            shape.close()
+            shape.selected = True
+            self.shapes.append(shape)
+        self.selectedShapes = list(newShapes)
+        self.selectedShape = newShapes[-1]
+        self.setHiding()
+        self.selectionChanged.emit(True)
+        self.repaint()
+        return newShapes
+
     def boundedShiftShape(self, shape):
         # Try to move in one direction, and if it fails in another.
         # Give up if both fail.
@@ -771,6 +1090,13 @@ class Canvas(QWidget):
             self.line.paint(p)
         if self.selectedShapeCopy:
             self.selectedShapeCopy.paint(p)
+
+        if self._marqueeStart is not None and self._marqueeDragging:
+            p.save()
+            p.setPen(QPen(QColor(0, 170, 255), 1.5 / self.scale, Qt.DashLine))
+            p.setBrush(QBrush(QColor(0, 170, 255, 45)))
+            p.drawRect(self._marqueeRect())
+            p.restore()
 
         # Paint rect
         # Paint rect
@@ -925,6 +1251,65 @@ class Canvas(QWidget):
             return self.scale * self.pixmap.size()
         return super(Canvas, self).minimumSizeHint()
 
+    def _selectedShapesForWheelResize(self):
+        shapes = []
+        for shape in self.selectedShapes:
+            if shape is not None and shape.selected and shape not in shapes:
+                shapes.append(shape)
+        if (self.selectedShape is not None and self.selectedShape.selected and
+                self.selectedShape not in shapes):
+            shapes.append(self.selectedShape)
+        return shapes
+
+    def resizeSelectedShapesByWheel(self, wheel_delta):
+        """Scale selected boxes around their centres without zooming the image."""
+        shapes = self._selectedShapesForWheelResize()
+        if not shapes or not wheel_delta:
+            return False
+
+        # A normal mouse-wheel notch is 120 units. Limiting one event prevents
+        # unusually large touchpad deltas from making a box jump in size.
+        notches = max(-10.0, min(10.0, float(wheel_delta) / 120.0))
+        factor = math.pow(self.WHEEL_SHAPE_SCALE_STEP, notches)
+        candidates = []
+
+        for shape in shapes:
+            if len(shape.points) < 2:
+                return False
+            center = (QPointF(shape.center) if shape.center is not None else
+                      shape.boundingRect().center())
+
+            if factor < 1.0:
+                edge_lengths = [
+                    distance(shape.points[(index + 1) % len(shape.points)] - point)
+                    for index, point in enumerate(shape.points)
+                ]
+                if (not edge_lengths or
+                        min(edge_lengths) * factor < self.MIN_SHAPE_EDGE):
+                    return False
+
+            new_points = []
+            for point in shape.points:
+                offset = point - center
+                new_point = QPointF(
+                    center.x() + offset.x() * factor,
+                    center.y() + offset.y() * factor
+                )
+                new_points.append(new_point)
+
+            if (not self.canOutOfBounding and
+                    any(self.outOfPixmap(point) for point in new_points)):
+                return False
+            candidates.append((shape, new_points))
+
+        for shape, new_points in candidates:
+            shape.points = new_points
+            shape.close()
+
+        self.shapeMoved.emit()
+        self.update()
+        return True
+
     def wheelEvent(self, ev):
         qt_version = 4 if hasattr(ev, "delta") else 5
         if qt_version == 4:
@@ -939,17 +1324,31 @@ class Canvas(QWidget):
             h_delta = delta.x()
             v_delta = delta.y()
 
-        mods = ev.modifiers()
-        if Qt.ControlModifier == int(mods) and v_delta:
-            self.zoomRequest.emit(v_delta)
-        else:
-            v_delta and self.scrollRequest.emit(v_delta, Qt.Vertical)
-            h_delta and self.scrollRequest.emit(h_delta, Qt.Horizontal)
+        zoom_delta = v_delta if v_delta else h_delta
+        if zoom_delta:
+            # Selected box: resize the box only. No selected box: preserve the
+            # existing wheel-to-image-zoom behaviour. Even at a resize limit,
+            # consume the event so the image never zooms unexpectedly.
+            if self._selectedShapesForWheelResize():
+                self.resizeSelectedShapesByWheel(zoom_delta)
+            else:
+                self.zoomRequest.emit(zoom_delta)
         ev.accept()
 
     def keyPressEvent(self, ev):
         key = ev.key()
-        if key == Qt.Key_Escape and self.current:
+        if key == Qt.Key_Escape and self._marqueeStart is not None:
+            self._clearMarqueeSelection()
+            self.overrideCursor(CURSOR_DEFAULT)
+            self.update()
+            ev.accept()
+            return
+        elif key == Qt.Key_Alt:
+            self._altPressed = True
+            self.overrideCursor(CURSOR_GRAB)
+            ev.accept()
+            return
+        elif key == Qt.Key_Escape and self.current:
             self.current = None
             self.drawingPolygon.emit(False)
             self.update()
@@ -965,10 +1364,6 @@ class Canvas(QWidget):
             else:
                 if len(self.shapes) > 0:
                     self.selectShape(self.shapes[0])
-        elif key == Qt.Key_Left and self.selectedShape:
-            self.moveOnePixel('Left')
-        elif key == Qt.Key_Right and self.selectedShape:
-            self.moveOnePixel('Right')
         elif key == Qt.Key_Up and self.selectedShape:
             self.moveOnePixel('Up')
         elif key == Qt.Key_Down and self.selectedShape:
@@ -1011,6 +1406,15 @@ class Canvas(QWidget):
         elif key == Qt.Key_B:
             self.showCenter = not self.showCenter
             self.update()
+
+    def keyReleaseEvent(self, ev):
+        if ev.key() == Qt.Key_Alt:
+            self._altPressed = False
+            if not self._panning:
+                self.overrideCursor(CURSOR_DRAW if self.drawing() else CURSOR_DEFAULT)
+            ev.accept()
+            return
+        super(Canvas, self).keyReleaseEvent(ev)
 
     def rotateOutOfBound(self, angle):
         if self.canOutOfBounding:
@@ -1081,6 +1485,7 @@ class Canvas(QWidget):
         self.update()
 
     def loadPixmap(self, pixmap):
+        self._clearMarqueeSelection()
         self.pixmap = pixmap
         self.shapes = []
         self.selectedShapes = []
@@ -1113,6 +1518,7 @@ class Canvas(QWidget):
         QApplication.restoreOverrideCursor()
 
     def resetState(self):
+        self._clearMarqueeSelection()
         self.restoreCursor()
         self.pixmap = None
         #self.localScalePixmap = None

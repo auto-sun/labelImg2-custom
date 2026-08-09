@@ -38,8 +38,10 @@ class CMyListModel(QStringListModel):
 
 
 class LabelDialog(QDialog):
+    defaultLabelChanged = pyqtSignal(str)
 
-    def __init__(self, text="Enter object label", parent=None, listItem=None):
+    def __init__(self, text="Enter object label", parent=None, listItem=None,
+                 defaultLabel=None):
         super(LabelDialog, self).__init__(parent)
 
         self.edit = QLineEdit()
@@ -67,20 +69,10 @@ class LabelDialog(QDialog):
         self.listView = QListView(self)
 
         self.model = CMyListModel(self.listView)
-        
-
-        self.model.setStringList(listItem)
         self.listView.setModel(self.model)
 
         self.sm = self.listView.selectionModel()
-
-        if listItem is not None and len(listItem) > 0:
-            self.default_label = listItem[0]
-            self.model.setData(self.model.index(0), QBrush(Qt.red), Qt.BackgroundRole)
-            
-        else:
-            self.default_label = None
-
+        self.default_label = defaultLabel
         self.updateListItems(listItem)
         
         
@@ -90,7 +82,21 @@ class LabelDialog(QDialog):
         self.setLayout(self.layout)
 
     def updateListItems(self, listItem):
-        self.model.setStringList(listItem)
+        self.model.setStringList(listItem or [])
+        self.setDefaultLabel(self.default_label)
+
+    def setDefaultLabel(self, label):
+        labels = self.model.stringList()
+        self.model.rowColors = {}
+        if not labels:
+            self.default_label = None
+            return
+        if label not in labels:
+            label = labels[0]
+        self.default_label = label
+        index = self.model.index(labels.index(label))
+        self.model.setData(index, QBrush(Qt.red), Qt.BackgroundRole)
+        self.listView.setCurrentIndex(index)
 
     def addLabel(self):
         if not self.edit.text() in self.model.stringList():
@@ -102,23 +108,13 @@ class LabelDialog(QDialog):
 
     def defaultLabel(self):
         curr = self.sm.currentIndex()
-
-        sl = self.model.stringList()
-        
-        if self.default_label is None:
+        if not curr.isValid():
             return
-        
+        label = self.model.data(curr, Qt.EditRole)
         if sys.version_info < (3, 0, 0):
-            j = sl.indexOf(self.default_label)
-        else:
-            j = sl.index(self.default_label)
-            
-        self.model.setData(self.model.index(j), QBrush(Qt.transparent), Qt.BackgroundRole)
-
-        self.default_label = self.model.data(curr, Qt.EditRole)
-        if sys.version_info < (3, 0, 0):
-            self.default_label = self.default_label.toPyObject()
-        self.model.setData(self.model.index(curr.row()), QBrush(Qt.red), Qt.BackgroundRole)
+            label = label.toPyObject()
+        self.setDefaultLabel(label)
+        self.defaultLabelChanged.emit(label)
 
 
     def validate(self):

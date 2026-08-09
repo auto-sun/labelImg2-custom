@@ -1,0 +1,59 @@
+# Modifications in this fork
+
+This file summarises the main differences from the upstream
+`chinakook/labelImg2` project.
+
+## Annotation workflow
+
+- `E` toggles rotated OBB drawing mode.
+- The `W` shortcut for axis-aligned drawing is disabled.
+- Drawing one box returns to edit mode instead of continuing to draw.
+- The new box is selected and its label editor opens automatically.
+- Image navigation shortcuts are disabled while a label editor is active, so
+  label initials such as `d` cannot switch images accidentally.
+
+## Labels
+
+- "Set as default" persists across application restarts.
+- Repeated initial-letter selection cycles through matching labels in a
+  usage-based order instead of alphabetical order.
+- Label frequency and recency are stored in the local settings file.
+
+## Canvas and selection
+
+- Plain mouse wheel zooms the image when no box is selected.
+- Mouse wheel resizes selected boxes around their centres while preserving OBB
+  angles.
+- `Alt + left drag` pans the canvas.
+- Dragging on an empty image area creates a marquee multi-selection.
+- Ctrl/Shift marquee adds to the current selection.
+- Selected groups can be moved, resized, duplicated, copied, pasted and
+  deleted together.
+
+## Clipboard
+
+- `Ctrl+C` and `Ctrl+V` copy and paste boxes, including across images.
+- Same-image pastes are offset to avoid exact overlap.
+- Cross-image pastes retain the original coordinates.
+- Right-click copy and paste are supported.
+- Ctrl-dragging an existing box creates and moves a duplicate.
+
+## Navigation and persistence
+
+- A/D and left/right arrow keys navigate between images.
+- Image filenames use natural numeric ordering.
+- The last image directory, current image, annotation directory, default label
+  and label usage data are restored at startup.
+- Changing the image directory no longer overwrites an explicitly selected
+  annotation directory.
+- Nested annotation directories are created automatically before saving.
+- Invalid image and scale states are guarded to reduce crashes.
+
+## YOLO export
+
+- Pascal VOC XML is converted directly to same-name YOLO or YOLO OBB `.txt`
+  files.
+- Export does not copy or re-encode images.
+- Export does not create train/validation directories, list files or YAML.
+- YOLO OBB records use normalised four-corner coordinates.
+- Class IDs follow the current predefined-class order.

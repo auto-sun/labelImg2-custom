@@ -5,12 +5,14 @@ import sys
 
 class Settings(object):
     def __init__(self):
-        # Be default, the home will be in the same folder as labelImg
+        # Always keep one settings file beside labelImg.py, independent of the
+        # current working directory or the shortcut used to launch the app.
         self.data = {}
+        app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
         if sys.version_info < (3, 0, 0):
-            self.path = './labelImg2Settings2.pkl'
+            self.path = os.path.join(app_dir, 'labelImg2Settings2.pkl')
         else:
-            self.path = './labelImg2Settings3.pkl'
+            self.path = os.path.join(app_dir, 'labelImg2Settings3.pkl')
 
     def __setitem__(self, key, value):
         self.data[key] = value

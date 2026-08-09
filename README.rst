@@ -1,140 +1,99 @@
-LabelImg2
-========
+LabelImg2 Custom
+================
 
-LabelImg2 is a graphical image annotation tool.
+This repository is a modified fork of
+`chinakook/labelImg2 <https://github.com/chinakook/labelImg2>`_, a graphical
+image annotation tool written in Python and PyQt5.
 
-It is written in Python and uses Qt for its graphical interface.
+The original project and this modified version are distributed under the MIT
+License. The original copyright notice and license text are preserved in
+``LICENSE``. See ``NOTICE.md`` for attribution and ``MODIFICATIONS.md`` for a
+detailed list of changes.
 
-Annotations are saved as XML files in PASCAL VOC format.
+Main additions
+--------------
 
-Annotations can now be exported in Ultralytics YOLO's BOX format and OBB format.
-
-.. image:: img/screen0.jpg
-     :alt: labelImg2 with rotated box and extra label
+* Rotated bounding-box (OBB) focused annotation workflow.
+* Mouse-wheel image zoom, and mouse-wheel resizing for selected boxes.
+* ``Alt + left drag`` canvas panning.
+* Marquee multi-selection with group move, resize, copy and delete.
+* ``Ctrl+C`` / ``Ctrl+V`` box clipboard across images.
+* Automatic label editor after drawing a box.
+* Frequently used labels are prioritised when cycling by initial letter.
+* Persistent image directory, current image, annotation directory and default
+  label.
+* Natural numeric image ordering (for example, ``2.jpg`` before ``10.jpg``).
+* Direct Pascal VOC XML to YOLO or YOLO OBB ``.txt`` conversion, without
+  copying images, splitting datasets or generating YAML files.
 
 Installation
+------------
+
+Python 3.8 or newer is recommended.
+
+.. code:: console
+
+   python -m venv .venv
+   .venv\Scripts\activate
+   pip install -r requirements.txt
+   python labelImg.py
+
+To load a predefined class file:
+
+.. code:: console
+
+   python labelImg.py "" "path\to\classes.txt"
+
+The bundled fallback class list is ``data/predefined_classes.txt``.
+
+Key controls
+------------
+
+==============================  =============================================
+Control                         Behaviour
+==============================  =============================================
+``E``                           Enter/leave rotated OBB drawing mode
+Mouse wheel, no box selected    Zoom the image
+Mouse wheel, box selected       Resize the selected box or selected group
+``Alt + left drag``             Pan the canvas
+Left drag on empty image area   Marquee-select boxes
+``Ctrl/Shift + marquee``        Add boxes to the current selection
+``Ctrl + click``                Toggle a box in the multi-selection
+Drag a selected box             Move the selected box or selected group
+``Ctrl + drag a box``           Copy and move that box
+``Ctrl+C`` / ``Ctrl+V``         Copy/paste selected boxes
+``Ctrl+D``                      Duplicate selected boxes
+``Delete``                      Delete selected boxes
+``A`` / left arrow              Previous image
+``D`` / right arrow             Next image
+``Z`` / ``X``                   Rotate counter-clockwise (large/small step)
+``C`` / ``V``                   Rotate clockwise (small/large step)
+``F``                           Rotate 90 degrees clockwise
+``Ctrl+S``                      Save annotations
+==============================  =============================================
+
+The old ``W`` shortcut for creating an axis-aligned box is intentionally
+disabled to reduce accidental activation.
+
+Annotation formats
 ------------------
 
-Build from source
-~~~~~~~~~~~~~~~~~
+Annotations are edited and saved as Pascal VOC XML. The export menu supports:
 
-Linux/macOS
-^^^^^^^^^^^
+* YOLO box: ``class_id cx cy width height``
+* YOLO OBB: ``class_id x1 y1 x2 y2 x3 y3 x4 y4``
 
-uv is recommended for building the app.
-Download and install uv python evironment:
+Export creates only same-name ``.txt`` label files. It does not copy images,
+create train/validation/test splits, or generate dataset YAML/list files.
+Class IDs follow the current predefined-class order.
 
-.. code::
+Licence and attribution
+-----------------------
 
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    uv venv --python 3.13 .venv
-    source .venv/bin/activate
-    uv pip install -r requirements.txt
+MIT License. See ``LICENSE``.
 
-Windows + uv
-^^^^^^^
+Original project: Chinakook, LabelImg2
+https://github.com/chinakook/labelImg2
 
-Open the Windows PowerShell and go to the `labelImg <#labelimg>`__ directory. 
-You might need admin privileges to install.
-
-.. code::
-
-    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-Then run the following commands in the Command Prompt:
-
-.. code::
-
-    set Path=C:\Users\<Your User Name>\.local\bin;%Path%
-    uv venv --python 3.13 .venv
-    .\.venv\Scripts\activate.bat
-    uv pip install -r requirements.txt
-
-Atfer that, you can run the app:
-
-.. code::
-
-    python labelImg.py
-    python labelImg.py [IMAGE_PATH] [PRE-DEFINED CLASS FILE]
-
-Usage
------
-
-Steps (PascalVOC)
-~~~~~
-
-1. Build and launch using the instructions above.
-2. Click 'Change default saved annotation folder' in Menu/File
-3. Click 'Open Dir'
-4. Click 'Create RectBox'
-5. Click and release left mouse to select a region to annotate the rect
-   box
-6. You can use right mouse to drag the rect box to copy or move it
-
-The annotation will be saved to the folder you specify.
-
-You can refer to the below hotkeys to speed up your workflow.
-
-Create pre-defined classes
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can edit the
-`data/predefined\_classes.txt <https://github.com/chinakook/labelImg2/blob/master/data/predefined_classes.txt>`__
-to load pre-defined classes
-
-OBB Format
-~~~~~~~~~~
-
-TODO:
-
-Hotkeys
-~~~~~~~
-
-+------------+--------------------------------------------+
-| Ctrl + u   | Load all of the images from a directory    |
-+------------+--------------------------------------------+
-| Ctrl + r   | Change the default annotation target dir   |
-+------------+--------------------------------------------+
-| Ctrl + s   | Save                                       |
-+------------+--------------------------------------------+
-| Ctrl + d   | Copy the current label and rect box        |
-+------------+--------------------------------------------+
-| Space      | Flag the current image as verified         |
-+------------+--------------------------------------------+
-| w          | Create a rect box                          |
-+------------+--------------------------------------------+
-| d          | Next image                                 |
-+------------+--------------------------------------------+
-| a          | Previous image                             |
-+------------+--------------------------------------------+
-| z          | Rotates counterclockwise, big steps;       |
-+------------+--------------------------------------------+
-| x          | Rotates counterclockwise, small steps;     |
-+------------+--------------------------------------------+
-| c          | Rotates clockwise, small steps;            |
-+------------+--------------------------------------------+
-| v          | Rotates clockwise, big steps.              |
-+------------+--------------------------------------------+
-| f          | Rotates 90 degrees clockwise.              |
-+------------+--------------------------------------------+
-| del        | Delete the selected rect box               |
-+------------+--------------------------------------------+
-| Enter      | Select a rect box                          |
-+------------+--------------------------------------------+
-| Ctrl++     | Zoom in                                    |
-+------------+--------------------------------------------+
-| Ctrl--     | Zoom out                                   |
-+------------+--------------------------------------------+
-| ↑→↓←       | Keyboard arrows to move selected rect box  |
-+------------+--------------------------------------------+
-
-How to contribute
-~~~~~~~~~~~~~~~~~
-
-Send a pull request
-
-License
-~~~~~~~
-`Free software: MIT license <https://github.com/chinakook/labelImg2/blob/master/LICENSE>`_
-
-Citation: Chinakook. LabelImg2. Git code (2018-2026). https://github.com/chinakook/labelImg2
+This repository contains independent modifications to the upstream project;
+it is not presented as an official upstream release.

@@ -1,64 +1,92 @@
 import os
-import shutil
-import random
-import cv2
-import numpy as np
-def make_yolo_dirs(basedir, tag = 'train'):
-    os.makedirs(os.path.join(basedir, 'images', tag), exist_ok=True)
-    os.makedirs(os.path.join(basedir, 'labels', tag), exist_ok=True)
 
-def cvt_lbidata_rotdet(lbi_data_dir, all_shapes_map, yolo_class_map, yolo_data_dir, tag = 'train', format = 'box'):
-    make_yolo_dirs(yolo_data_dir, tag=tag)
 
-    f_train_list = open(os.path.join(os.path.join(yolo_data_dir, '{}_list.txt'.format(tag,))), 'w', encoding='utf8')
-    
+def _normalise(value, dimension):
+    return float(value) / float(dimension)
 
-    for i, (anno_img_fn, img_anno) in enumerate(all_shapes_map.items()):
-        anno_fn = anno_img_fn
-        anno_img_h = img_anno['height']
-        anno_img_w = img_anno['width']
-        anno_bboxes = img_anno['bboxes']
 
-        f_train_list.write('./images/{}/{}.png\n'.format(tag, i))
+def _format_number(value):
+    """Write compact, stable floating-point values accepted by Ultralytics."""
+    return "{:.8f}".format(value).rstrip("0").rstrip(".") or "0"
 
-        src_fn = os.path.join(lbi_data_dir, anno_fn)
-        dst_fn = os.path.join(yolo_data_dir, 'images', tag, '{}.png'.format(i))
-        # shutil.copy(os.path.join(lbi_data_dir, anno_fn), os.path.join(yolo_data_dir, 'images', tag, '{}.png'.format(i)))
-        decbuf = np.fromfile(src_fn, dtype=np.uint8)
-        img = cv2.imdecode(decbuf, cv2.IMREAD_COLOR)
 
-        cv2.imencode('.png', img)[1].tofile(dst_fn)
+def _safe_output_path(output_dir, relative_xml_path):
+    relative_txt_path = os.path.splitext(relative_xml_path)[0] + ".txt"
+    output_root = os.path.abspath(output_dir)
+    output_path = os.path.abspath(os.path.join(output_root, relative_txt_path))
+    if os.path.commonpath([output_root, output_path]) != output_root:
+        raise ValueError("Invalid annotation path: {}".format(relative_xml_path))
+    return output_path
 
-        f_anno = open(os.path.join(yolo_data_dir, 'labels', tag, '{}.txt'.format(i)), 'w')
 
-        dw = 1./anno_img_w
-        dh = 1./anno_img_h
+def cvt_xml_annotations_to_yolo(all_shapes_map, yolo_class_map,
+                                output_dir, format="box"):
+    """Convert parsed Pascal VOC annotations directly to YOLO text files.
 
-        if format == 'box':
-            for b in anno_bboxes:
-                xmin = b['x0']
-                xmax = b['x2']
-                ymin = b['y0']
-                ymax = b['y2']
-                bc = b['class']
+    ``all_shapes_map`` maps an XML path relative to the annotation root to its
+    image size and boxes. Only corresponding ``.txt`` files are written. Images,
+    split folders, list files and YAML files are deliberately not generated.
+    """
+    if format not in ("box", "rotbox"):
+        raise NotImplementedError("Unsupported YOLO format: {}".format(format))
 
-                yolo_x = (xmin + xmax) / 2.0
-                yolo_y = (ymin + ymax) / 2.0
-                yolo_w = xmax - xmin
-                yolo_h = ymax - ymin
-                yolo_x *= dw
-                yolo_w *= dw
-                yolo_y *= dh
-                yolo_h *= dh
+    os.makedirs(output_dir, exist_ok=True)
+    exported_files = []
 
-                f_anno.write("{} {} {} {} {}\n".format(yolo_class_map[bc], yolo_x, yolo_y, yolo_w, yolo_h))
-        elif format == 'rotbox':
-            for b in anno_bboxes:
-                bc = b['class']
-                f_anno.write("{} {} {} {} {} {} {} {} {}\n".format(yolo_class_map[bc],
-                                                                b['x0'] * dw, b['y0'] * dh, b['x1'] * dw, b['y1'] * dh, 
-                                                                b['x2'] * dw, b['y2'] * dh, b['x3'] * dw, b['y3'] * dh
-                                                                ))
-        else:
-            raise NotImplementedError()
-        f_anno.close()
+    for relative_xml_path, image_annotation in all_shapes_map.items():
+        image_width = float(image_annotation["width"])
+        image_height = float(image_annotation["height"])
+        if image_width <= 0 or image_height <= 0:
+            raise ValueError(
+                "Invalid image size in {}: {} x {}".format(
+                    relative_xml_path, image_width, image_height
+                )
+            )
+
+        output_path = _safe_output_path(output_dir, relative_xml_path)
+        output_parent = os.path.dirname(output_path)
+        if output_parent:
+            os.makedirs(output_parent, exist_ok=True)
+
+        lines = []
+        for box in image_annotation["bboxes"]:
+            class_name = box["class"]
+            if class_name not in yolo_class_map:
+                raise ValueError("Unknown class: {}".format(class_name))
+            class_id = yolo_class_map[class_name]
+
+            if format == "box":
+                xs = [box["x0"], box["x1"], box["x2"], box["x3"]]
+                ys = [box["y0"], box["y1"], box["y2"], box["y3"]]
+                xmin, xmax = min(xs), max(xs)
+                ymin, ymax = min(ys), max(ys)
+                values = [
+                    (xmin + xmax) / 2.0 / image_width,
+                    (ymin + ymax) / 2.0 / image_height,
+                    (xmax - xmin) / image_width,
+                    (ymax - ymin) / image_height,
+                ]
+            else:
+                values = [
+                    _normalise(box["x0"], image_width),
+                    _normalise(box["y0"], image_height),
+                    _normalise(box["x1"], image_width),
+                    _normalise(box["y1"], image_height),
+                    _normalise(box["x2"], image_width),
+                    _normalise(box["y2"], image_height),
+                    _normalise(box["x3"], image_width),
+                    _normalise(box["y3"], image_height),
+                ]
+
+            lines.append(
+                "{} {}".format(
+                    class_id, " ".join(_format_number(value) for value in values)
+                )
+            )
+
+        with open(output_path, "w", encoding="utf-8", newline="\n") as label_file:
+            if lines:
+                label_file.write("\n".join(lines) + "\n")
+        exported_files.append(output_path)
+
+    return exported_files

@@ -14,7 +14,40 @@ class HashableQStandardItem(QStandardItem):
         return hash(id(self))
 
 
+class CCommonOrderComboBox(QComboBox):
+    searchTimeoutMs = 1200
+
+    def __init__(self, parent=None):
+        super(CCommonOrderComboBox, self).__init__(parent)
+        self._lastSearchKey = None
+        self._lastSearchTime = 0
+        self._matchPosition = -1
+
+    def keyPressEvent(self, event):
+        text = event.text().casefold()
+        if len(text) == 1 and text.isalpha():
+            matches = [
+                index for index in range(self.count())
+                if self.itemText(index).casefold().startswith(text)
+            ]
+            if matches:
+                now = QDateTime.currentMSecsSinceEpoch()
+                repeated = (text == self._lastSearchKey and
+                            now - self._lastSearchTime <= self.searchTimeoutMs)
+                self._matchPosition = ((self._matchPosition + 1) % len(matches)
+                                       if repeated else 0)
+                self._lastSearchKey = text
+                self._lastSearchTime = now
+                self.setCurrentIndex(matches[self._matchPosition])
+                event.accept()
+                return
+        super(CCommonOrderComboBox, self).keyPressEvent(event)
+
+
 class CComboBoxDelegate(QStyledItemDelegate):
+    editingActiveChanged = pyqtSignal(bool)
+    labelChosen = pyqtSignal(str)
+
     def __init__(self, parent, listItem):
         super(CComboBoxDelegate, self).__init__(parent)
         self.listItem = listItem
@@ -23,12 +56,20 @@ class CComboBoxDelegate(QStyledItemDelegate):
         self.listItem = listItem
 
     def createEditor(self, parent, option, index):
-        editor = QComboBox(parent)
+        editor = CCommonOrderComboBox(parent)
         for i in self.listItem:
             editor.addItem(i)
         editor.currentIndexChanged.connect(self.editorIndexChanged)
         editor.setCurrentIndex(0)
+        self.editingActiveChanged.emit(True)
         return editor
+
+    def destroyEditor(self, editor, index):
+        chosen = editor.currentText()
+        if chosen:
+            self.labelChosen.emit(chosen)
+        self.editingActiveChanged.emit(False)
+        return super(CComboBoxDelegate, self).destroyEditor(editor, index)
 
     # commit data early, prevent to loss data when clicking OpenNextImg
     def editorIndexChanged(self, index):
@@ -40,6 +81,7 @@ class CComboBoxDelegate(QStyledItemDelegate):
         if sys.version_info < (3, 0, 0):
             text = text.toPyObject()
         combox = editor
+        combox.setProperty("initialLabel", text)
         tindex = combox.findText(text)
         combox.setCurrentIndex(tindex)
 
