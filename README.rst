@@ -67,6 +67,19 @@ Python 3.8 or newer is recommended.
    pip install -r requirements.txt
    python labelImg.py
 
+The Windows launcher supports both a project virtual environment and Conda:
+
+.. code:: console
+
+   labelImg.bat             Auto-select a usable environment
+   labelImg.bat --venv     Force the project .venv
+   labelImg.bat --conda    Force the Conda environment named labelimg2
+   labelImg.bat --check    Print the selected environment without launching
+
+Auto mode tries the project ``.venv``, the Conda environment named
+``labelimg2``, then another currently active Conda environment. It does
+not use the Windows ``py/pyw`` launcher registry.
+
 To load a predefined class file:
 
 .. code:: console

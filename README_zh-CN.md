@@ -58,6 +58,17 @@ pip install -r requirements.txt
 python labelImg.py
 ```
 
+`labelImg.bat` 同时支持项目 `.venv` 和 Conda：
+
+```bat
+labelImg.bat             自动选择可用环境
+labelImg.bat --venv     强制使用项目 .venv
+labelImg.bat --conda    强制使用名为 labelimg2 的 Conda 环境
+labelImg.bat --check    只检查并显示环境
+```
+
+自动模式依次尝试项目 `.venv`、名为 `labelimg2` 的 Conda、当前激活的其他 Conda 环境，并且不再依赖 Windows `py/pyw`。
+
 如果需要指定自己的类别文件：
 
 ```powershell

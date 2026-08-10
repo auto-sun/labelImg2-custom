@@ -36,7 +36,21 @@ python -m venv .venv
 .\.venv\Scripts\python.exe labelImg.py
 ```
 
-安装完成后，也可以直接双击 `labelImg.bat` 启动。批处理会优先使用项目 `.venv` 中的 Python。
+安装完成后可以直接双击 `labelImg.bat`。启动器不会使用 Windows `py/pyw` 注册信息，并按以下顺序自动选择：
+
+1. 项目目录中的 `.venv`；
+2. 名为 `labelimg2` 的 Conda 环境；
+3. 当前已经激活且依赖完整的其他 Conda 环境。
+
+也可以显式指定，两个环境互不影响：
+
+```bat
+labelImg.bat --venv
+labelImg.bat --conda
+labelImg.bat --check
+```
+
+`--venv` 只使用项目 `.venv`，`--conda` 只使用 Conda 的 `labelimg2` 环境，`--check` 只显示将使用的环境而不启动程序。
 
 指定自己的类别文件：
 

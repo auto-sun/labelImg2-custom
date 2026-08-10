@@ -84,8 +84,11 @@ This file summarises the main differences from the upstream
 
 ## Startup and documentation
 
-- `labelImg.bat` no longer contains a machine-specific Anaconda path. It
-  prefers the project `.venv`, then falls back to `pyw` or `pythonw`.
+- `labelImg.bat` supports active Conda, a project `.venv`, and the named
+  Conda environment `labelimg2` without using Windows `py/pyw` registry
+  entries.
+- `--venv` and `--conda` force one environment family without fallback;
+  `--check` reports the selected environment without launching the GUI.
 - `Paint Labels` uses `Ctrl+Shift+L`, avoiding the existing
   `Ctrl+Shift+P` Play shortcut.
 - GitHub uses the Chinese `README.md` as the main page while retaining

@@ -86,7 +86,30 @@ YOLO 和 YOLO OBB 的类别编号从 `0` 开始，严格按照这个文件的行
 
 程序窗口标题显示 `labelImg2`，说明启动成功。
 
-虚拟环境安装完成后，也可以直接双击项目根目录中的 `labelImg.bat`。它会优先使用 `.venv` 中的 Python。
+环境安装完成后可以直接双击项目根目录中的 `labelImg.bat`。启动器不会调用 Windows `py/pyw`，因此不受系统 Python 注册表影响。
+
+自动选择顺序：
+
+1. 项目目录中的 `.venv`；
+2. 名为 `labelimg2` 的 Conda 环境；
+3. 当前已经激活且依赖完整的其他 Conda 环境。
+
+需要明确指定环境时：
+
+```bat
+labelImg.bat --venv
+labelImg.bat --conda
+```
+
+只检查环境、不打开窗口：
+
+```bat
+labelImg.bat --check
+labelImg.bat --check --venv
+labelImg.bat --check --conda
+```
+
+显式指定模式时不会回退到另一种环境：`--venv` 缺失会直接提示创建 `.venv`，`--conda` 缺失会直接提示创建名为 `labelimg2` 的 Conda 环境。
 
 ## 六、第一次打开数据集
 

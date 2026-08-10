@@ -74,7 +74,8 @@
 
 - 未开启自动保存时，带有未保存修改的图片在切换前会弹出确认，不再静默丢失框。
 - 修正滚轮缩放时传入 Qt 控件的浮点数，避免新版 Python/PyQt5 下直接退出。
-- `labelImg.bat` 不再写死某台电脑的 Anaconda 路径，优先使用项目 `.venv`，并兼容 `pyw` 或 `pythonw`。
+- `labelImg.bat` 同时支持当前激活的 Conda、项目 `.venv` 和名为 `labelimg2` 的 Conda 环境，并彻底取消 Windows `py/pyw` 注册表依赖。
+- `--venv` 和 `--conda` 可以强制选择一种环境且不会回退；`--check` 只检查并显示选中的环境。
 - `Paint Labels` 改用 `Ctrl+Shift+L`，不再与 `Play` 的 `Ctrl+Shift+P` 冲突。
 - GitHub 使用中文 `README.md` 作为主页，同时保留英文 `README.rst` 入口。
 - 增加独立中文小白教程，覆盖下载、安装、类别文件、标注与格式转换。
