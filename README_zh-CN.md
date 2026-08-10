@@ -1,6 +1,8 @@
 # LabelImg2 Custom 中文说明
 
-[English](README.rst) | 简体中文
+[中文主页](README.md) | [English](README.rst) | 简体中文
+
+第一次安装和使用请直接阅读：[小白首次使用流程](FIRST_USE_GUIDE_zh-CN.md)。
 
 这是 [chinakook/labelImg2](https://github.com/chinakook/labelImg2) 的修改版，
 主要针对高频 YOLO OBB 标注工作进行了操作优化。

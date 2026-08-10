@@ -43,6 +43,8 @@ This file summarises the main differences from the upstream
 ## Navigation and persistence
 
 - A/D and left/right arrow keys navigate between images.
+- With auto-save disabled, navigating away from unsaved changes asks for
+  confirmation instead of silently discarding boxes.
 - Image filenames use natural numeric ordering.
 - The last image directory, current image, annotation directory, default label
   and label usage data are restored at startup.
@@ -51,6 +53,8 @@ This file summarises the main differences from the upstream
 - Nested annotation directories are created automatically before saving.
 - The selected XML, YOLO or YOLO OBB save format is restored at startup.
 - Invalid image and scale states are guarded to reduce crashes.
+- Wheel zoom values are converted to Qt-compatible integers to prevent an
+  application exit on current Python/PyQt5 versions.
 
 ## Annotation formats and directories
 
@@ -77,3 +81,14 @@ This file summarises the main differences from the upstream
 - Export does not create train/validation directories, list files or YAML.
 - YOLO OBB records use normalised four-corner coordinates.
 - Class IDs follow the current predefined-class order.
+
+## Startup and documentation
+
+- `labelImg.bat` no longer contains a machine-specific Anaconda path. It
+  prefers the project `.venv`, then falls back to `pyw` or `pythonw`.
+- `Paint Labels` uses `Ctrl+Shift+L`, avoiding the existing
+  `Ctrl+Shift+P` Play shortcut.
+- GitHub uses the Chinese `README.md` as the main page while retaining
+  `README.rst` as the English documentation entry.
+- A separate Chinese first-time-user guide covers download, installation,
+  class files, annotation and format conversion.

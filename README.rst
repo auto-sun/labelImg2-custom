@@ -1,7 +1,7 @@
 LabelImg2 Custom
 ================
 
-Documentation: English | `简体中文 <README_zh-CN.md>`_
+Documentation: English | `简体中文主页 <README.md>`_
 
 This repository is a modified fork of
 `chinakook/labelImg2 <https://github.com/chinakook/labelImg2>`_, a graphical

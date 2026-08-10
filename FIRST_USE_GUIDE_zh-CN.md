@@ -1,0 +1,204 @@
+# LabelImg2 Custom 小白首次使用流程
+
+本文按“第一次接触 Python 和 LabelImg2”的情况编写，从下载和安装开始，一直到保存 YOLO OBB 标签。
+
+## 使用前注意
+
+正式标注前请先了解下面几点：
+
+1. YOLO 和 YOLO OBB 的 `class_id` 由类别文件的行顺序决定，开始正式标注后不要随意调整类别顺序。
+2. 建议开启 `View > Auto Saving`。未开启时，如果当前图片有未保存修改，切换图片会先询问是否放弃修改。
+3. 当前推荐通过 `requirements.txt` 安装依赖后直接运行 `labelImg.py`，不要使用旧的 `setup.py` 安装。
+
+## 一、准备 Python
+
+建议安装 64 位 Python 3.10、3.11 或 3.12。安装 Python 时勾选 `Add Python to PATH`。
+
+安装完成后打开 PowerShell，检查：
+
+```powershell
+python --version
+```
+
+能看到 Python 版本号即可继续。
+
+## 二、下载项目
+
+### 方法一：下载 ZIP
+
+1. 打开项目主页：<https://github.com/auto-sun/labelImg2-custom>
+2. 点击 `Code > Download ZIP`。
+3. 解压到路径简单、自己有写入权限的位置，例如：
+
+```text
+D:\LabelImg2-custom
+```
+
+### 方法二：使用 Git
+
+```powershell
+git clone https://github.com/auto-sun/labelImg2-custom.git
+cd labelImg2-custom
+```
+
+## 三、建立独立环境并安装依赖
+
+在项目目录空白处按住 `Shift` 后点击鼠标右键，选择“在此处打开 PowerShell”，依次执行：
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+这里直接使用虚拟环境中的 Python，不要求执行激活脚本，可以避开部分电脑的 PowerShell 执行策略问题。
+
+## 四、准备类别文件
+
+默认类别文件是：
+
+```text
+data\predefined_classes.txt
+```
+
+一行写一个类别，例如：
+
+```text
+Anthracnose
+Brown_Stem_Spot
+Soft_Rot
+Stem_Canker
+```
+
+YOLO 和 YOLO OBB 的类别编号从 `0` 开始，严格按照这个文件的行顺序生成。正式标注开始后不要随意交换类别顺序。
+
+如果不想修改仓库默认文件，也可以指定自己的类别文件：
+
+```powershell
+.\.venv\Scripts\python.exe labelImg.py "" "D:\my_dataset\classes.txt"
+```
+
+## 五、启动程序
+
+```powershell
+.\.venv\Scripts\python.exe labelImg.py
+```
+
+程序窗口标题显示 `labelImg2`，说明启动成功。
+
+虚拟环境安装完成后，也可以直接双击项目根目录中的 `labelImg.bat`。它会优先使用 `.venv` 中的 Python。
+
+## 六、第一次打开数据集
+
+建议的数据结构：
+
+```text
+my_dataset\
+├─ images\
+│  ├─ train\
+│  ├─ val\
+│  └─ test\
+└─ labels\
+   ├─ train\
+   ├─ val\
+   └─ test\
+```
+
+操作顺序：
+
+1. 点击 `File > Open Dir`，选择图片根目录，例如 `my_dataset\images`。
+2. 点击 `File > Open Annotation Dir`，选择标签根目录，例如 `my_dataset\labels`。
+3. 点击 `File > Annotation Format`，选择需要直接保存的格式：
+   - `Pascal VOC XML`
+   - `Ultralytics YOLO`
+   - `Ultralytics YOLO OBB`
+4. 建议打开 `View > Auto Saving`；如果不开启，切换未保存图片时程序会弹出确认提示。
+
+图片和标签可以具有相同的多层子目录。程序会按相对路径递归对应，例如：
+
+```text
+images\train\day1\001.jpg
+labels\train\day1\001.txt
+```
+
+打开标签目录后，程序会自动判断 `.txt` 内容：
+
+- 每行 5 个值：YOLO 普通矩形框。
+- 每行 9 个值：YOLO OBB 四点框。
+- 空 `.txt`：背景图，文件列表显示 `[BG]`。
+- XML 与 TXT 同时存在时，优先读取当前选择格式对应的文件。
+
+## 七、推荐的 YOLO OBB 标注流程
+
+1. 按 `E` 进入旋转框绘制状态；再次按 `E` 可以退出。
+2. 在图片上拖出矩形框。
+3. 松开鼠标后程序退出连续绘制，新框自动进入选中和类别编辑状态。
+4. 输入类别首字母选择类别；同首字母类别按常用次数和最近使用顺序循环。
+5. 使用 `Z`、`X`、`C`、`V`、`F` 调整倾斜角度。
+6. 框处于选中状态时滚轮调整框大小。
+7. 按 `Ctrl+S` 保存。
+8. 按 `D` 或右方向键进入下一张；按 `A` 或左方向键返回上一张。
+9. 再按 `E` 画下一个框。
+
+## 八、复制、多选和平移
+
+- `Ctrl+C`：复制当前选中的一个或多个框。
+- `Ctrl+V`：粘贴框。
+- 同一张图片粘贴时会自动偏移，防止与原框完全重叠。
+- 切换到另一张图片再粘贴时，保留原位置、类别、大小和角度。
+- `Ctrl + 拖动框`：直接复制并移动单个框。
+- 从图片空白处按住左键拖动：框选多个框。
+- `Ctrl/Shift + 框选`：追加选择。
+- 拖动任意已选框：整体移动全部选中框。
+- `Delete`：删除全部选中框。
+- `Alt + 鼠标左键拖动`：平移画布。
+
+## 九、保存格式说明
+
+### Pascal VOC XML
+
+每张图片生成同名 `.xml`，能够保存普通框和旋转框信息。
+
+### Ultralytics YOLO
+
+每行格式：
+
+```text
+class_id center_x center_y width height
+```
+
+旋转框保存为普通 YOLO 时，会变成包住旋转框的最小轴对齐外接矩形，倾斜角度不会保留。
+
+### Ultralytics YOLO OBB
+
+每行格式：
+
+```text
+class_id x1 y1 x2 y2 x3 y3 x4 y4
+```
+
+坐标均为 `0～1` 的归一化坐标，能够保留四个顶点和倾斜方向。
+
+## 十、已有 XML 批量转换
+
+如果以前已经标成 XML，可以使用：
+
+```text
+File > Export to > Ultralytics YOLO
+File > Export to > Ultralytics YOLO OBB
+```
+
+转换功能只生成同名 `.txt` 标签，保留相对子目录结构，不复制图片，不生成 YAML，也不自动划分训练集、验证集和测试集。
+
+## 十一、重新打开后的恢复
+
+正常关闭 LabelImg2 后，下次启动会恢复：
+
+- 上次打开的图片目录；
+- 上次正在查看的图片；
+- 上次选择的标签目录；
+- XML、YOLO 或 YOLO OBB 保存格式；
+- `set as default` 设置的默认类别；
+- 类别使用次数和最近使用顺序。
+
+设置保存在项目目录旁的 `labelImg2Settings3.pkl`。移动项目目录、删除这个文件或没有项目目录写入权限时，恢复记录会丢失。

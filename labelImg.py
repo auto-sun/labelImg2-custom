@@ -416,7 +416,9 @@ class MainWindow(QMainWindow, WindowMixin):
         
         # Add option to enable/disable labels being painted at the top of bounding boxes
         self.paintLabelsOption = QAction("Paint Labels", self)
-        self.paintLabelsOption.setShortcut("Ctrl+Shift+P")
+        # Ctrl+Shift+P is already used by Play. Keep both actions usable by
+        # assigning Paint Labels its own shortcut.
+        self.paintLabelsOption.setShortcut("Ctrl+Shift+L")
         self.paintLabelsOption.setCheckable(True)
         self.paintLabelsOption.setChecked(settings.get(SETTING_PAINT_LABEL, False))
         self.paintLabelsOption.triggered.connect(self.togglePaintLabelsOption)
@@ -814,6 +816,24 @@ class MainWindow(QMainWindow, WindowMixin):
 
 
     def fileCurrentChanged(self, current, previous):
+        # File-list clicks and navigation shortcuts change the selection
+        # before this slot runs. When auto-save is disabled, give the user a
+        # chance to keep editing instead of silently discarding new boxes.
+        if self.dirty and not self.autoSaving.isChecked():
+            self.labelList.earlyCommit()
+            if not self.discardChangesDialog():
+                self.filesm.blockSignals(True)
+                try:
+                    self.filesm.setCurrentIndex(
+                        previous, QItemSelectionModel.SelectCurrent)
+                finally:
+                    self.filesm.blockSignals(False)
+                if previous.isValid():
+                    self.statFile.setText('{0}/{1}'.format(
+                        previous.row() + 1, previous.model().rowCount()))
+                    self.fileListView.scrollTo(previous)
+                return
+
         self.statFile.setText('{0}/{1}'.format(current.row()+1, current.model().rowCount()))
         if self.autoSaving.isChecked():
             if self.defaultSaveDir is not None:
@@ -1147,7 +1167,9 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions.fitWidth.setChecked(False)
         self.actions.fitWindow.setChecked(False)
         self.zoomMode = self.MANUAL_ZOOM
-        self.zoomWidget.setValue(value)
+        # QSpinBox accepts integers only. Wheel zoom calculates a float on
+        # Python 3, and passing it through can terminate the Qt application.
+        self.zoomWidget.setValue(int(round(value)))
 
     def addZoom(self, increment=10):
         self.setZoom(self.zoomWidget.value() + increment)
@@ -1201,8 +1223,8 @@ class MainWindow(QMainWindow, WindowMixin):
         new_h_bar_value = h_bar.value() + move_x * d_h_bar_max
         new_v_bar_value = v_bar.value() + move_y * d_v_bar_max
 
-        h_bar.setValue(new_h_bar_value)
-        v_bar.setValue(new_v_bar_value)
+        h_bar.setValue(int(round(new_h_bar_value)))
+        v_bar.setValue(int(round(new_v_bar_value)))
 
     def setFitWindow(self, value=True):
         if value:
@@ -1374,6 +1396,7 @@ class MainWindow(QMainWindow, WindowMixin):
     def closeEvent(self, event):
         if not self.mayContinue():
             event.ignore()
+            return
         settings = self.settings
         # Remember the current image so directory-based sessions can resume.
         settings[SETTING_FILENAME] = self.filePath if self.filePath else ''
@@ -1588,7 +1611,7 @@ class MainWindow(QMainWindow, WindowMixin):
       
         self.filesm.setCurrentIndex(prevIndex, QItemSelectionModel.SelectCurrent)
 
-        return True
+        return self.filesm.currentIndex() == prevIndex
 
     def openNextImg(self, _value=False):
         currIndex = self.filesm.currentIndex()
@@ -1598,7 +1621,7 @@ class MainWindow(QMainWindow, WindowMixin):
         nextIndex = self.fileModel.index(currIndex.row() + 1)      
         self.filesm.setCurrentIndex(nextIndex, QItemSelectionModel.SelectCurrent)
 
-        return True
+        return self.filesm.currentIndex() == nextIndex
 
     def openFile(self, _value=False):
         if not self.mayContinue():
