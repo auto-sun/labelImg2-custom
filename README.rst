@@ -28,6 +28,8 @@ Cycle duplicate initials slowly   Put frequently used matching labels first
 Redraw similar objects            Copy/paste boxes, including across images
 Edit boxes one at a time          Marquee-select and transform a whole group
 Remember separate wheel controls  Resize selected boxes; otherwise zoom image
+Convert formats after annotation  Save directly as XML, YOLO or YOLO OBB
+Manage two annotation commands  One ``Open Annotation Dir`` command
 Clean old export artefacts        Export only same-name YOLO/OBB label files
 ================================  ============================================
 
@@ -47,6 +49,8 @@ Main additions
 * Frequently used labels are prioritised when cycling by initial letter.
 * Persistent image directory, current image, annotation directory and default
   label.
+* Persistent XML, YOLO or YOLO OBB output-format selection.
+* Automatic XML / 5-column YOLO / 9-column YOLO OBB input detection.
 * Natural numeric image ordering (for example, ``2.jpg`` before ``10.jpg``).
 * Direct Pascal VOC XML to YOLO or YOLO OBB ``.txt`` conversion, without
   copying images, splitting datasets or generating YAML files.
@@ -95,6 +99,7 @@ Drag a selected box             Move the selected box or selected group
 ``C`` / ``V``                   Rotate clockwise (small/large step)
 ``F``                           Rotate 90 degrees clockwise
 ``Ctrl+S``                      Save annotations
+``Ctrl+R``                      Open the annotation directory
 ==============================  =============================================
 
 The old ``W`` shortcut for creating an axis-aligned box is intentionally
@@ -103,18 +108,30 @@ disabled to reduce accidental activation.
 Annotation formats
 ------------------
 
-LabelImg2 loads matching annotations from the selected annotation directory
-with the same relative subdirectory as each image. Pascal VOC ``.xml`` is
-preferred; when no matching XML exists, standard YOLO OBB ``.txt`` is loaded:
+Choose the output type from ``File > Annotation Format``:
 
-``class_id x1 y1 x2 y2 x3 y3 x4 y4``
+* Pascal VOC XML: ``.xml``
+* YOLO box: ``class_id cx cy width height`` in ``.txt``
+* YOLO OBB: ``class_id x1 y1 x2 y2 x3 y3 x4 y4`` in ``.txt``
 
-The OBB coordinates are normalized and class IDs follow the current
-predefined-class order. Editing a loaded TXT annotation saves the result as
-Pascal VOC XML, leaving the source TXT unchanged. If matching XML and TXT files
-both exist, the XML file is loaded.
+The choice is remembered across restarts. ``Ctrl+R`` or
+``File > Open Annotation Dir`` selects the single directory used both to load
+and save annotations. Labels match images recursively through the same
+relative subdirectory structure.
 
-Annotations are edited and saved as Pascal VOC XML. The export menu supports:
+TXT input is detected automatically: five values mean YOLO box and nine values
+mean YOLO OBB. If both XML and TXT exist, the selected output family is tried
+first (XML when XML is selected, otherwise TXT); the other file is used as a
+fallback when the preferred file is absent. The file list counts all three
+supported formats, and an empty label file is displayed as ``[BG]``.
+
+Coordinates in both YOLO formats are normalized and class IDs follow the
+current predefined-class order. Saving writes the currently selected format
+directly. Because standard YOLO cannot represent rotation, saving a rotated box
+as standard YOLO writes its enclosing axis-aligned rectangle. Existing files
+of the other extension are not deleted automatically.
+
+The export menu remains available for batch conversion from Pascal VOC XML:
 
 * YOLO box: ``class_id cx cy width height``
 * YOLO OBB: ``class_id x1 y1 x2 y2 x3 y3 x4 y4``

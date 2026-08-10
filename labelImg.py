@@ -26,7 +26,8 @@ from libs.zoomWidget import ZoomWidget
 from libs.labelDialog import LabelDialog
 from libs.labelFile import LabelFile, LabelFileError
 from libs.pascal_voc_io import PascalVocReader, XML_EXT
-from libs.yolo_obb_io import YoloObbReader, YoloObbError, YOLO_OBB_EXT
+from libs.yolo_obb_io import (YoloReader, YoloError, YOLO_EXT,
+                              save_yolo_annotations)
 
 from libs.labelView import CLabelView, HashableQStandardItem
 from libs.fileView import CFileView
@@ -80,6 +81,11 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # Save as Pascal voc xml
         self.defaultSaveDir = defaultSaveDir
+        saved_annotation_format = settings.get(
+            SETTING_ANNOTATION_FORMAT, FORMAT_PASCALVOC)
+        if saved_annotation_format not in SUPPORTED_ANNOTATION_FORMATS:
+            saved_annotation_format = FORMAT_PASCALVOC
+        self.annotationFormat = saved_annotation_format
 
         # For loading all image under a directory
         self.dirname = None
@@ -230,11 +236,33 @@ class MainWindow(QMainWindow, WindowMixin):
         opendir = action('&Open Dir', self.openDirDialog,
                          'Ctrl+u', 'dir.svg', u'Open Dir')
 
-        changeSavedir = action('&Change Save Dir', self.changeSavedirDialog,
-                               'Ctrl+r', 'dir.svg', u'Change default saved Annotation dir')
+        openAnnotationDir = action(
+            '&Open Annotation Dir', self.openAnnotationDirDialog,
+            'Ctrl+r', 'dir.svg',
+            u'Open the directory used to load and save annotations')
 
-        openAnnotation = action('&Open Annotation', self.openAnnotationDialog,
-                                'Ctrl+Shift+O', 'open.svg', u'Open Annotation')
+        formatXml = action(
+            'Pascal VOC XML',
+            partial(self.setAnnotationFormat, FORMAT_PASCALVOC),
+            checkable=True)
+        formatYolo = action(
+            'Ultralytics YOLO',
+            partial(self.setAnnotationFormat, FORMAT_YOLO),
+            checkable=True)
+        formatYoloObb = action(
+            'Ultralytics YOLO OBB',
+            partial(self.setAnnotationFormat, FORMAT_YOLO_OBB),
+            checkable=True)
+        self.annotationFormatGroup = QActionGroup(self)
+        self.annotationFormatGroup.setExclusive(True)
+        self.annotationFormatActions = {
+            FORMAT_PASCALVOC: formatXml,
+            FORMAT_YOLO: formatYolo,
+            FORMAT_YOLO_OBB: formatYoloObb,
+        }
+        for formatAction in self.annotationFormatActions.values():
+            self.annotationFormatGroup.addAction(formatAction)
+        self.annotationFormatActions[self.annotationFormat].setChecked(True)
 
 
 
@@ -349,6 +377,9 @@ class MainWindow(QMainWindow, WindowMixin):
                               zoom=zoom, zoomIn=zoomIn, zoomOut=zoomOut, zoomOrg=zoomOrg,
                                fitWindow=fitWindow, fitWidth=fitWidth, play=play,
                                openPrevImg=openPrevImg, openNextImg=openNextImg,
+                               openAnnotationDir=openAnnotationDir,
+                               formatXml=formatXml, formatYolo=formatYolo,
+                               formatYoloObb=formatYoloObb,
                                zoomActions=zoomActions,
                               fileMenuActions=(
                                   open, opendir, save, saveAs, close, resetAll, quit),
@@ -375,6 +406,7 @@ class MainWindow(QMainWindow, WindowMixin):
             help=self.menu('&Help'),
             recentFiles=QMenu('Open &Recent'),
             exportAnnotations=QMenu('Export to'),
+            annotationFormat=QMenu('Annotation Format'),
             labelList=labelMenu)
 
         # Auto saving : Enable auto saving if pressing next
@@ -394,8 +426,13 @@ class MainWindow(QMainWindow, WindowMixin):
         self.drawCorner.setChecked(settings.get(SETTING_DRAW_CORNER, False))
         self.drawCorner.triggered.connect(self.canvas.setDrawCornerState)
         
+        addActions(self.menus.annotationFormat,
+                   (formatXml, formatYolo, formatYoloObb))
+
         addActions(self.menus.file,
-                   (open, opendir, changeSavedir, openAnnotation, self.menus.recentFiles, self.menus.exportAnnotations, 
+                   (open, opendir, openAnnotationDir,
+                    self.menus.annotationFormat,
+                    self.menus.recentFiles, self.menus.exportAnnotations,
                     save, saveAs, close, resetAll, quit))
         
         export_as_yolo = action('Ultralytics YOLO', self.exportAsYOLO)
@@ -422,7 +459,7 @@ class MainWindow(QMainWindow, WindowMixin):
             action('&Move here', self.moveShape)))
 
         self.tools = self.toolbar('Tools')
-        self.actions.beginner = (open, opendir, changeSavedir, verify, save, None, create, createSo, createRo, copy, delete, None,
+        self.actions.beginner = (open, opendir, openAnnotationDir, verify, save, None, create, createSo, createRo, copy, delete, None,
             zoomIn, zoom, zoomOut, zoomOrg, fitWindow, fitWidth)
 
         self.statusBar().showMessage('%s started.' % __appname__)
@@ -790,7 +827,7 @@ class MainWindow(QMainWindow, WindowMixin):
                         self.fileModel.setData(previous, None, Qt.BackgroundRole)
                         self.removeFile()
             else:
-                self.changeSavedirDialog()
+                self.openAnnotationDirDialog()
                 return
         filename = self.fileModel.data(current, Qt.EditRole)
         if filename:
@@ -939,10 +976,6 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas.loadShapes(s)
 
     def saveLabels(self, annotationFilePath):
-        if self.labelFile is None:
-            self.labelFile = LabelFile()
-            self.labelFile.verified = self.canvas.verified
-
         def format_shape(s):
             return dict(label=s.label,
                         line_color=s.line_color.getRgb(),
@@ -956,15 +989,26 @@ class MainWindow(QMainWindow, WindowMixin):
                         extra_text = s.extra_label)
 
         shapes = [format_shape(shape) for shape in self.canvas.shapes]
-        # Can add differrent annotation formats here
         try:
-            if annotationFilePath[-4:] != ".xml":
-                annotationFilePath += XML_EXT
-            print ('Img: ' + self.filePath + ' -> Its xml: ' + annotationFilePath)
-            self.labelFile.savePascalVocFormat(annotationFilePath, shapes, self.filePath, self.imageData,
-                                                self.lineColor.getRgb(), self.fillColor.getRgb())
+            if self.annotationFormat == FORMAT_PASCALVOC:
+                if self.labelFile is None:
+                    self.labelFile = LabelFile()
+                    self.labelFile.verified = self.canvas.verified
+                self.labelFile.savePascalVocFormat(
+                    annotationFilePath, shapes, self.filePath, self.imageData,
+                    self.lineColor.getRgb(), self.fillColor.getRgb())
+            else:
+                save_yolo_annotations(
+                    annotationFilePath,
+                    shapes,
+                    self.image.width(),
+                    self.image.height(),
+                    self.labelHist,
+                    self.annotationFormat)
+            print('Img: %s -> Its annotation: %s' %
+                  (self.filePath, annotationFilePath))
             return True
-        except LabelFileError as e:
+        except (LabelFileError, YoloError, OSError, UnicodeError) as e:
             self.errorMessage(u'Error saving label data', u'<b>%s</b>' % e)
             return False
 
@@ -1247,26 +1291,27 @@ class MainWindow(QMainWindow, WindowMixin):
             self.toggleActions(True)
 
             # Load a matching annotation while preserving the image folder's
-            # relative subdirectory structure. XML remains the primary format;
-            # a YOLO OBB TXT file is used only when the XML does not exist.
+            # relative subdirectory structure. The selected output format is
+            # preferred when XML and TXT both exist; TXT contents are detected
+            # automatically as YOLO boxes (5 columns) or YOLO OBB (9 columns).
             vocReader = None
-            if self.defaultSaveDir is not None:
-                if self.dirname is not None and os.path.exists(self.dirname):
-                    relname = os.path.relpath(self.filePath, self.dirname)
-                    relname = os.path.splitext(relname)[0]
-                    annotationBasePath = os.path.join(self.defaultSaveDir, relname)
-                else:
-                    annotationBasePath = os.path.splitext(filePath)[0]
-            else:
-                annotationBasePath = os.path.splitext(filePath)[0]
+            annotationBasePath = self.annotationBasePathForImage(
+                self.filePath)
 
             xmlPath = annotationBasePath + XML_EXT
-            yoloObbPath = annotationBasePath + YOLO_OBB_EXT
+            yoloPath = annotationBasePath + YOLO_EXT
+            annotationCandidates = ((xmlPath, 'xml'), (yoloPath, 'txt'))
+            if self.annotationFormat != FORMAT_PASCALVOC:
+                annotationCandidates = tuple(reversed(annotationCandidates))
 
-            if os.path.isfile(xmlPath):
-                vocReader = self.loadPascalXMLByFilename(xmlPath)
-            elif os.path.isfile(yoloObbPath):
-                self.loadYOLOOBBByFilename(yoloObbPath)
+            for annotationPath, annotationKind in annotationCandidates:
+                if not os.path.isfile(annotationPath):
+                    continue
+                if annotationKind == 'xml':
+                    vocReader = self.loadPascalXMLByFilename(annotationPath)
+                else:
+                    self.loadYOLOByFilename(annotationPath)
+                break
 
             if vocReader is not None:
                 vocWidth, vocHeight, _ = vocReader.getSize()
@@ -1354,6 +1399,7 @@ class MainWindow(QMainWindow, WindowMixin):
         settings[SETTING_PAINT_LABEL] = self.paintLabelsOption.isChecked()
         settings[SETTING_DEFAULT_LABEL] = self.default_label
         settings[SETTING_LABEL_USAGE] = self.labelUsage
+        settings[SETTING_ANNOTATION_FORMAT] = self.annotationFormat
         settings.save()
     ## User Dialogs ##
 
@@ -1380,42 +1426,87 @@ class MainWindow(QMainWindow, WindowMixin):
         sorted_images = sorted(images, key=sort_key)
         return sorted_images
 
-    def changeSavedirDialog(self, _value=False):
-        if self.defaultSaveDir is not None:
-            path = self.defaultSaveDir
-        else:
-            path = '.'
+    def annotationFormatName(self, annotationFormat=None):
+        annotationFormat = annotationFormat or self.annotationFormat
+        return {
+            FORMAT_PASCALVOC: 'Pascal VOC XML',
+            FORMAT_YOLO: 'YOLO',
+            FORMAT_YOLO_OBB: 'YOLO OBB',
+        }.get(annotationFormat, annotationFormat)
 
-        dirpath = QFileDialog.getExistingDirectory(self,
-                                                       '%s - Save annotations to the directory' % __appname__, path,  QFileDialog.ShowDirsOnly
-                                                       | QFileDialog.DontResolveSymlinks)
-
-        if dirpath is not None and len(dirpath) > 1:
-            self.defaultSaveDir = dirpath
-            self.settings[SETTING_SAVE_DIR] = dirpath
-            self.settings.save()
-
-        imglist = self.scanAllImages(self.dirname)
-        self.fileModel.setStringList(imglist, self.dirname, self.defaultSaveDir)
-
-        self.statusBar().showMessage('%s . Annotation will be saved to %s' %
-                                     ('Change saved folder', self.defaultSaveDir))
-        self.statusBar().show()
-
-    def openAnnotationDialog(self, _value=False):
-        if self.filePath is None:
-            self.statusBar().showMessage('Please select image first')
-            self.statusBar().show()
+    def refreshAnnotationFileList(self, reloadCurrent=False):
+        if not self.dirname or not os.path.isdir(self.dirname):
+            if reloadCurrent and self.filePath:
+                currentFile = self.filePath
+                self.loadFile(currentFile)
             return
 
-        path = os.path.dirname(self.filePath) \
-            if self.filePath else '.'
-        filters = "Open Annotation XML file (%s)" % ' '.join(['*.xml'])
-        filename = QFileDialog.getOpenFileName(self,'%s - Choose a xml file' % __appname__, path, filters)
-        if filename:
-            if isinstance(filename, (tuple, list)):
-                filename = filename[0]
-        self.loadPascalXMLByFilename(filename)
+        currentFile = self.filePath
+        imglist = self.scanAllImages(self.dirname)
+        self.filesm.blockSignals(True)
+        try:
+            self.fileModel.setStringList(
+                imglist, self.dirname, self.defaultSaveDir,
+                self.annotationFormat)
+            if currentFile in imglist:
+                currentIndex = self.fileModel.index(imglist.index(currentFile))
+                self.filesm.setCurrentIndex(
+                    currentIndex, QItemSelectionModel.SelectCurrent)
+                self.fileListView.scrollTo(currentIndex)
+        finally:
+            self.filesm.blockSignals(False)
+
+        if reloadCurrent and currentFile and currentFile in imglist:
+            self.loadFile(currentFile)
+
+    def setAnnotationFormat(self, annotationFormat, checked=True):
+        if not checked or annotationFormat not in SUPPORTED_ANNOTATION_FORMATS:
+            return
+        changed = annotationFormat != self.annotationFormat
+        self.annotationFormat = annotationFormat
+        self.annotationFormatActions[annotationFormat].setChecked(True)
+        self.settings[SETTING_ANNOTATION_FORMAT] = annotationFormat
+        self.settings.save()
+
+        # Keep unsaved boxes on screen when switching output format. If the
+        # image is clean, reload it so the newly preferred XML/TXT file is
+        # reflected immediately.
+        self.refreshAnnotationFileList(
+            reloadCurrent=changed and not self.dirty)
+        self.status(
+            'Annotation format: %s' %
+            self.annotationFormatName(annotationFormat),
+            8000)
+
+    def openAnnotationDirDialog(self, _value=False, dirpath=None):
+        if not self.mayContinue():
+            return
+
+        path = (self.defaultSaveDir
+                if self.defaultSaveDir and os.path.isdir(self.defaultSaveDir)
+                else (self.dirname if self.dirname else '.'))
+        if dirpath is None:
+            dirpath = QFileDialog.getExistingDirectory(
+                self,
+                '%s - Open Annotation Dir' % __appname__,
+                path,
+                QFileDialog.ShowDirsOnly |
+                QFileDialog.DontResolveSymlinks)
+        if not dirpath:
+            return
+
+        self.defaultSaveDir = os.path.abspath(dirpath)
+        self.settings[SETTING_SAVE_DIR] = self.defaultSaveDir
+        self.settings.save()
+        self.refreshAnnotationFileList(reloadCurrent=bool(self.filePath))
+        self.status(
+            'Annotation directory: %s | Save format: %s' %
+            (self.defaultSaveDir, self.annotationFormatName()),
+            10000)
+
+    def changeSavedirDialog(self, _value=False):
+        """Compatibility alias for older shortcuts and internal calls."""
+        return self.openAnnotationDirDialog(_value)
 
     def openDirDialog(self, _value=False, dirpath=None):
         if not self.mayContinue():
@@ -1447,7 +1538,9 @@ class MainWindow(QMainWindow, WindowMixin):
             self.defaultSaveDir = dirpath
 
         imglist = self.scanAllImages(dirpath)
-        self.fileModel.setStringList(imglist, self.dirname, self.defaultSaveDir)
+        self.fileModel.setStringList(
+            imglist, self.dirname, self.defaultSaveDir,
+            self.annotationFormat)
         self.setWindowTitle(__appname__ + ' ' + self.dirname)
         resumeFilePath = os.path.abspath(resumeFilePath) if resumeFilePath else None
         if resumeFilePath in imglist:
@@ -1460,6 +1553,19 @@ class MainWindow(QMainWindow, WindowMixin):
     def verifyImg(self, _value=False):
         # Proceding next image without dialog if having any label
          if self.filePath is not None:
+            if self.annotationFormat != FORMAT_PASCALVOC:
+                # YOLO text formats have no Pascal VOC-style verified field.
+                # Treat Verify as an explicit save so the action remains safe.
+                self.canvas.verified = True
+                self.fileModel.setData(
+                    self.filesm.currentIndex(), len(self.canvas.shapes),
+                    Qt.BackgroundRole)
+                self.saveFile()
+                self.status(
+                    '%s saved (YOLO formats do not store a verified flag).' %
+                    self.annotationFormatName(),
+                    8000)
+                return
             try:
                 self.labelFile.toggleVerify()
             except AttributeError:
@@ -1520,71 +1626,102 @@ class MainWindow(QMainWindow, WindowMixin):
         imgFileName = os.path.basename(file_path)
         savedFileName = os.path.splitext(imgFileName)[0]
         savedPath = os.path.join(imgFileDir, savedFileName)
-        self._saveFile(savedPath if self.labelFile
-                    else self.saveFileDialog())
+        return self._saveFile(savedPath)
+
+    def annotationExtension(self):
+        return (XML_EXT if self.annotationFormat == FORMAT_PASCALVOC
+                else YOLO_EXT)
+
+    def annotationBasePathForImage(self, imageFilePath):
+        if not self.defaultSaveDir:
+            return os.path.splitext(imageFilePath)[0]
+
+        if self.dirname and os.path.isdir(self.dirname):
+            try:
+                relativePath = os.path.relpath(imageFilePath, self.dirname)
+            except ValueError:
+                relativePath = None
+            if relativePath is not None:
+                parentPrefix = os.pardir + os.sep
+                if (relativePath != os.pardir and
+                        not relativePath.startswith(parentPrefix) and
+                        not os.path.isabs(relativePath)):
+                    return os.path.join(
+                        self.defaultSaveDir,
+                        os.path.splitext(relativePath)[0])
+
+        return os.path.join(
+            self.defaultSaveDir,
+            os.path.splitext(os.path.basename(imageFilePath))[0])
+
+    def annotationPathWithExtension(self, annotationFilePath):
+        expectedExtension = self.annotationExtension()
+        root, currentExtension = os.path.splitext(annotationFilePath)
+        if currentExtension.lower() in (XML_EXT, YOLO_EXT):
+            return root + expectedExtension
+        return annotationFilePath + expectedExtension
+
     def saveFile(self, _value=False):
-        
+        if not self.filePath:
+            return False
         if self.defaultSaveDir is not None and len(self.defaultSaveDir):
-            if self.filePath:
-                if self.dirname is not None and os.path.exists(self.dirname):
-                    relname = os.path.relpath(self.filePath, self.dirname)
-                    relname = os.path.splitext(relname)[0]
-                    savedPath = os.path.join(self.defaultSaveDir, relname)
-                    self._saveFile(savedPath)
-                else:
-                    self.saveLocal(self.filePath)
-        else:
-            self.saveLocal(self.filePath)
+            return self._saveFile(
+                self.annotationBasePathForImage(self.filePath))
+        return self.saveLocal(self.filePath)
             
     def removeFile(self):
+        if not self.filePath:
+            return False
         if self.defaultSaveDir is not None and len(self.defaultSaveDir):
-            if self.filePath:
-                relname = os.path.relpath(self.filePath, self.dirname)
-                relname = os.path.splitext(relname)[0]
-                savedPath = os.path.join(self.defaultSaveDir, relname)
+            savedPath = self.annotationBasePathForImage(self.filePath)
         else:
             imgFileDir = os.path.dirname(self.filePath)
             imgFileName = os.path.basename(self.filePath)
             savedFileName = os.path.splitext(imgFileName)[0]
             savedPath = os.path.join(imgFileDir, savedFileName)
-            if self.labelFile is None:
-                savedPath = self.saveFileDialog()
-        if not savedPath.endswith(XML_EXT):
-            savedPath += XML_EXT
+        savedPath = self.annotationPathWithExtension(savedPath)
         if os.path.exists(savedPath):
             os.remove(savedPath)
+            return True
+        return False
 
     def saveFileAndRenderList(self, _value=False):
-        self.saveFile(_value=_value)
-        cur = self.filesm.currentIndex()
-        self.fileModel.setData(cur, len(self.canvas.shapes), Qt.BackgroundRole)
+        if self.saveFile(_value=_value):
+            cur = self.filesm.currentIndex()
+            self.fileModel.setData(
+                cur, len(self.canvas.shapes), Qt.BackgroundRole)
 
     def saveFileAs(self, _value=False):
         assert not self.image.isNull(), "cannot save empty image"
-        self._saveFile(self.saveFileDialog())
+        return self._saveFile(self.saveFileDialog())
 
     def saveFileDialog(self):
-        caption = '%s - Choose File' % __appname__
-        filters = 'File (*%s)' % LabelFile.suffix
+        extension = self.annotationExtension()
+        caption = '%s - Save %s Annotation' % (
+            __appname__, self.annotationFormatName())
+        filters = '%s File (*%s)' % (
+            self.annotationFormatName(), extension)
         openDialogPath = self.currentPath()
         dlg = QFileDialog(self, caption, openDialogPath, filters)
-        dlg.setDefaultSuffix(LabelFile.suffix[1:])
+        dlg.setDefaultSuffix(extension[1:])
         dlg.setAcceptMode(QFileDialog.AcceptSave)
         filenameWithoutExtension = os.path.splitext(self.filePath)[0]
-        dlg.selectFile(filenameWithoutExtension)
+        dlg.selectFile(filenameWithoutExtension + extension)
         dlg.setOption(QFileDialog.DontUseNativeDialog, False)
         if dlg.exec_():
-            fullFilePath = dlg.selectedFiles()[0]
-            return os.path.splitext(fullFilePath)[0] # Return file path without the extension.
+            return dlg.selectedFiles()[0]
         return ''
 
     def _saveFile(self, annotationFilePath):
         if not annotationFilePath:
             return False
 
+        annotationFilePath = self.annotationPathWithExtension(
+            annotationFilePath)
+
         # Images may be opened recursively from a subdirectory (for example
         # dataset/image.jpg) while annotations are stored under another root.
-        # Create the matching annotation subdirectory before writing the XML.
+        # Create the matching annotation subdirectory before writing labels.
         annotationDir = os.path.dirname(os.path.abspath(annotationFilePath))
         try:
             os.makedirs(annotationDir, exist_ok=True)
@@ -1599,7 +1736,9 @@ class MainWindow(QMainWindow, WindowMixin):
             return False
 
         self.setClean()
-        self.statusBar().showMessage('Saved to  %s' % annotationFilePath)
+        self.statusBar().showMessage(
+            'Saved %s to %s' %
+            (self.annotationFormatName(), annotationFilePath))
         self.statusBar().show()
         return True
 
@@ -1679,25 +1818,33 @@ class MainWindow(QMainWindow, WindowMixin):
         if os.path.isfile(xmlPath) is False:
             return None
 
-        tVocParseReader = PascalVocReader(xmlPath)
+        try:
+            tVocParseReader = PascalVocReader(xmlPath)
+        except Exception as error:
+            self.errorMessage(
+                u'Error opening Pascal VOC labels',
+                u'<p><b>%s</b></p><p>The XML file was not loaded.</p>' %
+                str(error))
+            self.status('Error reading %s' % xmlPath)
+            return None
         shapes = tVocParseReader.getShapes()
         self.loadLabels(shapes)
         self.canvas.verified = tVocParseReader.verified
         return tVocParseReader
 
-    def loadYOLOOBBByFilename(self, txtPath):
+    def loadYOLOByFilename(self, txtPath):
         if self.filePath is None or not os.path.isfile(txtPath):
             return None
 
         try:
-            reader = YoloObbReader(
+            reader = YoloReader(
                 txtPath,
                 self.image.width(),
                 self.image.height(),
                 self.labelHist)
-        except (OSError, UnicodeError, YoloObbError) as error:
+        except (OSError, UnicodeError, YoloError) as error:
             self.errorMessage(
-                u'Error opening YOLO OBB labels',
+                u'Error opening YOLO labels',
                 u'<p><b>%s</b></p><p>The TXT file was not loaded.</p>' %
                 str(error))
             self.status('Error reading %s' % txtPath)
@@ -1705,11 +1852,16 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.loadLabels(reader.getShapes())
         self.canvas.verified = False
+        detectedFormat = reader.annotation_format or 'empty YOLO TXT'
         self.status(
-            'Loaded YOLO OBB labels from %s; edits are saved as XML.' %
-            os.path.basename(txtPath),
+            'Loaded %s labels from %s.' %
+            (detectedFormat, os.path.basename(txtPath)),
             8000)
         return reader
+
+    def loadYOLOOBBByFilename(self, txtPath):
+        """Compatibility alias for code using the previous method name."""
+        return self.loadYOLOByFilename(txtPath)
 
     def togglePaintLabelsOption(self):
         paintLabelsOptionChecked = self.paintLabelsOption.isChecked()

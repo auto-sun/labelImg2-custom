@@ -6,9 +6,9 @@ import sys
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
+from .constants import FORMAT_PASCALVOC
 from .pascal_voc_io import PascalVocReader, XML_EXT
-from .yolo_obb_io import (YOLO_OBB_EXT, YoloObbError,
-                          count_yolo_obb_objects)
+from .yolo_obb_io import YOLO_EXT, count_yolo_objects
 
 class CFileListModel(QStringListModel):
     def __init__(self, parent = None):
@@ -16,7 +16,8 @@ class CFileListModel(QStringListModel):
         
         self.dispList = []
     
-    def parseOne(self, s, openedDir = None, defaultSaveDir = None):
+    def parseOne(self, s, openedDir=None, defaultSaveDir=None,
+                 annotationFormat=FORMAT_PASCALVOC):
         if openedDir is not None and defaultSaveDir is not None:
             relname = os.path.relpath(s, openedDir)
             relname = os.path.splitext(relname)[0]
@@ -24,26 +25,34 @@ class CFileListModel(QStringListModel):
         else:
             annotationBasePath = os.path.splitext(s)[0]
         xmlPath = annotationBasePath + XML_EXT
-        yoloObbPath = annotationBasePath + YOLO_OBB_EXT
-        if os.path.exists(xmlPath) and os.path.isfile(xmlPath):
-            tVocParser = PascalVocReader(xmlPath)
-            shapes = tVocParser.getShapes()
-            info = [os.path.split(s)[1], len(shapes), False]
-        elif os.path.exists(yoloObbPath) and os.path.isfile(yoloObbPath):
-            try:
-                count = count_yolo_obb_objects(yoloObbPath)
-            except (OSError, UnicodeError, YoloObbError):
-                count = None
-            info = [os.path.split(s)[1], count, False]
-        else:
-            info = [os.path.split(s)[1], None, False]
-        return info
+        yoloPath = annotationBasePath + YOLO_EXT
+        candidates = ((xmlPath, 'xml'), (yoloPath, 'txt'))
+        if annotationFormat != FORMAT_PASCALVOC:
+            candidates = tuple(reversed(candidates))
 
-    def setStringList(self, strings, openedDir = None, defaultSaveDir = None):
+        for annotationPath, kind in candidates:
+            if not os.path.isfile(annotationPath):
+                continue
+            try:
+                if kind == 'xml':
+                    count = len(PascalVocReader(annotationPath).getShapes())
+                else:
+                    count = count_yolo_objects(annotationPath)
+            # A malformed annotation must not crash the recursive file-list
+            # scan. Loading the image later shows the detailed parser error.
+            except Exception:
+                count = None
+            return [os.path.split(s)[1], count, False]
+
+        return [os.path.split(s)[1], None, False]
+
+    def setStringList(self, strings, openedDir=None, defaultSaveDir=None,
+                      annotationFormat=FORMAT_PASCALVOC):
         self.dispList = []
 
         for s in strings:
-            info = self.parseOne(s, openedDir, defaultSaveDir)
+            info = self.parseOne(
+                s, openedDir, defaultSaveDir, annotationFormat)
             self.dispList.append(info)
 
         return super(CFileListModel, self).setStringList(strings)

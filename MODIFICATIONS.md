@@ -49,17 +49,28 @@ This file summarises the main differences from the upstream
 - Changing the image directory no longer overwrites an explicitly selected
   annotation directory.
 - Nested annotation directories are created automatically before saving.
+- The selected XML, YOLO or YOLO OBB save format is restored at startup.
 - Invalid image and scale states are guarded to reduce crashes.
+
+## Annotation formats and directories
+
+- Pascal VOC XML, standard YOLO and YOLO OBB can be selected as the direct
+  per-image save format.
+- "Change Save Dir" and single-file "Open Annotation" are replaced by one
+  "Open Annotation Dir" action used for both loading and saving.
+- XML and TXT lookup preserves the image directory's relative subdirectory
+  structure.
+- Five-column YOLO and nine-column YOLO OBB TXT records are detected
+  automatically.
+- When XML and TXT both exist, the selected output family is preferred and the
+  other file is used as a fallback when the preferred file is absent.
+- The file list counts XML and both TXT formats; empty files display as
+  background images.
+- Standard YOLO saves the enclosing axis-aligned rectangle for rotated boxes.
+- Class IDs use the current predefined-class order.
 
 ## YOLO export
 
-- Standard YOLO OBB `.txt` annotations can be loaded directly when no
-  matching Pascal VOC XML exists.
-- TXT lookup preserves the image directory's relative subdirectory structure.
-- The file list counts valid TXT records, and class IDs use the current
-  predefined-class order.
-- Editing imported TXT labels saves Pascal VOC XML and does not overwrite the
-  source TXT.
 - Pascal VOC XML is converted directly to same-name YOLO or YOLO OBB `.txt`
   files.
 - Export does not copy or re-encode images.
