@@ -26,6 +26,7 @@ from libs.zoomWidget import ZoomWidget
 from libs.labelDialog import LabelDialog
 from libs.labelFile import LabelFile, LabelFileError
 from libs.pascal_voc_io import PascalVocReader, XML_EXT
+from libs.yolo_obb_io import YoloObbReader, YoloObbError, YOLO_OBB_EXT
 
 from libs.labelView import CLabelView, HashableQStandardItem
 from libs.fileView import CFileView
@@ -1245,21 +1246,27 @@ class MainWindow(QMainWindow, WindowMixin):
             self.addRecentFile(self.filePath)
             self.toggleActions(True)
 
-            # Label xml file and show bound box according to its filename
+            # Load a matching annotation while preserving the image folder's
+            # relative subdirectory structure. XML remains the primary format;
+            # a YOLO OBB TXT file is used only when the XML does not exist.
             vocReader = None
             if self.defaultSaveDir is not None:
                 if self.dirname is not None and os.path.exists(self.dirname):
                     relname = os.path.relpath(self.filePath, self.dirname)
                     relname = os.path.splitext(relname)[0]
-                    # TODO: defaultSaveDir changed to another dir need mkdir for subdir
-                    xmlPath = os.path.join(self.defaultSaveDir, relname + XML_EXT)
+                    annotationBasePath = os.path.join(self.defaultSaveDir, relname)
                 else:
-                    xmlPath = os.path.splitext(filePath)[0] + XML_EXT
+                    annotationBasePath = os.path.splitext(filePath)[0]
             else:
-                xmlPath = os.path.splitext(filePath)[0] + XML_EXT
+                annotationBasePath = os.path.splitext(filePath)[0]
+
+            xmlPath = annotationBasePath + XML_EXT
+            yoloObbPath = annotationBasePath + YOLO_OBB_EXT
 
             if os.path.isfile(xmlPath):
                 vocReader = self.loadPascalXMLByFilename(xmlPath)
+            elif os.path.isfile(yoloObbPath):
+                self.loadYOLOOBBByFilename(yoloObbPath)
 
             if vocReader is not None:
                 vocWidth, vocHeight, _ = vocReader.getSize()
@@ -1677,6 +1684,32 @@ class MainWindow(QMainWindow, WindowMixin):
         self.loadLabels(shapes)
         self.canvas.verified = tVocParseReader.verified
         return tVocParseReader
+
+    def loadYOLOOBBByFilename(self, txtPath):
+        if self.filePath is None or not os.path.isfile(txtPath):
+            return None
+
+        try:
+            reader = YoloObbReader(
+                txtPath,
+                self.image.width(),
+                self.image.height(),
+                self.labelHist)
+        except (OSError, UnicodeError, YoloObbError) as error:
+            self.errorMessage(
+                u'Error opening YOLO OBB labels',
+                u'<p><b>%s</b></p><p>The TXT file was not loaded.</p>' %
+                str(error))
+            self.status('Error reading %s' % txtPath)
+            return None
+
+        self.loadLabels(reader.getShapes())
+        self.canvas.verified = False
+        self.status(
+            'Loaded YOLO OBB labels from %s; edits are saved as XML.' %
+            os.path.basename(txtPath),
+            8000)
+        return reader
 
     def togglePaintLabelsOption(self):
         paintLabelsOptionChecked = self.paintLabelsOption.isChecked()

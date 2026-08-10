@@ -53,6 +53,13 @@ This file summarises the main differences from the upstream
 
 ## YOLO export
 
+- Standard YOLO OBB `.txt` annotations can be loaded directly when no
+  matching Pascal VOC XML exists.
+- TXT lookup preserves the image directory's relative subdirectory structure.
+- The file list counts valid TXT records, and class IDs use the current
+  predefined-class order.
+- Editing imported TXT labels saves Pascal VOC XML and does not overwrite the
+  source TXT.
 - Pascal VOC XML is converted directly to same-name YOLO or YOLO OBB `.txt`
   files.
 - Export does not copy or re-encode images.

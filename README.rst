@@ -103,6 +103,17 @@ disabled to reduce accidental activation.
 Annotation formats
 ------------------
 
+LabelImg2 loads matching annotations from the selected annotation directory
+with the same relative subdirectory as each image. Pascal VOC ``.xml`` is
+preferred; when no matching XML exists, standard YOLO OBB ``.txt`` is loaded:
+
+``class_id x1 y1 x2 y2 x3 y3 x4 y4``
+
+The OBB coordinates are normalized and class IDs follow the current
+predefined-class order. Editing a loaded TXT annotation saves the result as
+Pascal VOC XML, leaving the source TXT unchanged. If matching XML and TXT files
+both exist, the XML file is loaded.
+
 Annotations are edited and saved as Pascal VOC XML. The export menu supports:
 
 * YOLO box: ``class_id cx cy width height``

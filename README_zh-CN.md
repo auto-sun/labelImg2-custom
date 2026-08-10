@@ -152,6 +152,31 @@ data/predefined_classes.txt
 
 设置保存在程序目录旁的本地 `.pkl` 文件中，该文件已被 `.gitignore` 排除，不会上传到 GitHub。
 
+## 读取已有 YOLO OBB 标签
+
+程序可以直接显示标准 YOLO OBB `.txt` 标签：
+
+```text
+class_id x1 y1 x2 y2 x3 y3 x4 y4
+```
+
+读取规则：
+
+- 图片目录和标签目录按相同的相对子目录结构递归匹配；
+- 坐标按 YOLO OBB 标准视为 `0～1` 的归一化四顶点坐标；
+- `class_id` 按当前类别预设文件中的类别顺序映射；
+- 同名 `.xml` 和 `.txt` 同时存在时优先读取 XML；
+- 没有同名 XML 时自动读取 YOLO OBB TXT；
+- 右侧图片列表会显示 TXT 中的框数量，空 TXT 显示为 `[BG]`；
+- 编辑从 TXT 读取的框后仍保存为 Pascal VOC XML，不覆盖原 TXT。
+
+例如图片为 `images/site_a/day/001.jpg`，图片根目录选择 `images`，标签目录选择 `labels`，程序会依次查找：
+
+```text
+labels/site_a/day/001.xml
+labels/site_a/day/001.txt
+```
+
 ## YOLO 和 YOLO OBB 导出
 
 标注过程中仍保存 Pascal VOC XML。完成后可从导出菜单转换。

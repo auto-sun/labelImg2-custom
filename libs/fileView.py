@@ -7,6 +7,8 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from .pascal_voc_io import PascalVocReader, XML_EXT
+from .yolo_obb_io import (YOLO_OBB_EXT, YoloObbError,
+                          count_yolo_obb_objects)
 
 class CFileListModel(QStringListModel):
     def __init__(self, parent = None):
@@ -18,13 +20,21 @@ class CFileListModel(QStringListModel):
         if openedDir is not None and defaultSaveDir is not None:
             relname = os.path.relpath(s, openedDir)
             relname = os.path.splitext(relname)[0]
-            xmlPath = os.path.join(defaultSaveDir, relname + XML_EXT)
+            annotationBasePath = os.path.join(defaultSaveDir, relname)
         else:
-            xmlPath = os.path.splitext(s)[0] + XML_EXT
+            annotationBasePath = os.path.splitext(s)[0]
+        xmlPath = annotationBasePath + XML_EXT
+        yoloObbPath = annotationBasePath + YOLO_OBB_EXT
         if os.path.exists(xmlPath) and os.path.isfile(xmlPath):
             tVocParser = PascalVocReader(xmlPath)
             shapes = tVocParser.getShapes()
             info = [os.path.split(s)[1], len(shapes), False]
+        elif os.path.exists(yoloObbPath) and os.path.isfile(yoloObbPath):
+            try:
+                count = count_yolo_obb_objects(yoloObbPath)
+            except (OSError, UnicodeError, YoloObbError):
+                count = None
+            info = [os.path.split(s)[1], count, False]
         else:
             info = [os.path.split(s)[1], None, False]
         return info

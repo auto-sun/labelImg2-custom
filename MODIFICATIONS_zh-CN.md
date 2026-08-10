@@ -50,6 +50,10 @@
 
 ## YOLO/YOLO OBB 导出
 
+- 没有同名 XML 时可直接读取标准 YOLO OBB `.txt` 标签。
+- TXT 按图片目录的相对子目录结构递归匹配。
+- 右侧文件列表统计有效 TXT 标签行数，类别 ID 按当前类别预设顺序映射。
+- 编辑导入的 TXT 标签后保存为 Pascal VOC XML，不覆盖源 TXT。
 - XML 直接转换为同名 YOLO 或 YOLO OBB `.txt`。
 - 普通 YOLO 使用中心点和宽高格式。
 - YOLO OBB 使用归一化四顶点格式。
