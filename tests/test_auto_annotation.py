@@ -11,7 +11,8 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from PyQt5.QtWidgets import QApplication
 
 import labelImg
-from libs.auto_annotation import AutoAnnotationThread, shapes_for_job
+from libs.auto_annotation import (AutoAnnotationThread, class_similarity,
+                                  match_model_classes, shapes_for_job)
 
 
 class FakeBoxes(object):
@@ -85,6 +86,34 @@ class AutoAnnotationPolicyTests(unittest.TestCase):
     def test_unknown_policy_is_rejected(self):
         with self.assertRaises(ValueError):
             shapes_for_job({'existing_policy': 'unknown'}, self.generated)
+
+    def test_exact_model_class_beats_an_earlier_shared_token(self):
+        mapping, details = match_model_classes(
+            {0: 'pipe_row'}, ['Drill_pipe', 'pipe_row'])
+        self.assertEqual('pipe_row', mapping[0])
+        self.assertEqual('pipe_row', details[0]['project_name'])
+        self.assertEqual(1.0, details[0]['score'])
+
+    def test_shared_token_is_not_scored_as_a_full_name_match(self):
+        self.assertLess(
+            class_similarity('pipe_row', 'Drill_pipe'),
+            class_similarity('pipe_row', 'pipe_row'))
+
+    def test_normalized_full_name_match_beats_fuzzy_candidates(self):
+        mapping, _details = match_model_classes(
+            {0: 'PIPE-ROW'}, ['Drill_pipe', 'pipe_row'])
+        self.assertEqual('pipe_row', mapping[0])
+
+    def test_every_exact_preset_name_maps_back_to_itself(self):
+        classes_path = os.path.join(
+            os.path.dirname(labelImg.__file__),
+            'data', 'predefined_classes.txt')
+        with open(classes_path, 'r', encoding='utf-8') as stream:
+            project_classes = [line.strip() for line in stream if line.strip()]
+        model_names = dict(enumerate(project_classes))
+        mapping, _details = match_model_classes(
+            model_names, project_classes)
+        self.assertEqual(model_names, mapping)
 
     def test_thread_appends_and_returns_single_image_result(self):
         fake_module = types.ModuleType('ultralytics')

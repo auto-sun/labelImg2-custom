@@ -18,7 +18,10 @@ detailed list of changes.
 Downloads
 ---------
 
-* **v2.1.0 (recommended, current-image automatic annotation):**
+* **v2.2.0 (recommended, undo and exact class matching):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.tar.gz>`__
+* **v2.1.0 (current-image automatic annotation):**
   `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip>`__ |
   `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz>`__
 * **v2.0.2 (standalone repository and all earlier custom features):**
@@ -139,6 +142,7 @@ Left drag on empty image area   Marquee-select boxes
 Drag a selected box             Move the selected box or selected group
 ``Ctrl + drag a box``           Copy and move that box
 ``Ctrl+C`` / ``Ctrl+V``         Copy/paste selected boxes
+``Ctrl+Z``                      Undo the last box operation (up to 50 steps)
 ``Ctrl+D``                      Duplicate selected boxes
 ``Delete``                      Delete selected boxes
 ``A`` / left arrow              Previous image
@@ -167,6 +171,9 @@ finishes. Model class names are fuzzily mapped to the most similar current
 project class. The completion dialog lists every mapping for review. Images
 that already have XML or TXT annotations are skipped and never overwritten.
 The default confidence threshold is ``0.25``.
+
+An exact full class-name match always takes priority over fuzzy shared-token
+matches, so ``pipe_row`` cannot be redirected to ``Drill_pipe``.
 
 The ``标注当前图`` toolbar action runs the model only on the currently open
 image. If that image already has labels, a dialog offers three explicit

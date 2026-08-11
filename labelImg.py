@@ -38,7 +38,7 @@ from libs.fileView import CFileView
 from libs.cvtlabels2yolo import cvt_xml_annotations_to_yolo
 
 __appname__ = 'labelImg2'
-__version__ = '2.1.0'
+__version__ = '2.2.0'
 
 # Utility functions and classes.
 
@@ -74,6 +74,7 @@ class WindowMixin(object):
 
 class MainWindow(QMainWindow, WindowMixin):
     FIT_WINDOW, FIT_WIDTH, MANUAL_ZOOM = list(range(3))
+    UNDO_LIMIT = 50
 
     def __init__(self, defaultFilename=None, defaultPrefdefClassFile=None, defaultSaveDir=None):
         super(MainWindow, self).__init__()
@@ -122,6 +123,9 @@ class MainWindow(QMainWindow, WindowMixin):
         self._shapeClipboard = []
         self._clipboardPasteCount = 0
         self._shapeClipboardSourceFile = None
+        self._undoStack = []
+        self._undoPendingSnapshot = None
+        self._undoRestoring = False
         self.autoAnnotationThread = None
         self.autoAnnotationModelPath = settings.get(
             SETTING_AUTO_ANNOTATION_MODEL, '')
@@ -216,8 +220,10 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas.panRequest.connect(self.panRequest)
 
         self.canvas.newShape.connect(self.newShape)
-        self.canvas.shapeMoved.connect(self.setDirty)
+        self.canvas.shapeMoved.connect(self.setCanvasDirty)
         self.canvas.shapeCopied.connect(self.copyShapeByDragging)
+        self.canvas.shapeChangeStarted.connect(self.beginUndoOperation)
+        self.canvas.shapeChangeFinished.connect(self.finishUndoOperation)
         self.canvas.selectionChanged.connect(self.shapeSelectionChanged)
         self.canvas.drawingPolygon.connect(self.toggleDrawingSensitive)
         self.canvas.cancelDraw.connect(self.createCancel)
@@ -331,6 +337,9 @@ class MainWindow(QMainWindow, WindowMixin):
         pasteFromClipboard = action('Paste Box', self.pasteShapeFromClipboard,
                                     'Ctrl+V', 'copy.svg',
                                     u'Paste copied Box', enabled=False)
+        undo = action('Undo Last Operation', self.undoLastOperation,
+                      'Ctrl+Z', None,
+                      u'Undo the last box operation', enabled=False)
 
         showInfo = action('&About', self.showInfoDialog, None, 'info.svg', u'About')
 
@@ -397,6 +406,7 @@ class MainWindow(QMainWindow, WindowMixin):
                               labelAsBack=labelAsBack, deleteLabel=deleteLabel, edit=edit, copy=copy,
                               copyToClipboard=copyToClipboard,
                               pasteFromClipboard=pasteFromClipboard,
+                              undo=undo,
                               zoom=zoom, zoomIn=zoomIn, zoomOut=zoomOut, zoomOrg=zoomOrg,
                                fitWindow=fitWindow, fitWidth=fitWidth, play=play,
                                openPrevImg=openPrevImg, openNextImg=openNextImg,
@@ -410,10 +420,12 @@ class MainWindow(QMainWindow, WindowMixin):
                               fileMenuActions=(
                                   open, opendir, save, saveAs, close, resetAll, quit),
                               beginner=(),
-                              editMenu=(edit, copyToClipboard, pasteFromClipboard,
+                              editMenu=(undo, None, edit,
+                                        copyToClipboard, pasteFromClipboard,
                                         copy, delete,
                                         None),
-                              beginnerContext=(copyToClipboard, pasteFromClipboard, None,
+                              beginnerContext=(undo, None,
+                                               copyToClipboard, pasteFromClipboard, None,
                                                create, createSo, createRo, copy,
                                                delete, labelAsBack, deleteLabel),
                               onLoadActive=(
@@ -597,7 +609,141 @@ class MainWindow(QMainWindow, WindowMixin):
         actions = (self.actions.create, self.actions.createSo, self.actions.createRo) 
         addActions(self.menus.edit, actions + self.actions.editMenu)
 
+    def copyShapeForUndo(self, shape):
+        """Create an independent shape copy for an undo snapshot."""
+        copied = shape.copy()
+        copied.points = [QPointF(point) for point in shape.points]
+        copied.center = (QPointF(shape.center)
+                         if shape.center is not None else None)
+        copied.line_color = QColor(shape.line_color)
+        copied.fill_color = QColor(shape.fill_color)
+        copied.paintLabel = shape.paintLabel
+        copied.alwaysShowCorner = shape.alwaysShowCorner
+        copied.highlightCorner = False
+        copied.highlightClear()
+        return copied
+
+    def captureUndoSnapshot(self):
+        selected = []
+        selectedShapes = list(self.canvas.selectedShapes)
+        if (self.canvas.selectedShape is not None and
+                self.canvas.selectedShape not in selectedShapes):
+            selectedShapes.append(self.canvas.selectedShape)
+        for shape in selectedShapes:
+            if shape in self.canvas.shapes:
+                selected.append(self.canvas.shapes.index(shape))
+        return {
+            'shapes': [self.copyShapeForUndo(shape)
+                       for shape in self.canvas.shapes],
+            'selected': selected,
+            'back_sample': bool(self.back_sample),
+        }
+
+    def undoSnapshotSignature(self, snapshot):
+        def colorValue(color):
+            return int(QColor(color).rgba())
+
+        shapes = []
+        for shape in snapshot['shapes']:
+            shapes.append((
+                shape.label,
+                tuple((point.x(), point.y()) for point in shape.points),
+                bool(shape.isRotated),
+                float(shape.direction),
+                bool(shape.difficult),
+                shape.extra_label,
+                colorValue(shape.line_color),
+                colorValue(shape.fill_color),
+            ))
+        return tuple(shapes), bool(snapshot['back_sample'])
+
+    def updateUndoAction(self):
+        if hasattr(self, 'actions') and hasattr(self.actions, 'undo'):
+            self.actions.undo.setEnabled(
+                bool(self.filePath and self._undoStack))
+
+    def resetUndoHistory(self):
+        self._undoStack = []
+        self._undoPendingSnapshot = None
+        self.updateUndoAction()
+
+    def beginUndoOperation(self):
+        if self._undoRestoring or not self.filePath:
+            return
+        if self._undoPendingSnapshot is None:
+            self._undoPendingSnapshot = self.captureUndoSnapshot()
+
+    def cancelUndoOperation(self):
+        self._undoPendingSnapshot = None
+
+    def finishUndoOperation(self):
+        if self._undoRestoring or self._undoPendingSnapshot is None:
+            return
+        previous = self._undoPendingSnapshot
+        self._undoPendingSnapshot = None
+        current = self.captureUndoSnapshot()
+        if (self.undoSnapshotSignature(previous) ==
+                self.undoSnapshotSignature(current)):
+            return
+        self._undoStack.append(previous)
+        if len(self._undoStack) > self.UNDO_LIMIT:
+            del self._undoStack[:-self.UNDO_LIMIT]
+        self.updateUndoAction()
+
+    def undoLastOperation(self, _value=False):
+        self.finishUndoOperation()
+        if not self.filePath or not self._undoStack:
+            return False
+
+        snapshot = self._undoStack.pop()
+        self._undoRestoring = True
+        try:
+            if self.canvas.drawing() or self.canvas.continueDrawing():
+                self.canvas.current = None
+                self.canvas.line.points = []
+                self.createCancel()
+
+            self.labelModel.clear()
+            self.labelModel.setHorizontalHeaderLabels(
+                ["Label", "Extra Info"])
+            self.ShapeItemDict.clear()
+            self.ItemShapeDict.clear()
+            self.canvas.visible.clear()
+            self.canvas.selectedShape = None
+            self.canvas.selectedShapes = []
+
+            shapes = [self.copyShapeForUndo(shape)
+                      for shape in snapshot['shapes']]
+            for shape in shapes:
+                shape.selected = False
+                self.addLabel(shape)
+            self.canvas.loadShapes(shapes)
+
+            selected = [shapes[index] for index in snapshot['selected']
+                        if 0 <= index < len(shapes)]
+            self.canvas._setSelectedShapes(selected)
+            self.back_sample = bool(snapshot['back_sample'])
+
+            for actionItem in self.actions.onShapesPresent:
+                actionItem.setEnabled(bool(shapes))
+            self.dirty = True
+            self.actions.save.setEnabled(True)
+            self.canvas.update()
+        finally:
+            self._undoRestoring = False
+            self._undoPendingSnapshot = None
+            self.updateUndoAction()
+
+        self.status(u'已撤销上一步操作。', 5000)
+        return True
+
     def setDirty(self):
+        self.finishUndoOperation()
+        self.dirty = True
+        self.actions.save.setEnabled(True)
+
+    def setCanvasDirty(self):
+        """Mark an in-progress canvas gesture dirty; commit on release."""
         self.dirty = True
         self.actions.save.setEnabled(True)
 
@@ -643,6 +789,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.statusBar().showMessage(message, delay)
 
     def resetState(self):
+        self.resetUndoHistory()
         self.labelModel.clear()
         self.labelModel.setHorizontalHeaderLabels(["Label", "Extra Info"])
         self.ShapeItemDict.clear()
@@ -658,6 +805,7 @@ class MainWindow(QMainWindow, WindowMixin):
     def labelDataChanged(self, topLeft, bottomRight):
         item0 = self.labelModel.item(topLeft.row(), 0)
         shape = self.ItemShapeDict[item0]
+        self.beginUndoOperation()
         if topLeft.column() == 0:
             shape.label = self.labelModel.data(topLeft)
             if sys.version_info < (3, 0, 0):
@@ -924,6 +1072,7 @@ class MainWindow(QMainWindow, WindowMixin):
         # Checked and Update
         try:
             if difficult != shape.difficult:
+                self.beginUndoOperation()
                 shape.difficult = difficult
                 self.setDirty()
             else:  # User probably changed item visibility
@@ -1078,12 +1227,15 @@ class MainWindow(QMainWindow, WindowMixin):
             return False
 
     def copySelectedShape(self):
+        self.beginUndoOperation()
         newShapes = self.canvas.copySelectedShape()
         for shape in newShapes:
             self.addLabel(shape)
         if newShapes:
             self.shapeSelectionChanged(True)
             self.setDirty()
+        else:
+            self.cancelUndoOperation()
 
     def copyShapeToClipboard(self):
         shapes = (list(self.canvas.selectedShapes)
@@ -1120,11 +1272,13 @@ class MainWindow(QMainWindow, WindowMixin):
             distance = 10 * self._clipboardPasteCount
             offset = QPointF(distance, distance)
 
+        self.beginUndoOperation()
         newShapes = self.canvas.pasteShapes(
             self._shapeClipboard, target=target, offset=offset,
             constrainToCanvas=sameSourceImage,
             avoidExactOverlap=sameSourceImage)
         if not newShapes:
+            self.cancelUndoOperation()
             return
         for shape in newShapes:
             shape.alwaysShowCorner = self.drawCorner.isChecked()
@@ -1141,7 +1295,7 @@ class MainWindow(QMainWindow, WindowMixin):
     def copyShapeByDragging(self, shape):
         self.addLabel(shape)
         self.shapeSelectionChanged(True)
-        self.setDirty()
+        self.setCanvasDirty()
 
 
     def labelCurrentChanged(self, current, previous):
@@ -2236,6 +2390,7 @@ class MainWindow(QMainWindow, WindowMixin):
         return os.path.dirname(self.filePath) if self.filePath else '.'
 
     def deleteSelectedShape(self):
+        self.beginUndoOperation()
         deleted = self.canvas.deleteSelected()
         if deleted:
             for shape in deleted:
@@ -2245,23 +2400,29 @@ class MainWindow(QMainWindow, WindowMixin):
                 for action in self.actions.onShapesPresent:
                     action.setEnabled(False)
                 self.resetBackSample()
+        else:
+            self.cancelUndoOperation()
 
     def labelAsBackground(self):
+        self.beginUndoOperation()
         self.remAllLabels()
-        self.setDirty()
         self.setBackSample()
+        self.setDirty()
 
     def deleteLabel(self):
+        self.beginUndoOperation()
         self.remAllLabels()
-        self.setDirty()
         self.resetBackSample()
+        self.setDirty()
 
     def copyShape(self):
+        self.beginUndoOperation()
         self.canvas.endMove(copy=True)
         self.addLabel(self.canvas.selectedShape)
         self.setDirty()
 
     def moveShape(self):
+        self.beginUndoOperation()
         self.canvas.endMove(copy=False)
         self.setDirty()
 

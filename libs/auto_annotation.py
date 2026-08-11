@@ -33,6 +33,24 @@ def _name_parts(value):
     return ''.join(tokens), ''.join(singular_tokens), singular_tokens
 
 
+def class_match_priority(model_name, project_name):
+    """Rank exact forms ahead of every fuzzy similarity score."""
+    model_text = unicodedata.normalize('NFKC', str(model_name)).strip()
+    project_text = unicodedata.normalize('NFKC', str(project_name)).strip()
+    if model_text == project_text:
+        return 4
+    if model_text.casefold() == project_text.casefold():
+        return 3
+
+    model_compact, model_singular, _ = _name_parts(model_name)
+    project_compact, project_singular, _ = _name_parts(project_name)
+    if model_compact and model_compact == project_compact:
+        return 2
+    if model_singular and model_singular == project_singular:
+        return 1
+    return 0
+
+
 def _is_subsequence(short_text, long_text):
     if not short_text:
         return False
@@ -81,8 +99,12 @@ def class_similarity(model_name, project_name):
 
     for model_token in model_tokens:
         for project_token in project_tokens:
-            scores.append(difflib.SequenceMatcher(
-                None, model_token, project_token).ratio())
+            # A shared token (for example ``pipe`` in ``pipe_row`` and
+            # ``Drill_pipe``) is useful evidence, but must never tie an exact
+            # full class-name match at 1.0.
+            token_score = difflib.SequenceMatcher(
+                None, model_token, project_token).ratio()
+            scores.append(min(0.94, token_score))
             if (len(model_token) >= 3 and
                     (model_token in project_token or
                      project_token in model_token)):
@@ -118,6 +140,8 @@ def match_model_classes(model_names, project_classes):
         best_index = max(
             range(len(project_classes)),
             key=lambda index: (
+                class_match_priority(
+                    model_name, project_classes[index]),
                 class_similarity(model_name, project_classes[index]),
                 -index))
         project_name = project_classes[best_index]

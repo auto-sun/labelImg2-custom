@@ -13,6 +13,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
 - The model task is detected automatically and selects five-column YOLO or
   nine-column YOLO OBB output.
 - Model class names are fuzzily mapped to the current project class preset.
+- Exact full class names always outrank shared-token fuzzy matches.
 - Inference runs in a background thread with status-bar progress and a cancel
   button.
 - Existing XML/TXT annotations are skipped and never overwritten.
@@ -51,6 +52,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
 ## Clipboard
 
 - `Ctrl+C` and `Ctrl+V` copy and paste boxes, including across images.
+- `Ctrl+Z` undoes box edits such as move, paste, delete, resize, rotate,
+  and class changes. Each image keeps up to 50 undo steps.
 - Same-image pastes are offset to avoid exact overlap.
 - Cross-image pastes retain the original coordinates.
 - Right-click copy and paste are supported.

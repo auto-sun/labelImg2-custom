@@ -18,7 +18,8 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 | 版本 | 适用情况 | 下载 |
 | --- | --- | --- |
-| **v2.1.0（推荐）** | 当前图片自动标注，可选择覆盖或追加 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz) |
+| **v2.2.0（推荐）** | Ctrl+Z 撤销；修复自动标注类别精确匹配 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.tar.gz) |
+| v2.1.0 | 当前图片自动标注，可选择覆盖或追加 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz) |
 | v2.0.2 | 独立仓库发行版，自动标注和全部功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.tar.gz) |
 | v2.0.1 | 整体许可证调整为 AGPL-3.0 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.tar.gz) |
 | v2.0.0 | 首次加入本地模型自动标注 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.tar.gz) |
@@ -80,6 +81,9 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 模型类别会在当前预设类别中选择字符串最相似的一项。例如 `apple` 可匹配
 `apples`，`melon` 可匹配 `name_melon`。已有 XML 或 TXT 标签的图片会被跳过，
 不会覆盖人工标注。默认置信度为 `0.25`。
+
+类别匹配始终优先采用完整同名，其次才使用大小写、分隔符、单复数和模糊相似度。
+因此模型类别已经叫 `pipe_row` 时会直接使用预设中的 `pipe_row`，不会因共享单词而匹配到 `Drill_pipe`。
 
 顶部工具栏的“标注当前图”只处理正在查看的图片。若当前图片已有标签，会弹出：
 
@@ -143,6 +147,7 @@ data/predefined_classes.txt
 | `Ctrl + 拖动 Box` | 复制并移动一个相同 Box |
 | `Ctrl+C` | 复制全部选中框 |
 | `Ctrl+V` | 粘贴全部已复制框 |
+| `Ctrl+Z` | 撤销当前图片的上一步框操作（最多 50 步） |
 | `Ctrl+D` | 直接复制全部选中框 |
 | `Delete` | 删除全部选中框 |
 | `A` / 左方向键 | 上一张图片 |
@@ -155,6 +160,7 @@ data/predefined_classes.txt
 | `Ctrl+R` | 打开标签目录，同时作为读取和保存目录 |
 
 为了防止误触，`W` 创建普通矩形框的快捷键已取消，但界面中的普通框按钮仍然保留。
+撤销历史按图片独立保存；切换图片后会清空，避免把上一张图片的框恢复到当前图片。
 
 ## 多选和批量调整
 

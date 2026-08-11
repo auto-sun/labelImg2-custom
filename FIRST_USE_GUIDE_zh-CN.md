@@ -27,7 +27,7 @@ python --version
 ### 方法一：下载 ZIP
 
 1. 推荐直接下载最新稳定版：
-   <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip>
+   <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip>
 2. 其他历史版本见：<https://github.com/auto-sun/labelImg2-custom/releases>
 3. 解压到路径简单、自己有写入权限的位置，例如：
 
@@ -54,10 +54,10 @@ python -m venv .venv
 
 这里直接使用虚拟环境中的 Python，不要求执行激活脚本，可以避开部分电脑的 PowerShell 执行策略问题。
 
-`v2.1.0` 包含本地模型自动标注，因此会同时安装 Ultralytics 和 PyTorch，
+`v2.2.0` 包含本地模型自动标注，因此会同时安装 Ultralytics 和 PyTorch，
 下载体积和安装时间会比旧版本更大。只进行手工标注时仍可正常使用全部原有功能。
 
-`v2.1.0` 整体使用 GNU AGPL v3.0 免费开源；上游 LabelImg2 的 MIT 许可证单独保留在
+`v2.2.0` 整体使用 GNU AGPL v3.0 免费开源；上游 LabelImg2 的 MIT 许可证单独保留在
 `LICENSE-MIT-UPSTREAM`。
 
 ## 四、准备类别文件
@@ -179,6 +179,7 @@ labels\train\day1\001.txt
 
 OBB 模型会自动选择 YOLO OBB 格式。模型自己的类别名会匹配到当前
 `predefined_classes.txt` 中最相似的类别。已有 XML/TXT 的图片不会被覆盖。
+完整同名类别始终优先；例如模型类别 `pipe_row` 会直接映射到预设中的 `pipe_row`。
 
 只想处理当前图片时，点击顶部“标注当前图”。如果当前图已有标签，选择：
 
@@ -194,6 +195,7 @@ OBB 模型会自动选择 YOLO OBB 格式。模型自己的类别名会匹配到
 
 - `Ctrl+C`：复制当前选中的一个或多个框。
 - `Ctrl+V`：粘贴框。
+- `Ctrl+Z`：撤销上一步框操作，包括移动、粘贴、删除、缩放和旋转等；每张图片最多保留 50 步。
 - 同一张图片粘贴时会自动偏移，防止与原框完全重叠。
 - 切换到另一张图片再粘贴时，保留原位置、类别、大小和角度。
 - `Ctrl + 拖动框`：直接复制并移动单个框。

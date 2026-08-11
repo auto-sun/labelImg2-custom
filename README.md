@@ -14,7 +14,8 @@
 
 | 版本 | 主要内容 | ZIP | TAR.GZ |
 | --- | --- | --- | --- |
-| **v2.1.0（推荐）** | 新增当前图片自动标注及覆盖/追加选择 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz) |
+| **v2.2.0（推荐）** | Ctrl+Z 撤销；修复自动标注类别精确匹配 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.tar.gz) |
+| v2.1.0 | 新增当前图片自动标注及覆盖/追加选择 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz) |
 | v2.0.2 | 独立仓库发行版，自动标注及全部功能 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.tar.gz) |
 | v2.0.1 | 整体许可证调整为 AGPL-3.0 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.tar.gz) |
 | v2.0.0 | 首次加入本地 YOLO/YOLO OBB 模型自动标注 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.tar.gz) |
@@ -26,7 +27,7 @@
 [查看全部标签](https://github.com/auto-sun/labelImg2-custom/tags) ·
 [更新日志](CHANGELOG.md)
 
-`v1.0–v1.2` 是仓库继承的上游历史标签；需要当前完整功能请选择 `v2.1.0`。
+`v1.0–v1.2` 是仓库继承的上游历史标签；需要当前完整功能请选择 `v2.2.0`。
 
 ## 主要改进
 
@@ -37,6 +38,7 @@
 - 打开标签目录后自动识别 XML、YOLO 5 列 TXT、YOLO OBB 9 列 TXT 和空背景 TXT。
 - 支持本地 YOLO/YOLO OBB `.pt` 模型批量自动标注，自动切换输出格式并把模型类别
   模糊匹配到项目类别预设。
+- 自动标注类别完整同名时强制优先，避免 `pipe_row` 因共享单词误匹配到 `Drill_pipe`。
 - 自动标注在后台运行，状态栏显示进度并提供中止按钮；已有 XML/TXT 不会被覆盖。
 - 顶部“标注当前图”只推理当前图片；已有标签时可选择覆盖、直接添加或取消。
 - `E` 进入或退出 OBB 绘制，画完自动选中新框并打开类别选择。
@@ -123,6 +125,7 @@ labelImg.bat --check
 | `A / D` | 上一张 / 下一张 |
 | `左 / 右方向键` | 上一张 / 下一张 |
 | `Ctrl+C / Ctrl+V` | 复制 / 粘贴选中框 |
+| `Ctrl+Z` | 撤销上一步框操作（每张图片最多 50 步） |
 | `Ctrl+D` | 直接复制选中框 |
 | `Delete` | 删除全部选中框 |
 | `Alt + 左键拖动` | 平移画布 |

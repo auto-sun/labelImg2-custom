@@ -25,6 +25,8 @@ class Canvas(QWidget):
     selectionChanged = pyqtSignal(bool)
     shapeMoved = pyqtSignal()
     shapeCopied = pyqtSignal(object)
+    shapeChangeStarted = pyqtSignal()
+    shapeChangeFinished = pyqtSignal()
     drawingPolygon = pyqtSignal(bool)
 
     hideRRect = pyqtSignal(bool)
@@ -114,6 +116,7 @@ class Canvas(QWidget):
         self.restoreCursor()
 
     def focusOutEvent(self, ev):
+        self.shapeChangeFinished.emit()
         self._altPressed = False
         self._panning = False
         self._clearMarqueeSelection()
@@ -388,6 +391,7 @@ class Canvas(QWidget):
                 bool(ev.modifiers() & Qt.ControlModifier)):
             shape = self._shapeAt(pos)
             if shape is not None:
+                self.shapeChangeStarted.emit()
                 self._ctrlCopySource = shape
                 self._ctrlCopyShape = None
                 self._ctrlCopyStart = QPointF(pos)
@@ -416,10 +420,14 @@ class Canvas(QWidget):
             else:
                 self.selectShapePoint(pos, ev.modifiers())
                 self.prevPoint = pos
+                if self.editing() and self.selectedShape is not None:
+                    self.shapeChangeStarted.emit()
                 self.repaint()
         elif ev.button() == Qt.RightButton and self.editing():
             self.selectShapePoint(pos, ev.modifiers())
             self.prevPoint = pos
+            if self.selectedVertex() and self.selectedShape.isRotated:
+                self.shapeChangeStarted.emit()
             self.repaint()
 
     def mouseReleaseEvent(self, ev):
@@ -442,6 +450,7 @@ class Canvas(QWidget):
                 self.prevPoint = pos
             self.overrideCursor(CURSOR_GRAB if self.selectedShape else CURSOR_DEFAULT)
             self.repaint()
+            self.shapeChangeFinished.emit()
             ev.accept()
             return
 
@@ -459,6 +468,7 @@ class Canvas(QWidget):
 
         if ev.button() == Qt.RightButton:
             if self.selectedVertex() and self.selectedShape.isRotated:
+                self.shapeChangeFinished.emit()
                 return
             menu = self.menus[bool(self.selectedShapeCopy)]
             self.restoreCursor()
@@ -484,6 +494,8 @@ class Canvas(QWidget):
 
             if self.continueDrawing():
                 self.handleClickDrawing(pos)
+
+        self.shapeChangeFinished.emit()
 
     def _shapeAt(self, point):
         for shape in reversed(self.shapes):
@@ -1181,10 +1193,12 @@ class Canvas(QWidget):
 
         self.current.isRotated = self.canDrawRotatedRect
         self.current.close()
+        self.shapeChangeStarted.emit()
         self.shapes.append(self.current)
         self.current = None
         self.setHiding(False)
         self.newShape.emit(continous) # TODO:
+        self.shapeChangeFinished.emit()
         self.update()
 
     def closeEnough(self, p1, p2):
@@ -1302,11 +1316,13 @@ class Canvas(QWidget):
                 return False
             candidates.append((shape, new_points))
 
+        self.shapeChangeStarted.emit()
         for shape, new_points in candidates:
             shape.points = new_points
             shape.close()
 
         self.shapeMoved.emit()
+        self.shapeChangeFinished.emit()
         self.update()
         return True
 
@@ -1337,6 +1353,10 @@ class Canvas(QWidget):
 
     def keyPressEvent(self, ev):
         key = ev.key()
+        if (ev.modifiers() & Qt.ControlModifier and
+                key in (Qt.Key_Z, Qt.Key_X, Qt.Key_C, Qt.Key_V)):
+            ev.ignore()
+            return
         if key == Qt.Key_Escape and self._marqueeStart is not None:
             self._clearMarqueeSelection()
             self.overrideCursor(CURSOR_DEFAULT)
@@ -1370,28 +1390,38 @@ class Canvas(QWidget):
             self.moveOnePixel('Down')
         elif key == Qt.Key_Z and self.selectedShape and\
              self.selectedShape.isRotated and not self.rotateOutOfBound(0.1):
+            self.shapeChangeStarted.emit()
             self.selectedShape.rotate(0.1)
             self.shapeMoved.emit() 
+            self.shapeChangeFinished.emit()
             self.update()  
         elif key == Qt.Key_X and self.selectedShape and\
              self.selectedShape.isRotated and not self.rotateOutOfBound(0.01):
+            self.shapeChangeStarted.emit()
             self.selectedShape.rotate(0.01) 
             self.shapeMoved.emit()
+            self.shapeChangeFinished.emit()
             self.update()  
         elif key == Qt.Key_C and self.selectedShape and\
              self.selectedShape.isRotated and not self.rotateOutOfBound(-0.01):
+            self.shapeChangeStarted.emit()
             self.selectedShape.rotate(-0.01) 
             self.shapeMoved.emit()
+            self.shapeChangeFinished.emit()
             self.update()  
         elif key == Qt.Key_V and self.selectedShape and\
              self.selectedShape.isRotated and not self.rotateOutOfBound(-0.1):
+            self.shapeChangeStarted.emit()
             self.selectedShape.rotate(-0.1)
             self.shapeMoved.emit()
+            self.shapeChangeFinished.emit()
             self.update()
         elif key == Qt.Key_F and self.selectedShape and\
              self.selectedShape.isRotated and not self.rotateOutOfBound(-math.pi/2):
+            self.shapeChangeStarted.emit()
             self.selectedShape.rotate(-math.pi/2)
             self.shapeMoved.emit()
+            self.shapeChangeFinished.emit()
             self.update()
         elif key == Qt.Key_R:
             self.hideRotated = not self.hideRotated
@@ -1441,11 +1471,13 @@ class Canvas(QWidget):
             points = [p + step for p in sh.points]
             if any(self.outOfPixmap(p) for p in points):
                 return
+        self.shapeChangeStarted.emit()
         for sh in shapesToMove:
             for i in range(len(sh.points)):
                 sh.points[i] += step
             sh.center += step
         self.shapeMoved.emit()
+        self.shapeChangeFinished.emit()
         self.repaint()
 
     def moveOutOfBound(self, step):
