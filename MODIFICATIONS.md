@@ -16,6 +16,8 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
 - Inference runs in a background thread with status-bar progress and a cancel
   button.
 - Existing XML/TXT annotations are skipped and never overwritten.
+- A separate top-toolbar action annotates only the current image and prompts
+  to overwrite, append or cancel when labels already exist.
 - The completion dialog reports every model-to-project class mapping for
   manual review.
 

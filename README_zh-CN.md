@@ -18,7 +18,8 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 | 版本 | 适用情况 | 下载 |
 | --- | --- | --- |
-| **v2.0.2（推荐）** | 独立仓库发行版，自动标注和全部功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.tar.gz) |
+| **v2.1.0（推荐）** | 当前图片自动标注，可选择覆盖或追加 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz) |
+| v2.0.2 | 独立仓库发行版，自动标注和全部功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.tar.gz) |
 | v2.0.1 | 整体许可证调整为 AGPL-3.0 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.tar.gz) |
 | v2.0.0 | 首次加入本地模型自动标注 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.tar.gz) |
 | v1.5.0 | 独立 Conda/venv 启动器，不含自动标注 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.tar.gz) |
@@ -79,6 +80,14 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 模型类别会在当前预设类别中选择字符串最相似的一项。例如 `apple` 可匹配
 `apples`，`melon` 可匹配 `name_melon`。已有 XML 或 TXT 标签的图片会被跳过，
 不会覆盖人工标注。默认置信度为 `0.25`。
+
+顶部工具栏的“标注当前图”只处理正在查看的图片。若当前图片已有标签，会弹出：
+
+- `覆盖原标签`：只保存本次模型框；
+- `直接添加`：保留当前框并追加模型框；
+- `取消`：保持当前图片不变。
+
+单张结果保存为模型对应的 YOLO/YOLO OBB TXT，同名 XML 不会自动删除。
 
 项目不附带模型文件，请只使用自行训练或具有合法使用权的权重。`.pt` 已被 Git 忽略，
 放在项目目录中也不会随正常提交上传。

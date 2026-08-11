@@ -18,7 +18,10 @@ detailed list of changes.
 Downloads
 ---------
 
-* **v2.0.2 (recommended, standalone repository and all custom features):**
+* **v2.1.0 (recommended, current-image automatic annotation):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz>`__
+* **v2.0.2 (standalone repository and all earlier custom features):**
   `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.zip>`__ |
   `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.tar.gz>`__
 * **v2.0.1 (AGPL-3.0 licensing update):**
@@ -164,6 +167,12 @@ finishes. Model class names are fuzzily mapped to the most similar current
 project class. The completion dialog lists every mapping for review. Images
 that already have XML or TXT annotations are skipped and never overwritten.
 The default confidence threshold is ``0.25``.
+
+The ``标注当前图`` toolbar action runs the model only on the currently open
+image. If that image already has labels, a dialog offers three explicit
+choices: overwrite the current boxes, append model boxes to them, or cancel.
+The result is reloaded immediately after saving. Model output is written as
+YOLO/YOLO OBB TXT; an alternate same-name XML file is not deleted.
 
 No model weights are distributed with this repository. Use only models you
 trained or are licensed to use; ``.pt`` files are ignored by Git.

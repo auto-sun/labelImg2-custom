@@ -213,6 +213,17 @@ def shapes_from_result(result, annotation_format, class_mapping):
     return shapes, image_width, image_height
 
 
+def shapes_for_job(job, generated_shapes):
+    """Apply one job's existing-label policy to generated shapes."""
+    policy = str(job.get('existing_policy', 'skip') or 'skip').casefold()
+    if policy not in ('skip', 'overwrite', 'append'):
+        raise ValueError('Unsupported existing-label policy: %s' % policy)
+    generated_shapes = list(generated_shapes or [])
+    if policy == 'append':
+        return list(job.get('existing_shapes') or []) + generated_shapes
+    return generated_shapes
+
+
 class AutoAnnotationThread(QThread):
     """Load a local Ultralytics model and annotate image jobs off the UI thread."""
 
@@ -261,14 +272,23 @@ class AutoAnnotationThread(QThread):
             skipped = 0
             object_count = 0
             errors = []
+            job_results = []
             for index, job in enumerate(self.jobs):
                 if self.isInterruptionRequested():
                     break
 
                 image_path = job['image_path']
                 annotation_base = job['annotation_base']
-                if (os.path.isfile(annotation_base + XML_EXT) or
-                        os.path.isfile(annotation_base + YOLO_EXT)):
+                existing_policy = str(
+                    job.get('existing_policy', 'skip') or 'skip').casefold()
+                if existing_policy not in ('skip', 'overwrite', 'append'):
+                    raise ValueError(
+                        'Unsupported existing-label policy: %s' %
+                        existing_policy)
+                has_existing_file = (
+                    os.path.isfile(annotation_base + XML_EXT) or
+                    os.path.isfile(annotation_base + YOLO_EXT))
+                if has_existing_file and existing_policy == 'skip':
                     skipped += 1
                     self.progressChanged.emit(
                         index + 1, total, image_path, 0, 'skipped')
@@ -286,15 +306,26 @@ class AutoAnnotationThread(QThread):
                         raise ValueError('The model returned no result.')
                     shapes, image_width, image_height = shapes_from_result(
                         results[0], annotation_format, class_mapping)
+                    saved_shapes = shapes_for_job(job, shapes)
                     save_yolo_annotations(
                         annotation_base + YOLO_EXT,
-                        shapes,
+                        saved_shapes,
                         image_width,
                         image_height,
                         self.project_classes,
                         annotation_format)
                     saved += 1
                     object_count += len(shapes)
+                    if job.get('return_shapes'):
+                        job_results.append({
+                            'image_path': image_path,
+                            'annotation_path': annotation_base + YOLO_EXT,
+                            'policy': existing_policy,
+                            'generated_shapes': shapes,
+                            'saved_shapes': saved_shapes,
+                            'image_width': image_width,
+                            'image_height': image_height,
+                        })
                     self.progressChanged.emit(
                         index + 1, total, image_path, len(shapes), 'saved')
                 except Exception as error:
@@ -311,6 +342,7 @@ class AutoAnnotationThread(QThread):
                 'errors': errors,
                 'format': annotation_format,
                 'mapping': mapping_details,
+                'job_results': job_results,
             })
         except Exception as error:
             self.failed.emit(str(error))

@@ -3,6 +3,18 @@
 本项目从 `v1.3.0` 开始记录自定义版本。`v1.0`、`v1.1` 和 `v1.2`
 是仓库继承的上游历史标签，不包含当前完整的自定义功能。
 
+## [v2.1.0] - 2026-08-11
+
+### 新增：当前图片自动标注
+
+- 顶部工具栏和 `File` 菜单新增“标注当前图”。
+- 只对当前打开的图片执行一次本地 YOLO / YOLO OBB 模型推理。
+- 当前图片已有标签时，明确询问“覆盖原标签”“直接添加”或“取消”。
+- 覆盖模式只保存模型新框；追加模式保留当前框并加入模型新框。
+- 继续自动识别普通检测与 OBB 模型、切换 YOLO 保存格式并执行类别模糊匹配。
+- 单张任务沿用状态栏进度和中止按钮，完成后自动重新加载当前图片。
+- 新增覆盖、追加、后台保存和工具栏入口自动化测试。
+
 ## [v2.0.2] - 2026-08-11
 
 ### 独立仓库发布
@@ -77,6 +89,7 @@
 - `v1.1`：上游历史版本。
 - `v1.0`：上游历史版本。
 
+[v2.1.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.1.0
 [v2.0.2]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.0.2
 [v2.0.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.0.1
 [v2.0.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.0.0
