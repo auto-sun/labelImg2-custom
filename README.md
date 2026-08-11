@@ -2,7 +2,7 @@
 
 简体中文主页 | [English](README.rst)
 
-这是基于 [chinakook/labelImg2](https://github.com/chinakook/labelImg2) 的独立维护派生项目，主要针对高频 YOLO OBB 标注工作优化操作流程。原项目的 MIT License 和版权声明完整保留；包含自动标注功能的当前整体发行版采用 GNU AGPL v3.0。本仓库已脱离 GitHub Fork 网络，但不会隐藏或改变上游来源。
+这是基于 [chinakook/labelImg2](https://github.com/chinakook/labelImg2) 的独立维护派生项目，主要针对高频 YOLO OBB 标注工作优化操作流程。原项目的 MIT License 和版权声明完整保留；包含自动标注功能的当前整体发行版采用 GNU AGPL v3.0。
 
 第一次接触本项目，建议从这里开始：
 
