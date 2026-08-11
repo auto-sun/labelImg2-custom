@@ -6,7 +6,15 @@ This repository is a modified fork of
 [chinakook/labelImg2](https://github.com/chinakook/labelImg2).
 
 The original project is distributed under the MIT License. Its copyright
-notice and permission notice are preserved unchanged in [`LICENSE`](LICENSE).
+notice and permission notice are preserved unchanged in
+[`LICENSE-MIT-UPSTREAM`](LICENSE-MIT-UPSTREAM).
+
+Copyright (C) 2026 auto-sun and LabelImg2 Custom contributors.
+
+Beginning with v2.0.1, the combined modified distribution is released under
+the [GNU Affero General Public License v3.0](LICENSE). This combined licence
+choice does not remove or replace the MIT rights and attribution attached to
+the original upstream code.
 
 The modifications in this fork include workflow, input handling, persistence,
 multi-selection, clipboard, YOLO/YOLO OBB export, and local-model automatic
@@ -16,8 +24,10 @@ annotation changes. See
 Automatic annotation uses the separately installed third-party
 [Ultralytics](https://github.com/ultralytics/ultralytics) package. The
 installed package metadata identifies its licence as AGPL-3.0. Ultralytics is
-not copied into this repository; users must review and comply with its licence
-or obtain an appropriate commercial licence for their use case.
+not copied into this repository. The combined project is therefore published
+as AGPL-3.0-compatible free and open-source software. Users choosing a
+non-AGPL commercial arrangement for Ultralytics must obtain the appropriate
+licence directly from Ultralytics.
 
 No model weights are distributed in this repository or its release source
 archives. Users are responsible for ensuring that every `.pt` model they

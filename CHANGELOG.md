@@ -3,6 +3,18 @@
 本项目从 `v1.3.0` 开始记录自定义版本。`v1.0`、`v1.1` 和 `v1.2`
 是仓库继承的上游历史标签，不包含当前完整的自定义功能。
 
+## [v2.0.1] - 2026-08-11
+
+### 许可证合规调整
+
+- 当前组合发行版的整体许可证由 MIT 调整为 GNU AGPL v3.0，以匹配
+  Ultralytics 自动标注依赖的开源许可要求。
+- 根目录 `LICENSE` 替换为完整 GNU AGPL v3.0 许可证文本。
+- 上游 LabelImg2 的原始 MIT 许可证和版权声明原样保存在
+  `LICENSE-MIT-UPSTREAM`，不改变上游代码原有权利和归属。
+- README、NOTICE、安装教程、软件版本号和打包元数据统一更新。
+- 此版本只调整许可证和发布说明，不改变 `v2.0.0` 的自动标注行为。
+
 ## [v2.0.0] - 2026-08-11
 
 ### 新增：本地模型自动标注
@@ -56,6 +68,7 @@
 - `v1.1`：上游历史版本。
 - `v1.0`：上游历史版本。
 
+[v2.0.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.0.1
 [v2.0.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.0.0
 [v1.5.0]: https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.zip
 [v1.4.0]: https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.zip

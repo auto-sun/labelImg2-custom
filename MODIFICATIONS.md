@@ -109,3 +109,10 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
   `README.rst` as the English documentation entry.
 - A separate Chinese first-time-user guide covers download, installation,
   class files, annotation and format conversion.
+
+## Licensing
+
+- Starting with v2.0.1, the combined modified distribution is released under
+  GNU AGPL v3.0.
+- The upstream LabelImg2 MIT copyright and licence notice is preserved
+  separately in `LICENSE-MIT-UPSTREAM`.

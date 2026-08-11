@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# SPDX-License-Identifier: AGPL-3.0-only
 """Background inference and class matching for automatic annotation."""
 from __future__ import absolute_import
 

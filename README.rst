@@ -7,15 +7,20 @@ This repository is a modified fork of
 `chinakook/labelImg2 <https://github.com/chinakook/labelImg2>`_, a graphical
 image annotation tool written in Python and PyQt5.
 
-The original project and this modified version are distributed under the MIT
-License. The original copyright notice and license text are preserved in
+The original project is distributed under the MIT License; its original
+copyright notice and licence text are preserved in
+``LICENSE-MIT-UPSTREAM``. The current combined modified distribution,
+including its Ultralytics integration, is released under GNU AGPL v3.0 in
 ``LICENSE``. See ``NOTICE.md`` for attribution and ``MODIFICATIONS.md`` for a
 detailed list of changes.
 
 Downloads
 ---------
 
-* **v2.0.0 (recommended, automatic annotation and all custom features):**
+* **v2.0.1 (recommended, AGPL-3.0 and all custom features):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.tar.gz>`__
+* **v2.0.0 (first automatic-annotation release):**
   `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip>`__ |
   `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.tar.gz>`__
 * **v1.5.0 (isolated Conda/venv launcher):**
@@ -197,7 +202,9 @@ Class IDs follow the current predefined-class order.
 Licence and attribution
 -----------------------
 
-MIT License. See ``LICENSE``.
+The combined current distribution is licensed under GNU AGPL v3.0; see
+``LICENSE``. Original LabelImg2 portions retain their MIT notice and terms in
+``LICENSE-MIT-UPSTREAM``.
 
 Original project: Chinakook, LabelImg2
 https://github.com/chinakook/labelImg2

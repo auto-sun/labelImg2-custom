@@ -90,3 +90,8 @@
 - `Paint Labels` 改用 `Ctrl+Shift+L`，不再与 `Play` 的 `Ctrl+Shift+P` 冲突。
 - GitHub 使用中文 `README.md` 作为主页，同时保留英文 `README.rst` 入口。
 - 增加独立中文小白教程，覆盖下载、安装、类别文件、标注与格式转换。
+
+## 许可证
+
+- 从 v2.0.1 开始，当前组合发行版整体采用 GNU AGPL v3.0 免费开源发布。
+- 上游 LabelImg2 的 MIT 版权与许可证声明单独原样保存在 `LICENSE-MIT-UPSTREAM`。

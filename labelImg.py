@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# SPDX-License-Identifier: AGPL-3.0-only
+# LabelImg2 Custom is distributed under GNU AGPL v3.0. Upstream portions
+# retain the MIT terms in LICENSE-MIT-UPSTREAM.
 from __future__ import absolute_import
 
 import codecs
@@ -35,7 +38,7 @@ from libs.fileView import CFileView
 from libs.cvtlabels2yolo import cvt_xml_annotations_to_yolo
 
 __appname__ = 'labelImg2'
-__version__ = '2.0.0'
+__version__ = '2.0.1'
 
 # Utility functions and classes.
 
@@ -678,7 +681,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.recentFiles.insert(0, filePath)
 
     def showInfoDialog(self):
-        msg = u'{0} v{1}\n© Chinakook 2018. chinakook@msn.com'.format(
+        msg = (u'{0} v{1}\nGNU AGPL v3.0\n'
+               u'Upstream © Chinakook 2018. chinakook@msn.com').format(
             __appname__, __version__)
         QMessageBox.information(self, u'About', msg)
 

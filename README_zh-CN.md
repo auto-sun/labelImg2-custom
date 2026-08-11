@@ -8,7 +8,8 @@
 主要针对高频 YOLO OBB 标注工作进行了操作优化。
 
 这个版本没有把原项目包装成全新原创项目。原项目版权声明和 MIT 许可证完整保留在
-[`LICENSE`](LICENSE) 中；中文项目来源和修改范围见
+[`LICENSE-MIT-UPSTREAM`](LICENSE-MIT-UPSTREAM) 中；当前整体发行版采用
+[`GNU AGPL v3.0`](LICENSE)。中文项目来源和修改范围见
 [`NOTICE_zh-CN.md`](NOTICE_zh-CN.md) 与
 [`MODIFICATIONS_zh-CN.md`](MODIFICATIONS_zh-CN.md)。
 
@@ -16,7 +17,8 @@
 
 | 版本 | 适用情况 | 下载 |
 | --- | --- | --- |
-| **v2.0.0（推荐）** | 自动标注和全部自定义功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.tar.gz) |
+| **v2.0.1（推荐）** | 自动标注和全部功能，整体采用 AGPL-3.0 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.tar.gz) |
+| v2.0.0 | 首次加入本地模型自动标注 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.tar.gz) |
 | v1.5.0 | 独立 Conda/venv 启动器，不含自动标注 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.tar.gz) |
 | v1.4.0 | XML、YOLO、YOLO OBB 直接读写 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.tar.gz) |
 | v1.3.0 | OBB 快捷标注工作流 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.tar.gz) |
@@ -281,7 +283,13 @@ class_id x1 y1 x2 y2 x3 y3 x4 y4
 
 ## 许可证和项目来源
 
-本项目遵循 MIT License，详见 [`LICENSE`](LICENSE)。
+当前整体发行版遵循 [GNU Affero General Public License v3.0](LICENSE)。这意味着可以
+免费使用、研究、修改和再发布，但分发修改版或通过网络向用户提供其功能时，需要按照
+AGPL-3.0 提供相应源代码并保留许可证说明。
+
+原始 LabelImg2 部分仍遵循其原有 [MIT License](LICENSE-MIT-UPSTREAM)，原作者版权
+声明保持不变。AGPL-3.0 是当前组合发行版及新增功能的整体发布许可，不会抹去上游
+代码原有的 MIT 权利和归属。
 
 原项目：Chinakook / LabelImg2
 

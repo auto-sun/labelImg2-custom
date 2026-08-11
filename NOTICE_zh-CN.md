@@ -4,7 +4,13 @@
 [chinakook/labelImg2](https://github.com/chinakook/labelImg2) 的修改版 Fork。
 
 原项目使用 MIT License 发布。原作者版权声明和完整许可证内容已原样保留在
-[`LICENSE`](LICENSE) 中。
+[`LICENSE-MIT-UPSTREAM`](LICENSE-MIT-UPSTREAM) 中。
+
+本修改版新增内容版权所有 © 2026 auto-sun 与 LabelImg2 Custom 贡献者。
+
+从 `v2.0.1` 开始，当前组合发行版整体采用
+[GNU Affero General Public License v3.0](LICENSE) 免费开源发布。整体采用 AGPL-3.0
+不会删除或取代上游代码原有的 MIT 权利、版权声明和作者归属。
 
 本 Fork 的修改范围主要包括：
 
@@ -21,7 +27,8 @@
 自动标注功能调用由用户另外安装的第三方
 [Ultralytics](https://github.com/ultralytics/ultralytics) 软件包。本机所安装版本的
 包元数据将其许可证标为 AGPL-3.0。仓库没有复制 Ultralytics 源码；使用者应自行阅读
-并遵守其许可证，或根据实际用途取得适当的商业许可。
+并遵守其许可证。本项目因此按 AGPL-3.0 兼容方式整体开源；如需不受 AGPL 约束的
+Ultralytics 商业使用方式，应直接向 Ultralytics 取得适当许可。
 
 本仓库及发行版源码压缩包均不包含任何模型权重。使用者应确保加载的 `.pt` 模型是
 自行训练或已获得合法授权；第三方依赖和模型权重仍分别受其自身许可证约束。
