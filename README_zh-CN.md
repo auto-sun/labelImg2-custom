@@ -12,6 +12,21 @@
 [`NOTICE_zh-CN.md`](NOTICE_zh-CN.md) 与
 [`MODIFICATIONS_zh-CN.md`](MODIFICATIONS_zh-CN.md)。
 
+## 版本下载
+
+| 版本 | 适用情况 | 下载 |
+| --- | --- | --- |
+| **v2.0.0（推荐）** | 自动标注和全部自定义功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.tar.gz) |
+| v1.5.0 | 独立 Conda/venv 启动器，不含自动标注 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.tar.gz) |
+| v1.4.0 | XML、YOLO、YOLO OBB 直接读写 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.tar.gz) |
+| v1.3.0 | OBB 快捷标注工作流 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.tar.gz) |
+
+[全部发行版本](https://github.com/auto-sun/labelImg2-custom/releases) ·
+[全部标签](https://github.com/auto-sun/labelImg2-custom/tags) ·
+[更新日志](CHANGELOG.md)
+
+`v1.0–v1.2` 是上游历史标签，不包含当前完整的自定义功能。
+
 ## 这个修改版方便在哪里
 
 修改的核心目标不是增加复杂菜单，而是减少每天标注时不断重复的操作。
@@ -29,6 +44,7 @@
 | 多个框只能逐个调整 | 鼠标框选后可集体移动、缩放、复制和删除 |
 | 图片缩放和框缩放需要不同复杂组合键 | 未选框时滚轮缩放图片，选中框时滚轮缩放框 |
 | 标完 XML 后还要批量转换 | 可直接选择保存为 XML、YOLO 或 YOLO OBB |
+| 未标注图片只能逐张手工画框 | 可加载本地 YOLO/YOLO OBB `.pt` 批量预标注 |
 | 打开标签和设置保存目录是两个入口 | 合并为一个 `Open Annotation Dir` |
 | 导出时生成重复图片、train/val 和 YAML | 只把 XML 转成同名 YOLO/YOLO OBB `.txt` |
 
@@ -46,6 +62,22 @@
 10. 再按 `E` 开始绘制下一个 OBB。
 
 相较于原来的操作，这个流程不需要反复双击类别、切换工具、重新选择目录或寻找标注进度。
+
+## 模型自动标注流程
+
+1. 用 `Open Dir` 打开图片根目录。
+2. 用 `Open Annotation Dir` 选择标签输出根目录。
+3. 点击工具栏“自动标注”，首次使用时选择本地 Ultralytics YOLO 或 YOLO OBB `.pt`。
+4. 程序自动识别普通检测或 OBB 模型。OBB 模型会自动选择 YOLO OBB 格式。
+5. 状态栏显示进度、当前文件和框数量；点击“中止”会在当前图片推理完成后停止。
+6. 完成后查看模型类别到项目类别的映射和相似度，并人工复核标签。
+
+模型类别会在当前预设类别中选择字符串最相似的一项。例如 `apple` 可匹配
+`apples`，`melon` 可匹配 `name_melon`。已有 XML 或 TXT 标签的图片会被跳过，
+不会覆盖人工标注。默认置信度为 `0.25`。
+
+项目不附带模型文件，请只使用自行训练或具有合法使用权的权重。`.pt` 已被 Git 忽略，
+放在项目目录中也不会随正常提交上传。
 
 ## 安装和启动
 

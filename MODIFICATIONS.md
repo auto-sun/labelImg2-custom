@@ -5,6 +5,20 @@
 This file summarises the main differences from the upstream
 `chinakook/labelImg2` project.
 
+See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
+
+## Local-model automatic annotation
+
+- Local Ultralytics YOLO detection and YOLO OBB ``.pt`` models are supported.
+- The model task is detected automatically and selects five-column YOLO or
+  nine-column YOLO OBB output.
+- Model class names are fuzzily mapped to the current project class preset.
+- Inference runs in a background thread with status-bar progress and a cancel
+  button.
+- Existing XML/TXT annotations are skipped and never overwritten.
+- The completion dialog reports every model-to-project class mapping for
+  manual review.
+
 ## Annotation workflow
 
 - `E` toggles rotated OBB drawing mode.

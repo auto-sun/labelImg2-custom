@@ -9,8 +9,20 @@ The original project is distributed under the MIT License. Its copyright
 notice and permission notice are preserved unchanged in [`LICENSE`](LICENSE).
 
 The modifications in this fork include workflow, input handling, persistence,
-multi-selection, clipboard and YOLO/YOLO OBB export changes. See
+multi-selection, clipboard, YOLO/YOLO OBB export, and local-model automatic
+annotation changes. See
 [`MODIFICATIONS.md`](MODIFICATIONS.md) for details.
+
+Automatic annotation uses the separately installed third-party
+[Ultralytics](https://github.com/ultralytics/ultralytics) package. The
+installed package metadata identifies its licence as AGPL-3.0. Ultralytics is
+not copied into this repository; users must review and comply with its licence
+or obtain an appropriate commercial licence for their use case.
+
+No model weights are distributed in this repository or its release source
+archives. Users are responsible for ensuring that every `.pt` model they
+load is self-trained or appropriately licensed. Third-party packages and model
+weights remain subject to their own licence terms.
 
 This fork is not an official release of the upstream project, and no
 endorsement by the original authors is implied.

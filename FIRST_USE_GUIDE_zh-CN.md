@@ -26,8 +26,9 @@ python --version
 
 ### 方法一：下载 ZIP
 
-1. 打开项目主页：<https://github.com/auto-sun/labelImg2-custom>
-2. 点击 `Code > Download ZIP`。
+1. 推荐直接下载最新稳定版：
+   <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip>
+2. 其他历史版本见：<https://github.com/auto-sun/labelImg2-custom/releases>
 3. 解压到路径简单、自己有写入权限的位置，例如：
 
 ```text
@@ -52,6 +53,9 @@ python -m venv .venv
 ```
 
 这里直接使用虚拟环境中的 Python，不要求执行激活脚本，可以避开部分电脑的 PowerShell 执行策略问题。
+
+`v2.0.0` 增加了本地模型自动标注，因此会同时安装 Ultralytics 和 PyTorch，
+下载体积和安装时间会比旧版本更大。只进行手工标注时仍可正常使用全部原有功能。
 
 ## 四、准备类别文件
 
@@ -163,7 +167,19 @@ labels\train\day1\001.txt
 8. 按 `D` 或右方向键进入下一张；按 `A` 或左方向键返回上一张。
 9. 再按 `E` 画下一个框。
 
-## 八、复制、多选和平移
+## 八、使用模型自动标注（可选）
+
+1. 先按第六节打开图片目录和标签目录。
+2. 点击工具栏“自动标注”。第一次运行会要求选择本地 YOLO 或 YOLO OBB `.pt`。
+3. 等待状态栏进度完成；需要停止时点击状态栏的“中止”。
+4. 完成后查看类别映射结果，并逐张人工复核模型生成的框。
+
+OBB 模型会自动选择 YOLO OBB 格式。模型自己的类别名会匹配到当前
+`predefined_classes.txt` 中最相似的类别。已有 XML/TXT 的图片不会被覆盖。
+
+仓库不提供模型权重，请使用自己训练或合法授权的模型。
+
+## 九、复制、多选和平移
 
 - `Ctrl+C`：复制当前选中的一个或多个框。
 - `Ctrl+V`：粘贴框。
@@ -176,7 +192,7 @@ labels\train\day1\001.txt
 - `Delete`：删除全部选中框。
 - `Alt + 鼠标左键拖动`：平移画布。
 
-## 九、保存格式说明
+## 十、保存格式说明
 
 ### Pascal VOC XML
 
@@ -202,7 +218,7 @@ class_id x1 y1 x2 y2 x3 y3 x4 y4
 
 坐标均为 `0～1` 的归一化坐标，能够保留四个顶点和倾斜方向。
 
-## 十、已有 XML 批量转换
+## 十一、已有 XML 批量转换
 
 如果以前已经标成 XML，可以使用：
 
@@ -213,7 +229,7 @@ File > Export to > Ultralytics YOLO OBB
 
 转换功能只生成同名 `.txt` 标签，保留相对子目录结构，不复制图片，不生成 YAML，也不自动划分训练集、验证集和测试集。
 
-## 十一、重新打开后的恢复
+## 十二、重新打开后的恢复
 
 正常关闭 LabelImg2 后，下次启动会恢复：
 

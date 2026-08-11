@@ -12,6 +12,27 @@ License. The original copyright notice and license text are preserved in
 ``LICENSE``. See ``NOTICE.md`` for attribution and ``MODIFICATIONS.md`` for a
 detailed list of changes.
 
+Downloads
+---------
+
+* **v2.0.0 (recommended, automatic annotation and all custom features):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.tar.gz>`__
+* **v1.5.0 (isolated Conda/venv launcher):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.tar.gz>`__
+* **v1.4.0 (direct XML, YOLO and YOLO OBB I/O):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.tar.gz>`__
+* **v1.3.0 (fast OBB workflow):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.tar.gz>`__
+
+See `all releases <https://github.com/auto-sun/labelImg2-custom/releases>`__,
+`all tags <https://github.com/auto-sun/labelImg2-custom/tags>`__, and the
+`changelog <CHANGELOG.md>`__. Tags v1.0 through v1.2 are inherited upstream
+history and do not contain the complete custom feature set.
+
 Why this fork is more convenient
 --------------------------------
 
@@ -51,6 +72,8 @@ Main additions
   label.
 * Persistent XML, YOLO or YOLO OBB output-format selection.
 * Automatic XML / 5-column YOLO / 9-column YOLO OBB input detection.
+* Background automatic annotation using a local YOLO or YOLO OBB ``.pt``
+  model, with progress, cancellation and fuzzy project-class mapping.
 * Natural numeric image ordering (for example, ``2.jpg`` before ``10.jpg``).
 * Direct Pascal VOC XML to YOLO or YOLO OBB ``.txt`` conversion, without
   copying images, splitting datasets or generating YAML files.
@@ -117,6 +140,24 @@ Drag a selected box             Move the selected box or selected group
 
 The old ``W`` shortcut for creating an axis-aligned box is intentionally
 disabled to reduce accidental activation.
+
+Automatic annotation
+--------------------
+
+Open the image root and annotation root, then click the ``自动标注`` toolbar
+action. The first run asks for a local Ultralytics YOLO detection or YOLO OBB
+``.pt`` model. OBB models automatically select nine-column YOLO OBB output;
+regular detection models select five-column YOLO output.
+
+Inference runs in the background. The status bar shows the current image and
+overall progress, and its cancel button stops after the current inference
+finishes. Model class names are fuzzily mapped to the most similar current
+project class. The completion dialog lists every mapping for review. Images
+that already have XML or TXT annotations are skipped and never overwritten.
+The default confidence threshold is ``0.25``.
+
+No model weights are distributed with this repository. Use only models you
+trained or are licensed to use; ``.pt`` files are ignored by Git.
 
 Annotation formats
 ------------------

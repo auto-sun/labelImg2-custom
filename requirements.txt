@@ -3,3 +3,4 @@ yamlloader
 pyqt5
 lxml
 opencv-python
+ultralytics>=8.3

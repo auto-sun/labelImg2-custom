@@ -10,6 +10,21 @@
 
 更完整的功能说明见：[中文详细说明](README_zh-CN.md)。
 
+## 版本下载
+
+| 版本 | 主要内容 | ZIP | TAR.GZ |
+| --- | --- | --- | --- |
+| **v2.0.0（推荐）** | 本地 YOLO/YOLO OBB 模型自动标注及全部自定义功能 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.tar.gz) |
+| v1.5.0 | Conda/venv 独立启动器，不含自动标注 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.tar.gz) |
+| v1.4.0 | XML、YOLO、YOLO OBB 直接读写 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.tar.gz) |
+| v1.3.0 | OBB 快捷标注工作流 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.tar.gz) |
+
+[查看所有发行版本](https://github.com/auto-sun/labelImg2-custom/releases) ·
+[查看全部标签](https://github.com/auto-sun/labelImg2-custom/tags) ·
+[更新日志](CHANGELOG.md)
+
+`v1.0–v1.2` 是仓库继承的上游历史标签；需要当前完整功能请选择 `v2.0.0`。
+
 ## 主要改进
 
 - 自动恢复上次打开的图片目录、当前进度、标签目录、保存格式和默认类别。
@@ -17,6 +32,9 @@
 - 支持相同子目录结构的图片与标签递归匹配。
 - 可以直接保存 Pascal VOC XML、Ultralytics YOLO 或 Ultralytics YOLO OBB。
 - 打开标签目录后自动识别 XML、YOLO 5 列 TXT、YOLO OBB 9 列 TXT 和空背景 TXT。
+- 支持本地 YOLO/YOLO OBB `.pt` 模型批量自动标注，自动切换输出格式并把模型类别
+  模糊匹配到项目类别预设。
+- 自动标注在后台运行，状态栏显示进度并提供中止按钮；已有 XML/TXT 不会被覆盖。
 - `E` 进入或退出 OBB 绘制，画完自动选中新框并打开类别选择。
 - 常用类别优先，减少同首字母类别的重复查找。
 - 支持框的复制粘贴、跨图片原位置粘贴、框选多选、整体移动和批量删除。
@@ -69,6 +87,19 @@ labelImg.bat --check
 5. 按 `E` 绘制旋转框，画完后直接输入类别首字母。
 6. 使用 `Z / X / C / V / F` 调整角度，选中框时滚轮调整大小。
 7. 按 `Ctrl+S` 保存，使用 `D` 或右方向键进入下一张。
+
+## 模型自动标注
+
+1. 使用 `Open Dir` 打开需要预标注的图片根目录。
+2. 使用 `Open Annotation Dir` 选择标签输出根目录。
+3. 点击工具栏“自动标注”；第一次使用时选择本地 YOLO/YOLO OBB `.pt`。
+4. OBB 模型会自动切换到 YOLO OBB，并生成 9 列 `.txt`；普通检测模型生成
+   5 列 YOLO `.txt`。
+5. 状态栏显示当前图片和总体进度，需要停止时点击“中止”。
+6. 完成后检查类别映射和相似度，并人工复核所有模型框。
+
+默认置信度为 `0.25`。自动标注只处理尚无 XML/TXT 的图片，不覆盖已有人工标签。
+项目不附带模型权重，请只使用自己训练或获得合法授权的 `.pt` 文件。
 
 ## 常用快捷键
 

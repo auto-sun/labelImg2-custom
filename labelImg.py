@@ -28,12 +28,14 @@ from libs.labelFile import LabelFile, LabelFileError
 from libs.pascal_voc_io import PascalVocReader, XML_EXT
 from libs.yolo_obb_io import (YoloReader, YoloError, YOLO_EXT,
                               save_yolo_annotations)
+from libs.auto_annotation import AutoAnnotationThread
 
 from libs.labelView import CLabelView, HashableQStandardItem
 from libs.fileView import CFileView
 from libs.cvtlabels2yolo import cvt_xml_annotations_to_yolo
 
 __appname__ = 'labelImg2'
+__version__ = '2.0.0'
 
 # Utility functions and classes.
 
@@ -117,6 +119,10 @@ class MainWindow(QMainWindow, WindowMixin):
         self._shapeClipboard = []
         self._clipboardPasteCount = 0
         self._shapeClipboardSourceFile = None
+        self.autoAnnotationThread = None
+        self.autoAnnotationModelPath = settings.get(
+            SETTING_AUTO_ANNOTATION_MODEL, '')
+        self.autoAnnotationExistingCount = 0
 
         labellistLayout = QVBoxLayout()
         labellistLayout.setContentsMargins(0, 0, 0, 0)
@@ -240,6 +246,14 @@ class MainWindow(QMainWindow, WindowMixin):
             '&Open Annotation Dir', self.openAnnotationDirDialog,
             'Ctrl+r', 'dir.svg',
             u'Open the directory used to load and save annotations')
+
+        selectAutoAnnotationModel = action(
+            u'选择自动标注模型...', self.selectAutoAnnotationModel,
+            None, 'settings.svg', u'选择本地 YOLO / YOLO OBB .pt 模型')
+        autoAnnotate = action(
+            u'自动标注', self.startAutoAnnotation,
+            None, 'batch-processing.svg',
+            u'使用本地 YOLO / YOLO OBB 模型批量标注未标注图片')
 
         formatXml = action(
             'Pascal VOC XML',
@@ -378,6 +392,8 @@ class MainWindow(QMainWindow, WindowMixin):
                                fitWindow=fitWindow, fitWidth=fitWidth, play=play,
                                openPrevImg=openPrevImg, openNextImg=openNextImg,
                                openAnnotationDir=openAnnotationDir,
+                               selectAutoAnnotationModel=selectAutoAnnotationModel,
+                               autoAnnotate=autoAnnotate,
                                formatXml=formatXml, formatYolo=formatYolo,
                                formatYoloObb=formatYoloObb,
                                zoomActions=zoomActions,
@@ -433,6 +449,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         addActions(self.menus.file,
                    (open, opendir, openAnnotationDir,
+                    selectAutoAnnotationModel, autoAnnotate, None,
                     self.menus.annotationFormat,
                     self.menus.recentFiles, self.menus.exportAnnotations,
                     save, saveAs, close, resetAll, quit))
@@ -461,7 +478,8 @@ class MainWindow(QMainWindow, WindowMixin):
             action('&Move here', self.moveShape)))
 
         self.tools = self.toolbar('Tools')
-        self.actions.beginner = (open, opendir, openAnnotationDir, verify, save, None, create, createSo, createRo, copy, delete, None,
+        self.actions.beginner = (open, opendir, openAnnotationDir, autoAnnotate,
+            verify, save, None, create, createSo, createRo, copy, delete, None,
             zoomIn, zoom, zoomOut, zoomOrg, fitWindow, fitWidth)
 
         self.statusBar().showMessage('%s started.' % __appname__)
@@ -535,6 +553,19 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.statFile = QLabel('')
         self.statusBar().addPermanentWidget(self.statFile)
+
+        self.autoAnnotationStatus = QLabel('')
+        self.autoAnnotationProgress = QProgressBar()
+        self.autoAnnotationProgress.setMinimumWidth(220)
+        self.autoAnnotationProgress.setTextVisible(True)
+        self.autoAnnotationCancelButton = QPushButton(u'中止')
+        self.autoAnnotationCancelButton.clicked.connect(
+            self.cancelAutoAnnotation)
+        self.statusBar().addPermanentWidget(self.autoAnnotationStatus)
+        self.statusBar().addPermanentWidget(self.autoAnnotationProgress)
+        self.statusBar().addPermanentWidget(
+            self.autoAnnotationCancelButton)
+        self.setAutoAnnotationWidgetsVisible(False)
 
         # Open Dir if deafult file
         if self.filePath and os.path.isdir(self.filePath):
@@ -647,7 +678,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.recentFiles.insert(0, filePath)
 
     def showInfoDialog(self):
-        msg = u'{0} \n©Chinakook 2018. chinakook@msn.com'.format(__appname__)
+        msg = u'{0} v{1}\n© Chinakook 2018. chinakook@msn.com'.format(
+            __appname__, __version__)
         QMessageBox.information(self, u'About', msg)
 
     def createShape(self):
@@ -1393,7 +1425,234 @@ class MainWindow(QMainWindow, WindowMixin):
             return 1.0
         return w / pixmapWidth
 
+    def setAutoAnnotationWidgetsVisible(self, visible):
+        self.autoAnnotationStatus.setVisible(visible)
+        self.autoAnnotationProgress.setVisible(visible)
+        self.autoAnnotationCancelButton.setVisible(visible)
+
+    def selectAutoAnnotationModel(self, _value=False):
+        current_model = self.autoAnnotationModelPath
+        if current_model and os.path.isfile(current_model):
+            start_path = current_model
+        elif current_model:
+            start_path = os.path.dirname(current_model)
+        else:
+            start_path = self.currentPath()
+        selected = QFileDialog.getOpenFileName(
+            self,
+            u'%s - 选择自动标注模型' % __appname__,
+            start_path,
+            u'Ultralytics PyTorch 模型 (*.pt)')
+        if isinstance(selected, (tuple, list)):
+            selected = selected[0]
+        if not selected:
+            return ''
+        self.autoAnnotationModelPath = os.path.abspath(selected)
+        self.settings[SETTING_AUTO_ANNOTATION_MODEL] = (
+            self.autoAnnotationModelPath)
+        self.settings.save()
+        self.status(
+            u'自动标注模型：%s' % self.autoAnnotationModelPath,
+            10000)
+        return self.autoAnnotationModelPath
+
+    def startAutoAnnotation(self, _value=False):
+        if (self.autoAnnotationThread is not None and
+                self.autoAnnotationThread.isRunning()):
+            self.status(u'自动标注正在运行。', 5000)
+            return
+
+        if self.dirty:
+            if not self.discardChangesDialog():
+                return
+            current_file = self.filePath
+            if current_file:
+                self.loadFile(current_file)
+
+        if not self.defaultSaveDir or not os.path.isdir(self.defaultSaveDir):
+            self.openAnnotationDirDialog()
+            if (not self.defaultSaveDir or
+                    not os.path.isdir(self.defaultSaveDir)):
+                return
+
+        if (not self.autoAnnotationModelPath or
+                not os.path.isfile(self.autoAnnotationModelPath)):
+            if not self.selectAutoAnnotationModel():
+                return
+        if not self.autoAnnotationModelPath.lower().endswith('.pt'):
+            self.errorMessage(
+                u'自动标注模型无效',
+                u'请选择 Ultralytics YOLO / YOLO OBB 的 .pt 模型文件。')
+            return
+        if not self.labelHist:
+            self.errorMessage(
+                u'项目类别为空',
+                u'请先在 data/predefined_classes.txt 中配置项目类别。')
+            return
+
+        if self.dirname and os.path.isdir(self.dirname):
+            image_files = self.scanAllImages(self.dirname)
+        elif self.filePath and os.path.isfile(self.filePath):
+            image_files = [self.filePath]
+        else:
+            self.errorMessage(
+                u'没有图片', u'请先使用 Open Dir 打开图片目录。')
+            return
+
+        jobs = []
+        existing_count = 0
+        for image_path in image_files:
+            annotation_base = self.annotationBasePathForImage(image_path)
+            if (os.path.isfile(annotation_base + XML_EXT) or
+                    os.path.isfile(annotation_base + YOLO_EXT)):
+                existing_count += 1
+                continue
+            jobs.append({
+                'image_path': image_path,
+                'annotation_base': annotation_base,
+            })
+        if not jobs:
+            QMessageBox.information(
+                self,
+                u'自动标注',
+                u'当前图片目录中的 %d 张图片都已有 XML 或 TXT 标签，'
+                u'没有覆盖任何文件。' % existing_count)
+            return
+
+        self.autoAnnotationExistingCount = existing_count
+        self.autoAnnotationProgress.setRange(0, len(jobs))
+        self.autoAnnotationProgress.setValue(0)
+        self.autoAnnotationStatus.setText(
+            u'加载模型…（待标注 %d 张）' % len(jobs))
+        self.autoAnnotationStatus.setToolTip(self.autoAnnotationModelPath)
+        self.autoAnnotationCancelButton.setEnabled(True)
+        self.autoAnnotationCancelButton.setText(u'中止')
+        self.setAutoAnnotationWidgetsVisible(True)
+        self.actions.autoAnnotate.setEnabled(False)
+        self.actions.selectAutoAnnotationModel.setEnabled(False)
+        self.fileListView.setEnabled(False)
+        self.canvas.setEnabled(False)
+
+        thread = AutoAnnotationThread(
+            self.autoAnnotationModelPath,
+            jobs,
+            self.labelHist,
+            confidence=0.25,
+            parent=self)
+        thread.modelLoaded.connect(self.autoAnnotationModelLoaded)
+        thread.progressChanged.connect(self.autoAnnotationProgressChanged)
+        thread.completed.connect(self.autoAnnotationCompleted)
+        thread.failed.connect(self.autoAnnotationFailed)
+        thread.finished.connect(self.autoAnnotationThreadFinished)
+        self.autoAnnotationThread = thread
+        thread.start()
+
+    def autoAnnotationModelLoaded(self, annotation_format, mapping_details):
+        self.setAnnotationFormat(annotation_format)
+        # Switching format can reload the current image; keep editing disabled
+        # until the background batch has finished.
+        self.canvas.setEnabled(False)
+        mapping_text = '\n'.join(
+            '%s -> %s (%.1f%%)' %
+            (item['model_name'], item['project_name'], item['score'] * 100.0)
+            for item in mapping_details)
+        self.autoAnnotationStatus.setText(
+            u'模型已加载：%s' % self.annotationFormatName(annotation_format))
+        self.autoAnnotationStatus.setToolTip(mapping_text)
+
+    def autoAnnotationProgressChanged(self, done, total, image_path,
+                                      object_count, state):
+        self.autoAnnotationProgress.setRange(0, total)
+        self.autoAnnotationProgress.setValue(done)
+        filename = os.path.basename(image_path)
+        if state == 'saved':
+            text = u'%s：%d 个框' % (filename, object_count)
+        elif state == 'skipped':
+            text = u'%s：已有标签，已跳过' % filename
+        else:
+            text = u'%s：处理失败，继续下一张' % filename
+        self.autoAnnotationStatus.setText(text)
+        self.autoAnnotationStatus.setToolTip(image_path)
+
+    def cancelAutoAnnotation(self):
+        thread = self.autoAnnotationThread
+        if thread is None or not thread.isRunning():
+            return
+        thread.cancel()
+        self.autoAnnotationCancelButton.setEnabled(False)
+        self.autoAnnotationCancelButton.setText(u'中止中…')
+        self.autoAnnotationStatus.setText(u'将在当前图片推理结束后中止…')
+
+    def autoAnnotationCompleted(self, summary):
+        self.finishAutoAnnotationUi()
+        self.refreshAnnotationFileList(reloadCurrent=bool(self.filePath))
+
+        mapping_lines = [
+            '%s -> %s (%.1f%%)' %
+            (item['model_name'], item['project_name'], item['score'] * 100.0)
+            for item in summary.get('mapping', [])
+        ]
+        if len(mapping_lines) > 20:
+            mapping_lines = mapping_lines[:20] + [
+                u'……其余 %d 项请查看状态栏提示。' %
+                (len(summary.get('mapping', [])) - 20)]
+
+        title = u'自动标注已中止' if summary.get('cancelled') else u'自动标注完成'
+        message_lines = [
+            u'保存格式：%s' % self.annotationFormatName(
+                summary.get('format')),
+            u'新生成标签：%d 张，共 %d 个框' %
+            (summary.get('saved', 0), summary.get('objects', 0)),
+            u'保护并跳过已有标签：%d 张' %
+            (self.autoAnnotationExistingCount + summary.get('skipped', 0)),
+        ]
+        errors = summary.get('errors', [])
+        if errors:
+            message_lines.append(u'失败：%d 张' % len(errors))
+            message_lines.append(u'前几项错误：')
+            message_lines.extend(errors[:5])
+        message_lines.append(u'')
+        message_lines.append(u'模型类别 -> 项目类别：')
+        message_lines.extend(mapping_lines)
+        message = '\n'.join(message_lines)
+
+        if errors:
+            QMessageBox.warning(self, title, message)
+        else:
+            QMessageBox.information(self, title, message)
+        self.status(message_lines[1] + u'；' + message_lines[2], 15000)
+
+    def autoAnnotationFailed(self, error):
+        self.finishAutoAnnotationUi()
+        self.errorMessage(
+            u'自动标注失败',
+            u'%s<br><br>如果提示缺少 ultralytics，请在当前 LabelImg2 '
+            u'环境中运行：<br><code>pip install -r requirements.txt</code>' %
+            error)
+
+    def finishAutoAnnotationUi(self):
+        self.actions.autoAnnotate.setEnabled(True)
+        self.actions.selectAutoAnnotationModel.setEnabled(True)
+        self.fileListView.setEnabled(True)
+        self.canvas.setEnabled(bool(self.filePath))
+        self.setAutoAnnotationWidgetsVisible(False)
+
+    def autoAnnotationThreadFinished(self):
+        thread = self.sender()
+        if thread is self.autoAnnotationThread:
+            self.autoAnnotationThread = None
+        thread.deleteLater()
+
     def closeEvent(self, event):
+        if (self.autoAnnotationThread is not None and
+                self.autoAnnotationThread.isRunning()):
+            self.cancelAutoAnnotation()
+            QMessageBox.information(
+                self,
+                u'自动标注正在中止',
+                u'请等待当前图片推理结束后再关闭 LabelImg2。')
+            event.ignore()
+            return
         if not self.mayContinue():
             event.ignore()
             return

@@ -20,4 +20,6 @@ cscope*
 .subvimrc
 .vscode
 *.pkl
+*.pkl.*
+*.pt
 /.vs
