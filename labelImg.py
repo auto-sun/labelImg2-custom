@@ -123,9 +123,11 @@ class MainWindow(QMainWindow, WindowMixin):
         self._shapeClipboard = []
         self._clipboardPasteCount = 0
         self._shapeClipboardSourceFile = None
+        self._shapeClipboardIsCut = False
         self._undoStack = []
         self._undoPendingSnapshot = None
         self._undoRestoring = False
+        self._singleAutoAnnotationUndoContext = None
         self.autoAnnotationThread = None
         self.autoAnnotationModelPath = settings.get(
             SETTING_AUTO_ANNOTATION_MODEL, '')
@@ -334,6 +336,9 @@ class MainWindow(QMainWindow, WindowMixin):
         copyToClipboard = action('Copy Box', self.copyShapeToClipboard,
                                  'Ctrl+C', 'copy.svg',
                                  u'Copy selected Box', enabled=False)
+        cutToClipboard = action('Cut Box', self.cutShapeToClipboard,
+                                'Ctrl+X', 'copy.svg',
+                                u'Cut selected Box', enabled=False)
         pasteFromClipboard = action('Paste Box', self.pasteShapeFromClipboard,
                                     'Ctrl+V', 'copy.svg',
                                     u'Paste copied Box', enabled=False)
@@ -405,6 +410,7 @@ class MainWindow(QMainWindow, WindowMixin):
                               create=create, createSo=createSo, createRo=createRo, delete=delete, 
                               labelAsBack=labelAsBack, deleteLabel=deleteLabel, edit=edit, copy=copy,
                               copyToClipboard=copyToClipboard,
+                              cutToClipboard=cutToClipboard,
                               pasteFromClipboard=pasteFromClipboard,
                               undo=undo,
                               zoom=zoom, zoomIn=zoomIn, zoomOut=zoomOut, zoomOrg=zoomOrg,
@@ -421,11 +427,13 @@ class MainWindow(QMainWindow, WindowMixin):
                                   open, opendir, save, saveAs, close, resetAll, quit),
                               beginner=(),
                               editMenu=(undo, None, edit,
-                                        copyToClipboard, pasteFromClipboard,
+                                        cutToClipboard, copyToClipboard,
+                                        pasteFromClipboard,
                                         copy, delete,
                                         None),
                               beginnerContext=(undo, None,
-                                               copyToClipboard, pasteFromClipboard, None,
+                                               cutToClipboard, copyToClipboard,
+                                               pasteFromClipboard, None,
                                                create, createSo, createRo, copy,
                                                delete, labelAsBack, deleteLabel),
                               onLoadActive=(
@@ -450,7 +458,7 @@ class MainWindow(QMainWindow, WindowMixin):
         # Auto saving : Enable auto saving if pressing next
         self.autoSaving = QAction("Auto Saving", self)
         self.autoSaving.setCheckable(True)
-        self.autoSaving.setChecked(settings.get(SETTING_AUTO_SAVE, False))
+        self.autoSaving.setChecked(settings.get(SETTING_AUTO_SAVE, True))
         
         # Add option to enable/disable labels being painted at the top of bounding boxes
         self.paintLabelsOption = QAction("Paint Labels", self)
@@ -685,10 +693,45 @@ class MainWindow(QMainWindow, WindowMixin):
         if (self.undoSnapshotSignature(previous) ==
                 self.undoSnapshotSignature(current)):
             return
-        self._undoStack.append(previous)
+        self.pushUndoSnapshot(previous)
+
+    def pushUndoSnapshot(self, snapshot):
+        self._undoStack.append(snapshot)
         if len(self._undoStack) > self.UNDO_LIMIT:
             del self._undoStack[:-self.UNDO_LIMIT]
         self.updateUndoAction()
+
+    def prepareSingleAutoAnnotationUndo(self):
+        """Preserve undo history across the reload performed after inference."""
+        self.finishUndoOperation()
+        self._singleAutoAnnotationUndoContext = {
+            'file_key': self.clipboardImageKey(),
+            'history': list(self._undoStack),
+            'snapshot': self.captureUndoSnapshot(),
+        }
+        self.actions.undo.setEnabled(False)
+
+    def restoreSingleAutoAnnotationUndo(self):
+        context = self._singleAutoAnnotationUndoContext
+        self._singleAutoAnnotationUndoContext = None
+        if context is None:
+            self.updateUndoAction()
+            return False
+        if (not self.filePath or
+                self.clipboardImageKey() != context['file_key']):
+            self.updateUndoAction()
+            return False
+
+        self._undoStack = list(context['history'])
+        previous = context['snapshot']
+        current = self.captureUndoSnapshot()
+        changed = (self.undoSnapshotSignature(previous) !=
+                   self.undoSnapshotSignature(current))
+        if changed:
+            self.pushUndoSnapshot(previous)
+        else:
+            self.updateUndoAction()
+        return changed
 
     def undoLastOperation(self, _value=False):
         self.finishUndoOperation()
@@ -734,7 +777,9 @@ class MainWindow(QMainWindow, WindowMixin):
             self._undoPendingSnapshot = None
             self.updateUndoAction()
 
-        self.status(u'已撤销上一步操作。', 5000)
+        self.status(
+            u'已撤销上一步操作；请按 Ctrl+S 保存撤销结果。',
+            8000)
         return True
 
     def setDirty(self):
@@ -1103,6 +1148,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions.delete.setEnabled(selected)
         self.actions.copy.setEnabled(selected)
         self.actions.copyToClipboard.setEnabled(selected)
+        self.actions.cutToClipboard.setEnabled(selected)
 
     def addLabel(self, shape):
         shape.paintLabel = self.paintLabelsOption.isChecked()
@@ -1247,9 +1293,23 @@ class MainWindow(QMainWindow, WindowMixin):
         self._shapeClipboard = [shape.copy() for shape in shapes]
         self._clipboardPasteCount = 0
         self._shapeClipboardSourceFile = self.clipboardImageKey()
+        self._shapeClipboardIsCut = False
         self.actions.pasteFromClipboard.setEnabled(
             self.canvas.pixmap is not None and not self.canvas.pixmap.isNull())
         self.status('Copied %d Box(es)' % len(self._shapeClipboard))
+
+    def cutShapeToClipboard(self):
+        shapes = (list(self.canvas.selectedShapes)
+                  if self.canvas.selectedShapes
+                  else ([self.canvas.selectedShape]
+                        if self.canvas.selectedShape else []))
+        if not shapes:
+            return
+        cutCount = len(shapes)
+        self.copyShapeToClipboard()
+        self._shapeClipboardIsCut = True
+        self.deleteSelectedShape()
+        self.status('Cut %d Box(es)' % cutCount)
 
     def pasteShapeFromClipboard(self):
         if (not self._shapeClipboard or self.canvas.pixmap is None or
@@ -1258,7 +1318,14 @@ class MainWindow(QMainWindow, WindowMixin):
 
         sameSourceImage = (
             self.clipboardImageKey() == self._shapeClipboardSourceFile)
-        if not sameSourceImage:
+        cutPaste = self._shapeClipboardIsCut
+        if cutPaste:
+            # A cut-paste should restore the original coordinates. If an undo
+            # already restored the source boxes, overlap avoidance below will
+            # find a nearby free position instead.
+            target = None
+            offset = QPointF(0, 0)
+        elif not sameSourceImage:
             # Across images, preserve every copied point at its original coordinate.
             target = None
             offset = QPointF(0, 0)
@@ -1285,6 +1352,9 @@ class MainWindow(QMainWindow, WindowMixin):
             self.addLabel(shape)
         self.shapeSelectionChanged(True)
         self.setDirty()
+        if cutPaste:
+            self._shapeClipboardIsCut = False
+            self._clipboardPasteCount = 0
         self.status('Pasted %d Box(es)' % len(newShapes))
 
     def clipboardImageKey(self):
@@ -1721,6 +1791,7 @@ class MainWindow(QMainWindow, WindowMixin):
                                 if existing_policy == 'append' else []),
             'return_shapes': True,
         }
+        self.prepareSingleAutoAnnotationUndo()
         self.startAutoAnnotationJobs([job], mode='single')
 
     def startAutoAnnotation(self, _value=False):
@@ -1805,6 +1876,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions.autoAnnotate.setEnabled(False)
         self.actions.singleAutoAnnotate.setEnabled(False)
         self.actions.selectAutoAnnotationModel.setEnabled(False)
+        self.actions.undo.setEnabled(False)
         self.fileListView.setEnabled(False)
         self.canvas.setEnabled(False)
 
@@ -1901,17 +1973,24 @@ class MainWindow(QMainWindow, WindowMixin):
         self.status(message_lines[1] + u'；' + message_lines[2], 15000)
 
     def singleAutoAnnotationCompleted(self, summary):
-        self.finishAutoAnnotationUi()
-        self.refreshAnnotationFileList(reloadCurrent=bool(self.filePath))
-
         results = summary.get('job_results', [])
         result = results[0] if results else None
         errors = summary.get('errors', [])
+        if result is not None:
+            self.resetBackSample()
+        self.finishAutoAnnotationUi()
+        self.refreshAnnotationFileList(reloadCurrent=bool(self.filePath))
+        undo_available = self.restoreSingleAutoAnnotationUndo()
         if summary.get('cancelled'):
+            if undo_available:
+                message = (u'当前图片已经写入模型标签。\n'
+                           u'可按 Ctrl+Z 撤销，再按 Ctrl+S 保存撤销结果。')
+            else:
+                message = u'当前图片没有写入新的模型标签。'
             QMessageBox.information(
                 self,
                 u'单张自动标注已中止',
-                u'当前图片没有写入新的模型标签。')
+                message)
             self.status(u'单张自动标注已中止。', 10000)
             return
         if errors or result is None:
@@ -1942,6 +2021,9 @@ class MainWindow(QMainWindow, WindowMixin):
             u'当前图片最终：%d 个框' % final_count,
             u'保存位置：%s' % result.get('annotation_path', ''),
         ]
+        if undo_available:
+            message_lines.append(
+                u'可按 Ctrl+Z 撤销，再按 Ctrl+S 保存撤销结果。')
         if mapping_lines:
             message_lines.extend((u'', u'模型类别 -> 项目类别：'))
             message_lines.extend(mapping_lines)
@@ -1953,6 +2035,8 @@ class MainWindow(QMainWindow, WindowMixin):
             15000)
 
     def autoAnnotationFailed(self, error):
+        if self.autoAnnotationMode == 'single':
+            self.restoreSingleAutoAnnotationUndo()
         self.finishAutoAnnotationUi()
         title = (u'单张自动标注失败'
                  if self.autoAnnotationMode == 'single'
@@ -1970,6 +2054,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.fileListView.setEnabled(True)
         self.canvas.setEnabled(bool(self.filePath))
         self.setAutoAnnotationWidgetsVisible(False)
+        self.updateUndoAction()
 
     def autoAnnotationThreadFinished(self):
         thread = self.sender()

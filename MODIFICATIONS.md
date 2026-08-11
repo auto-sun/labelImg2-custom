@@ -19,6 +19,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
 - Existing XML/TXT annotations are skipped and never overwritten.
 - A separate top-toolbar action annotates only the current image and prompts
   to overwrite, append or cancel when labels already exist.
+- A current-image model result is stored as one ``Ctrl+Z`` undo step.
 - The completion dialog reports every model-to-project class mapping for
   manual review.
 
@@ -51,7 +52,10 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
 
 ## Clipboard
 
-- `Ctrl+C` and `Ctrl+V` copy and paste boxes, including across images.
+- `Ctrl+C`, `Ctrl+X` and `Ctrl+V` copy, cut and paste boxes, including
+  multi-selected boxes and cross-image pastes.
+- The first paste after a cut retains the original coordinates; cutting and
+  pasting can each be undone separately.
 - `Ctrl+Z` undoes box edits such as move, paste, delete, resize, rotate,
   and class changes. Each image keeps up to 50 undo steps.
 - Same-image pastes are offset to avoid exact overlap.
@@ -62,6 +66,7 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
 ## Navigation and persistence
 
 - A/D and left/right arrow keys navigate between images.
+- Auto Saving is enabled on first launch and remembers later manual changes.
 - With auto-save disabled, navigating away from unsaved changes asks for
   confirmation instead of silently discarding boxes.
 - Image filenames use natural numeric ordering.

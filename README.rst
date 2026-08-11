@@ -80,11 +80,12 @@ Main additions
 * Mouse-wheel image zoom, and mouse-wheel resizing for selected boxes.
 * ``Alt + left drag`` canvas panning.
 * Marquee multi-selection with group move, resize, copy and delete.
-* ``Ctrl+C`` / ``Ctrl+V`` box clipboard across images.
+* ``Ctrl+C`` / ``Ctrl+X`` / ``Ctrl+V`` box clipboard across images.
 * Automatic label editor after drawing a box.
 * Frequently used labels are prioritised when cycling by initial letter.
 * Persistent image directory, current image, annotation directory and default
   label.
+* Auto Saving is enabled on first launch and remembers later manual changes.
 * Persistent XML, YOLO or YOLO OBB output-format selection.
 * Automatic XML / 5-column YOLO / 9-column YOLO OBB input detection.
 * Background automatic annotation using a local YOLO or YOLO OBB ``.pt``
@@ -141,7 +142,7 @@ Left drag on empty image area   Marquee-select boxes
 ``Ctrl + click``                Toggle a box in the multi-selection
 Drag a selected box             Move the selected box or selected group
 ``Ctrl + drag a box``           Copy and move that box
-``Ctrl+C`` / ``Ctrl+V``         Copy/paste selected boxes
+``Ctrl+C/X/V``                  Copy/cut/paste selected boxes
 ``Ctrl+Z``                      Undo the last box operation (up to 50 steps)
 ``Ctrl+D``                      Duplicate selected boxes
 ``Delete``                      Delete selected boxes
@@ -180,6 +181,8 @@ image. If that image already has labels, a dialog offers three explicit
 choices: overwrite the current boxes, append model boxes to them, or cancel.
 The result is reloaded immediately after saving. Model output is written as
 YOLO/YOLO OBB TXT; an alternate same-name XML file is not deleted.
+The complete current-image result is one ``Ctrl+Z`` undo step. Use ``Ctrl+S``
+after undoing to write the restored labels back to disk.
 
 No model weights are distributed with this repository. Use only models you
 trained or are licensed to use; ``.pt`` files are ignored by Git.
