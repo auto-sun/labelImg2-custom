@@ -2,8 +2,9 @@
 
 [简体中文](NOTICE_zh-CN.md)
 
-This repository is a modified fork of
-[chinakook/labelImg2](https://github.com/chinakook/labelImg2).
+This repository is an independently maintained derivative of
+[chinakook/labelImg2](https://github.com/chinakook/labelImg2). It has left
+GitHub's fork network, but its upstream provenance remains fully documented.
 
 The original project is distributed under the MIT License. Its copyright
 notice and permission notice are preserved unchanged in
@@ -16,7 +17,7 @@ the [GNU Affero General Public License v3.0](LICENSE). This combined licence
 choice does not remove or replace the MIT rights and attribution attached to
 the original upstream code.
 
-The modifications in this fork include workflow, input handling, persistence,
+The modifications in this derivative include workflow, input handling, persistence,
 multi-selection, clipboard, YOLO/YOLO OBB export, and local-model automatic
 annotation changes. See
 [`MODIFICATIONS.md`](MODIFICATIONS.md) for details.
@@ -34,5 +35,5 @@ archives. Users are responsible for ensuring that every `.pt` model they
 load is self-trained or appropriately licensed. Third-party packages and model
 weights remain subject to their own licence terms.
 
-This fork is not an official release of the upstream project, and no
+This derivative is not an official release of the upstream project, and no
 endorsement by the original authors is implied.

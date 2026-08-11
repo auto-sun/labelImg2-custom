@@ -38,7 +38,7 @@ from libs.fileView import CFileView
 from libs.cvtlabels2yolo import cvt_xml_annotations_to_yolo
 
 __appname__ = 'labelImg2'
-__version__ = '2.0.1'
+__version__ = '2.0.2'
 
 # Utility functions and classes.
 

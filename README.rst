@@ -3,9 +3,10 @@ LabelImg2 Custom
 
 Documentation: English | `简体中文主页 <README.md>`_
 
-This repository is a modified fork of
+This is an independently maintained derivative of
 `chinakook/labelImg2 <https://github.com/chinakook/labelImg2>`_, a graphical
-image annotation tool written in Python and PyQt5.
+image annotation tool written in Python and PyQt5. The repository has left
+GitHub's fork network without concealing or changing its upstream provenance.
 
 The original project is distributed under the MIT License; its original
 copyright notice and licence text are preserved in
@@ -17,7 +18,10 @@ detailed list of changes.
 Downloads
 ---------
 
-* **v2.0.1 (recommended, AGPL-3.0 and all custom features):**
+* **v2.0.2 (recommended, standalone repository and all custom features):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.tar.gz>`__
+* **v2.0.1 (AGPL-3.0 licensing update):**
   `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.zip>`__ |
   `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.tar.gz>`__
 * **v2.0.0 (first automatic-annotation release):**
@@ -38,8 +42,8 @@ See `all releases <https://github.com/auto-sun/labelImg2-custom/releases>`__,
 `changelog <CHANGELOG.md>`__. Tags v1.0 through v1.2 are inherited upstream
 history and do not contain the complete custom feature set.
 
-Why this fork is more convenient
---------------------------------
+Why this derivative is more convenient
+---------------------------------------
 
 The custom workflow removes many repeated operations from day-to-day OBB
 annotation:

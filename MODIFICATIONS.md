@@ -1,4 +1,4 @@
-# Modifications in this fork
+# Modifications in this derivative project
 
 [简体中文](MODIFICATIONS_zh-CN.md)
 

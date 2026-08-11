@@ -1,7 +1,8 @@
 # 项目来源与版权归属说明
 
-本仓库是
-[chinakook/labelImg2](https://github.com/chinakook/labelImg2) 的修改版 Fork。
+本仓库是基于
+[chinakook/labelImg2](https://github.com/chinakook/labelImg2) 的独立维护派生项目。
+仓库虽已脱离 GitHub Fork 网络，但上游来源、提交历史与版权归属仍完整保留。
 
 原项目使用 MIT License 发布。原作者版权声明和完整许可证内容已原样保留在
 [`LICENSE-MIT-UPSTREAM`](LICENSE-MIT-UPSTREAM) 中。
@@ -12,7 +13,7 @@
 [GNU Affero General Public License v3.0](LICENSE) 免费开源发布。整体采用 AGPL-3.0
 不会删除或取代上游代码原有的 MIT 权利、版权声明和作者归属。
 
-本 Fork 的修改范围主要包括：
+本派生项目的修改范围主要包括：
 
 - OBB 标注操作流程；
 - 鼠标和键盘交互；

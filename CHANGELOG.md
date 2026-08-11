@@ -3,6 +3,15 @@
 本项目从 `v1.3.0` 开始记录自定义版本。`v1.0`、`v1.1` 和 `v1.2`
 是仓库继承的上游历史标签，不包含当前完整的自定义功能。
 
+## [v2.0.2] - 2026-08-11
+
+### 独立仓库发布
+
+- GitHub 仓库正式脱离上游 Fork 网络，作为独立维护的派生项目发布。
+- 完整保留上游提交历史、来源说明、原作者版权和 MIT 许可证文本。
+- 项目整体继续采用 GNU AGPL v3.0 免费开源，不改变 v2.0.1 的功能行为。
+- README、NOTICE、下载链接和软件版本号统一更新为 v2.0.2。
+
 ## [v2.0.1] - 2026-08-11
 
 ### 许可证合规调整
@@ -68,6 +77,7 @@
 - `v1.1`：上游历史版本。
 - `v1.0`：上游历史版本。
 
+[v2.0.2]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.0.2
 [v2.0.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.0.1
 [v2.0.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.0.0
 [v1.5.0]: https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.zip
