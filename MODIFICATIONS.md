@@ -82,6 +82,13 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
 
 ## Annotation formats and directories
 
+- Manually selecting another annotation format converts all matching labels
+  in the current dataset with visible progress and optional cancellation.
+- An old annotation is removed only after its replacement is written
+  successfully; failed and unprocessed files retain their original format.
+- With no existing labels, the save format changes immediately without an
+  unnecessary progress dialog.
+
 - Pascal VOC XML, standard YOLO and YOLO OBB can be selected as the direct
   per-image save format.
 - "Change Save Dir" and single-file "Open Annotation" are replaced by one
@@ -96,15 +103,6 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
   background images.
 - Standard YOLO saves the enclosing axis-aligned rectangle for rotated boxes.
 - Class IDs use the current predefined-class order.
-
-## YOLO export
-
-- Pascal VOC XML is converted directly to same-name YOLO or YOLO OBB `.txt`
-  files.
-- Export does not copy or re-encode images.
-- Export does not create train/validation directories, list files or YAML.
-- YOLO OBB records use normalised four-corner coordinates.
-- Class IDs follow the current predefined-class order.
 
 ## Startup and documentation
 

@@ -31,11 +31,12 @@ from libs.labelFile import LabelFile, LabelFileError
 from libs.pascal_voc_io import PascalVocReader, XML_EXT
 from libs.yolo_obb_io import (YoloReader, YoloError, YOLO_EXT,
                               save_yolo_annotations)
+from libs.annotation_converter import (AnnotationConversionError,
+                                       convert_annotation_file)
 from libs.auto_annotation import AutoAnnotationThread
 
 from libs.labelView import CLabelView, HashableQStandardItem
 from libs.fileView import CFileView
-from libs.cvtlabels2yolo import cvt_xml_annotations_to_yolo
 
 __appname__ = 'labelImg2'
 __version__ = '2.2.0'
@@ -451,7 +452,6 @@ class MainWindow(QMainWindow, WindowMixin):
             view=self.menu('&View'),
             help=self.menu('&Help'),
             recentFiles=QMenu('Open &Recent'),
-            exportAnnotations=QMenu('Export to'),
             annotationFormat=QMenu('Annotation Format'),
             labelList=labelMenu)
 
@@ -482,13 +482,8 @@ class MainWindow(QMainWindow, WindowMixin):
                     selectAutoAnnotationModel, singleAutoAnnotate,
                     autoAnnotate, None,
                     self.menus.annotationFormat,
-                    self.menus.recentFiles, self.menus.exportAnnotations,
+                    self.menus.recentFiles,
                     save, saveAs, close, resetAll, quit))
-        
-        export_as_yolo = action('Ultralytics YOLO', self.exportAsYOLO)
-        export_as_yolo_obb = action('Ultralytics YOLO OBB', self.exportAsYOLOOBB)
-
-        addActions(self.menus.exportAnnotations, (export_as_yolo, export_as_yolo_obb,))
 
         addActions(self.menus.help, (showInfo,))
         addActions(self.menus.view, (
@@ -1895,7 +1890,11 @@ class MainWindow(QMainWindow, WindowMixin):
         thread.start()
 
     def autoAnnotationModelLoaded(self, annotation_format, mapping_details):
-        self.setAnnotationFormat(annotation_format)
+        # Model output selects its required save format without converting the
+        # user's existing dataset. Dataset conversion is only a manual menu
+        # action.
+        self.setAnnotationFormat(
+            annotation_format, convertExisting=False)
         # Switching format can reload the current image; keep editing disabled
         # until the background batch has finished.
         self.canvas.setEnabled(False)
@@ -2161,24 +2160,151 @@ class MainWindow(QMainWindow, WindowMixin):
         if reloadCurrent and currentFile and currentFile in imglist:
             self.loadFile(currentFile)
 
-    def setAnnotationFormat(self, annotationFormat, checked=True):
-        if not checked or annotationFormat not in SUPPORTED_ANNOTATION_FORMATS:
+    def annotationImagesForConversion(self):
+        if self.dirname and os.path.isdir(self.dirname):
+            return self.scanAllImages(self.dirname)
+        if self.filePath and os.path.isfile(self.filePath):
+            return [self.filePath]
+        return []
+
+    def annotationSourcePathForImage(self, imagePath):
+        basePath = self.annotationBasePathForImage(imagePath)
+        xmlPath = basePath + XML_EXT
+        txtPath = basePath + YOLO_EXT
+        candidates = ((xmlPath, txtPath)
+                      if self.annotationFormat == FORMAT_PASCALVOC
+                      else (txtPath, xmlPath))
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                return candidate
+        return None
+
+    def collectAnnotationConversionJobs(self):
+        jobs = []
+        seenSources = set()
+        for imagePath in self.annotationImagesForConversion():
+            sourcePath = self.annotationSourcePathForImage(imagePath)
+            if not sourcePath:
+                continue
+            sourceKey = os.path.normcase(os.path.abspath(sourcePath))
+            if sourceKey in seenSources:
+                continue
+            seenSources.add(sourceKey)
+            jobs.append((imagePath, sourcePath))
+        return jobs
+
+    def convertExistingAnnotations(self, targetFormat):
+        jobs = self.collectAnnotationConversionJobs()
+        summary = {
+            'total': len(jobs),
+            'converted': 0,
+            'objects': 0,
+            'cancelled': False,
+            'errors': [],
+        }
+        if not jobs:
+            return summary
+
+        progress = QProgressDialog(
+            u'准备修改标签格式…', u'中止', 0, len(jobs), self)
+        progress.setWindowTitle(u'修改 Annotation Format')
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setAutoClose(False)
+        progress.setAutoReset(False)
+        progress.setValue(0)
+        progress.show()
+
+        for index, (imagePath, sourcePath) in enumerate(jobs, 1):
+            QApplication.processEvents()
+            if progress.wasCanceled():
+                summary['cancelled'] = True
+                break
+            progress.setLabelText(
+                u'正在修改标签格式（%d/%d）\n%s' %
+                (index, len(jobs), os.path.basename(imagePath)))
+            progress.setValue(index - 1)
+            QApplication.processEvents()
+            try:
+                _targetPath, objectCount = convert_annotation_file(
+                    imagePath, sourcePath, targetFormat, self.labelHist)
+                summary['converted'] += 1
+                summary['objects'] += objectCount
+            except AnnotationConversionError as error:
+                summary['errors'].append((sourcePath, str(error)))
+            progress.setValue(index)
+
+        progress.close()
+        return summary
+
+    def showAnnotationFormatResult(self, targetFormat, summary):
+        formatName = self.annotationFormatName(targetFormat)
+        if summary['total'] == 0:
+            QMessageBox.information(
+                self,
+                u'修改格式成功',
+                u'当前数据集还没有标签。\n后续标签将保存为：%s' %
+                formatName)
             return
+
+        message = [
+            u'目标格式：%s' % formatName,
+            u'成功修改：%d/%d 个标签文件，共 %d 个框' %
+            (summary['converted'], summary['total'], summary['objects']),
+        ]
+        if summary['cancelled']:
+            message.append(u'操作已中止；尚未处理的标签保留原格式。')
+        if summary['errors']:
+            message.append(u'修改失败：%d 个文件（原文件已保留）' %
+                           len(summary['errors']))
+            for path, error in summary['errors'][:8]:
+                message.append(u'%s：%s' % (os.path.basename(path), error))
+            if len(summary['errors']) > 8:
+                message.append(u'……其余 %d 个失败文件略。' %
+                               (len(summary['errors']) - 8))
+
+        if summary['cancelled'] or summary['errors']:
+            QMessageBox.warning(
+                self, u'标签格式修改未全部完成', u'\n'.join(message))
+        else:
+            QMessageBox.information(
+                self, u'修改格式成功', u'\n'.join(message))
+
+    def setAnnotationFormat(self, annotationFormat, checked=True,
+                            convertExisting=True):
+        if not checked or annotationFormat not in SUPPORTED_ANNOTATION_FORMATS:
+            return False
         changed = annotationFormat != self.annotationFormat
+        if not changed:
+            self.annotationFormatActions[annotationFormat].setChecked(True)
+            return True
+
+        previousFormat = self.annotationFormat
+        conversionSummary = None
+        if convertExisting:
+            # Persist unsaved current boxes in the old format first, so they
+            # participate in the same dataset-wide conversion.
+            if self.dirty and self.filePath and not self.saveFile():
+                self.annotationFormatActions[previousFormat].setChecked(True)
+                return False
+            conversionSummary = self.convertExistingAnnotations(
+                annotationFormat)
+
         self.annotationFormat = annotationFormat
         self.annotationFormatActions[annotationFormat].setChecked(True)
         self.settings[SETTING_ANNOTATION_FORMAT] = annotationFormat
         self.settings.save()
 
-        # Keep unsaved boxes on screen when switching output format. If the
-        # image is clean, reload it so the newly preferred XML/TXT file is
-        # reflected immediately.
         self.refreshAnnotationFileList(
-            reloadCurrent=changed and not self.dirty)
+            reloadCurrent=bool(self.filePath) and not self.dirty)
         self.status(
             'Annotation format: %s' %
             self.annotationFormatName(annotationFormat),
             8000)
+        if conversionSummary is not None:
+            self.showAnnotationFormatResult(
+                annotationFormat, conversionSummary)
+        return True
 
     def openAnnotationDirDialog(self, _value=False, dirpath=None):
         if not self.mayContinue():
@@ -2576,122 +2702,6 @@ class MainWindow(QMainWindow, WindowMixin):
         paintLabelsOptionChecked = self.paintLabelsOption.isChecked()
         for shape in self.canvas.shapes:
             shape.paintLabel = paintLabelsOptionChecked
-
-    def exportAsYOLOImpl(self, obb=False):
-        annotation_dir = self.defaultSaveDir
-        if not annotation_dir or not os.path.isdir(annotation_dir):
-            annotation_dir = self.dirname
-        if not annotation_dir or not os.path.isdir(annotation_dir):
-            self.errorMessage(
-                u'Export failed',
-                u'Please open an image folder and select the XML save folder first.'
-            )
-            return
-
-        xml_files = find_xml_files(annotation_dir)
-        if not xml_files:
-            QMessageBox.warning(
-                self,
-                u'Export failed',
-                u'No XML annotation files were found in:\n%s' % annotation_dir
-            )
-            return
-
-        export_title = (u'%s - Select YOLO OBB label output directory' % __appname__
-                        if obb else
-                        u'%s - Select YOLO label output directory' % __appname__)
-        save_dir_path = QFileDialog.getExistingDirectory(
-            self,
-            export_title,
-            annotation_dir,
-            QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
-        )
-        if not save_dir_path:
-            return
-
-        # Class IDs follow the current preset order, keeping the mapping stable.
-        label_map = {}
-        for label_name in self.labelHist:
-            if label_name and label_name not in label_map:
-                label_map[label_name] = len(label_map)
-
-        all_shapes_map = {}
-        try:
-            for xml_path in xml_files:
-                voc_reader = PascalVocReader(xml_path)
-                image_width, image_height, _image_depth = voc_reader.getSize()
-                if image_width <= 0 or image_height <= 0:
-                    raise ValueError(u'Cannot read a valid image size from %s' % xml_path)
-
-                relative_xml_path = os.path.relpath(xml_path, annotation_dir)
-                image_annotation = {
-                    "height": image_height,
-                    "width": image_width,
-                    "bboxes": []
-                }
-
-                for shape in voc_reader.getShapes():
-                    label_name = shape[0]
-                    points = shape[1]
-                    if len(points) != 4:
-                        raise ValueError(
-                            u'Annotation does not contain four points: %s' % xml_path
-                        )
-                    if label_name not in label_map:
-                        label_map[label_name] = len(label_map)
-
-                    image_annotation["bboxes"].append({
-                        "class": label_name,
-                        "x0": points[0][0],
-                        "y0": points[0][1],
-                        "x1": points[1][0],
-                        "y1": points[1][1],
-                        "x2": points[2][0],
-                        "y2": points[2][1],
-                        "x3": points[3][0],
-                        "y3": points[3][1],
-                    })
-
-                all_shapes_map[relative_xml_path] = image_annotation
-
-            exported_files = cvt_xml_annotations_to_yolo(
-                all_shapes_map,
-                label_map,
-                save_dir_path,
-                format='rotbox' if obb else 'box'
-            )
-        except (IOError, OSError, ValueError) as error:
-            self.errorMessage(u'Export failed', str(error))
-            return
-
-        format_name = u'YOLO OBB' if obb else u'YOLO'
-        self.statusBar().showMessage(
-            u'Exported %d %s label files to %s' %
-            (len(exported_files), format_name, save_dir_path),
-            10000
-        )
-        QMessageBox.information(
-            self,
-            u'Export complete',
-            u'Converted %d XML files to %s .txt labels.\n\nOutput: %s\n\n'
-            u'Only label .txt files were generated.' %
-            (len(exported_files), format_name, save_dir_path)
-        )
-    def exportAsYOLO(self, _value=False):
-        self.exportAsYOLOImpl(obb=False)
-
-
-    def exportAsYOLOOBB(self, _value=False):
-        self.exportAsYOLOImpl(obb=True)
-
-
-def find_xml_files(annotation_dir):
-    result = []
-    for root, _dirs, files in os.walk(annotation_dir):
-        for filename in files:
-            if filename.lower().endswith(XML_EXT):
-                result.append(os.path.join(root, filename))
-    return sorted(result, key=lambda path: path.casefold())
 
 
 def find_matching_files(dir_a, dir_b):

@@ -35,6 +35,7 @@
 - 图片文件名按照自然数字顺序排列，例如 `1、2、10、20`。
 - 支持相同子目录结构的图片与标签递归匹配。
 - 可以直接保存 Pascal VOC XML、Ultralytics YOLO 或 Ultralytics YOLO OBB。
+- 手动切换 `Annotation Format` 会批量转换当前数据集的已有标签并显示进度；转换成功后移除旧格式，失败时保留原文件。
 - 打开标签目录后自动识别 XML、YOLO 5 列 TXT、YOLO OBB 9 列 TXT 和空背景 TXT。
 - 支持本地 YOLO/YOLO OBB `.pt` 模型批量自动标注，自动切换输出格式并把模型类别
   模糊匹配到项目类别预设。
@@ -49,7 +50,6 @@
 - 未选框时滚轮缩放图片；选中框时滚轮只调整框大小。
 - `Alt + 鼠标左键拖动`平移画布。
 - 未开启自动保存时，切换含未保存修改的图片会先弹出确认提示。
-- XML 批量转换只生成同名 YOLO/YOLO OBB `.txt`，不复制图片、不划分数据集、不生成 YAML。
 
 ## 快速安装
 
@@ -90,7 +90,7 @@ labelImg.bat --check
 
 1. 使用 `File > Open Dir` 选择图片根目录。
 2. 使用 `File > Open Annotation Dir` 选择标签根目录。
-3. 在 `File > Annotation Format` 中选择 `Ultralytics YOLO OBB`。
+3. 在 `File > Annotation Format` 中选择 `Ultralytics YOLO OBB`；已有标签会显示进度并批量转换。
 4. 建议在 `View` 菜单开启 `Auto Saving`。
 5. 按 `E` 绘制旋转框，画完后直接输入类别首字母。
 6. 使用 `Z / X / C / V / F` 调整角度，选中框时滚轮调整大小。
