@@ -138,6 +138,83 @@ class LabelStatisticsTests(unittest.TestCase):
         self.assertEqual('2', self.window.currentImageLabelCount.text())
         self.assertEqual('0', self.window.sessionLabelCountDisplay.text())
 
+    def test_deleting_session_box_reduces_count_and_undo_restores_it(self):
+        self.loadFirstImage()
+        self.window.beginUndoOperation()
+        shape = make_shape(self.window.labelHist[0])
+        self.window.canvas.shapes.append(shape)
+        self.window.addLabel(shape, sessionCreated=True)
+        self.window.setDirty()
+        self.window.resetUndoHistory()
+
+        self.window.canvas._setSelectedShapes([shape])
+        self.window.deleteSelectedShape()
+
+        self.assertEqual('3', self.window.projectLabelCount.text())
+        self.assertEqual('2', self.window.currentImageLabelCount.text())
+        self.assertEqual('0', self.window.sessionLabelCountDisplay.text())
+
+        self.assertTrue(self.window.undoLastOperation())
+        self.assertEqual('4', self.window.projectLabelCount.text())
+        self.assertEqual('3', self.window.currentImageLabelCount.text())
+        self.assertEqual('1', self.window.sessionLabelCountDisplay.text())
+
+    def test_deleting_an_existing_box_does_not_reduce_session_count(self):
+        self.loadFirstImage()
+        existing = self.window.canvas.shapes[0]
+        self.window.canvas._setSelectedShapes([existing])
+
+        self.window.deleteSelectedShape()
+
+        self.assertEqual('0', self.window.sessionLabelCountDisplay.text())
+        self.assertEqual('1', self.window.currentImageLabelCount.text())
+
+    def test_mixed_multi_delete_only_subtracts_session_boxes(self):
+        self.loadFirstImage()
+        existing = self.window.canvas.shapes[0]
+        created = make_shape(self.window.labelHist[0])
+        self.window.canvas.shapes.append(created)
+        self.window.addLabel(created, sessionCreated=True)
+        self.window.setDirty()
+        self.window.canvas._setSelectedShapes([existing, created])
+
+        self.window.deleteSelectedShape()
+
+        self.assertEqual('0', self.window.sessionLabelCountDisplay.text())
+        self.assertEqual('1', self.window.currentImageLabelCount.text())
+
+    def test_cut_and_paste_restores_session_box_count(self):
+        self.loadFirstImage()
+        created = make_shape(self.window.labelHist[0])
+        self.window.canvas.shapes.append(created)
+        self.window.addLabel(created, sessionCreated=True)
+        self.window.setDirty()
+        self.window.canvas._setSelectedShapes([created])
+
+        self.window.cutShapeToClipboard()
+        self.assertEqual('0', self.window.sessionLabelCountDisplay.text())
+        self.window.pasteShapeFromClipboard()
+        self.assertEqual('1', self.window.sessionLabelCountDisplay.text())
+
+    def test_session_provenance_survives_save_and_image_reload(self):
+        self.loadFirstImage()
+        shape = make_shape(self.window.labelHist[0])
+        self.window.canvas.shapes.append(shape)
+        self.window.addLabel(shape, sessionCreated=True)
+        self.window.setDirty()
+        self.assertTrue(self.window.saveFile())
+
+        self.assertTrue(self.window.loadFile(self.imagePaths[1]))
+        self.assertTrue(self.window.loadFile(self.imagePaths[0]))
+        sessionShapes = [
+            item for item in self.window.canvas.shapes
+            if item.sessionCreated]
+        self.assertEqual(1, len(sessionShapes))
+
+        self.window.canvas._setSelectedShapes(sessionShapes)
+        self.window.deleteSelectedShape()
+        self.assertEqual('0', self.window.sessionLabelCountDisplay.text())
+
     def test_session_count_is_not_saved_between_windows(self):
         self.window.recordSessionLabels(7)
         self.assertEqual('7', self.window.sessionLabelCountDisplay.text())

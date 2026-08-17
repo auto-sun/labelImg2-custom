@@ -42,6 +42,9 @@ class Shape(object):
         self.difficult = difficult
         self.paintLabel = paintLabel
         self.extra_label = extra_label
+        # Runtime-only provenance used by the session label counter.  This is
+        # deliberately not written to XML/YOLO annotation files.
+        self.sessionCreated = False
 
         self.direction = 0
         self.center = None
@@ -255,6 +258,7 @@ class Shape(object):
             shape.fill_color = self.fill_color
         shape.difficult = self.difficult
         shape.extra_label = self.extra_label
+        shape.sessionCreated = self.sessionCreated
         return shape
 
     def __len__(self):

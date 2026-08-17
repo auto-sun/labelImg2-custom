@@ -88,9 +88,13 @@ Main additions
 * Marquee multi-selection with group move, resize, copy and delete.
 * ``Ctrl+C`` / ``Ctrl+X`` / ``Ctrl+V`` box clipboard across images.
 * Automatic label editor after drawing a box.
+* Multiple persistent custom ``key -> class.txt label`` bindings can be set
+  from ``Box Labels``. Conflicting keys are rejected, and a binding starts one
+  OBB for that class without reopening the label picker.
 * Frequently used labels are prioritised when cycling by initial letter.
 * A panel below ``Box Labels`` shows project, current-image and current-session
-  box totals in real time; the session count resets when the application restarts.
+  box totals in real time. Adding, deleting and undoing session-created boxes
+  updates the net session total; it resets when the application restarts.
 * Persistent image directory, current image, annotation directory and default
   label.
 * Auto Saving is enabled on first launch and remembers later manual changes.

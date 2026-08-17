@@ -39,8 +39,13 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
   usage-based order instead of alphabetical order.
 - Label frequency and recency are stored in the local settings file.
 - A statistics panel below `Box Labels` shows the project, current-image and
-  current-session box totals. The session total is not persisted and rolls
-  back when a box-creation operation is undone.
+  current-session box totals. Deleting a session-created box decreases the
+  net session total, deleting an older box does not, and undo restores it.
+  Runtime provenance is not written to annotation files.
+- `Box Labels` provides persistent custom key-to-label mappings. Targets are
+  restricted to the startup `class.txt`; duplicate, existing-action and direct
+  canvas key conflicts are rejected. A mapping starts one OBB with that label
+  and bypasses the normal post-draw label picker.
 
 ## Canvas and selection
 

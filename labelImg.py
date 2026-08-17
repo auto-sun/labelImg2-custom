@@ -12,6 +12,7 @@ import platform
 import re
 import sys
 import subprocess
+from collections import Counter
 from functools import partial
 
 from PyQt5.QtGui import *
@@ -34,6 +35,10 @@ from libs.yolo_obb_io import (YoloReader, YoloError, YOLO_EXT,
 from libs.annotation_converter import (AnnotationConversionError,
                                        convert_annotation_file)
 from libs.auto_annotation import AutoAnnotationThread
+from libs.labelShortcutDialog import (LabelShortcutDialog,
+                                      LabelShortcutValidationError,
+                                      canonical_shortcut,
+                                      validate_label_shortcuts)
 
 from libs.labelView import CLabelView, HashableQStandardItem
 from libs.fileView import CFileView
@@ -108,6 +113,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # Load predefined classes to the list
         self.loadPredefinedClasses(defaultPrefdefClassFile)
+        self.predefinedClasses = tuple(self.labelHist)
         self.loadLabelUsage(settings.get(SETTING_LABEL_USAGE, {}))
 
         # Main widgets and related state.
@@ -129,9 +135,17 @@ class MainWindow(QMainWindow, WindowMixin):
         self._undoPendingSnapshot = None
         self._undoRestoring = False
         self._singleAutoAnnotationUndoContext = None
+        self.labelShortcutMappings = settings.get(
+            SETTING_LABEL_SHORTCUTS, [])
+        self.labelShortcutActions = []
+        self._labelEditorActive = False
+        self._labelShortcutEditorStates = None
+        self._pendingLabelShortcut = None
         # Counts boxes created during this application run only.  It is
         # intentionally not persisted in Settings, so reopening starts at 0.
         self.sessionLabelCount = 0
+        self._sessionShapeRegistry = {}
+        self._pendingAutoSessionCounts = {}
         self.autoAnnotationThread = None
         self.autoAnnotationModelPath = settings.get(
             SETTING_AUTO_ANNOTATION_MODEL, '')
@@ -147,8 +161,18 @@ class MainWindow(QMainWindow, WindowMixin):
         self.diffcButton.stateChanged.connect(self.btnstate)
         self.editButton = QToolButton()
         self.editButton.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.labelShortcutSettingsButton = QToolButton()
+        self.labelShortcutSettingsButton.setObjectName(
+            'labelShortcutSettingsButton')
+        self.labelShortcutSettingsButton.setText(u'标签快捷键设置...')
+        self.labelShortcutSettingsButton.setIcon(newIcon('settings.svg'))
+        self.labelShortcutSettingsButton.setToolButtonStyle(
+            Qt.ToolButtonTextBesideIcon)
+        self.labelShortcutSettingsButton.clicked.connect(
+            self.openLabelShortcutSettings)
 
         labellistLayout.addWidget(self.editButton)
+        labellistLayout.addWidget(self.labelShortcutSettingsButton)
         labellistLayout.addWidget(self.diffcButton)
 
         # Create and add a widget for showing current label items
@@ -543,6 +567,10 @@ class MainWindow(QMainWindow, WindowMixin):
             create, createSo, createRo, copy, delete, None,
             zoomIn, zoom, zoomOut, zoomOrg, fitWindow, fitWidth)
 
+        self.setLabelShortcutMappings(
+            self.labelShortcutMappings, persist=False,
+            discardInvalid=True)
+
         self.statusBar().showMessage('%s started.' % __appname__)
         self.statusBar().show()
 
@@ -679,11 +707,112 @@ class MainWindow(QMainWindow, WindowMixin):
             str(max(0, self.sessionLabelCount)))
 
     def recordSessionLabels(self, count):
-        """Count newly created boxes for this application run."""
+        """Adjust the net number of session-created boxes."""
         count = int(count or 0)
-        if count > 0:
-            self.sessionLabelCount += count
+        self.sessionLabelCount = max(0, self.sessionLabelCount + count)
         self.updateLabelStatistics()
+
+    def imageSessionKey(self, imagePath=None):
+        imagePath = imagePath or self.filePath
+        if not imagePath:
+            return None
+        return os.path.normcase(os.path.abspath(imagePath))
+
+    def sessionShapeSignature(self, shape):
+        """Build a reload-stable signature without saving private metadata."""
+        if isinstance(shape, dict):
+            label = shape.get('label', '')
+            points = shape.get('points', [])
+        else:
+            label = shape.label
+            points = shape.points
+
+        normalizedPoints = []
+        for point in points:
+            if isinstance(point, QPointF):
+                x, y = point.x(), point.y()
+            else:
+                x, y = point
+            normalizedPoints.append((int(round(x)), int(round(y))))
+        if not normalizedPoints:
+            return str(label), ()
+        xs = [point[0] for point in normalizedPoints]
+        ys = [point[1] for point in normalizedPoints]
+        # The outer bounds survive XML, YOLO and YOLO OBB reloads.  Standard
+        # YOLO intentionally drops rotation, so rotation cannot be part of a
+        # stable runtime provenance signature.
+        return str(label), (min(xs), min(ys), max(xs), max(ys))
+
+    def rememberCurrentSessionShapes(self):
+        """Remember runtime provenance before a save, reload or image switch."""
+        if not hasattr(self, 'canvas'):
+            return
+        imageKey = self.imageSessionKey()
+        if not imageKey:
+            return
+        signatures = Counter(
+            self.sessionShapeSignature(shape)
+            for shape in self.canvas.shapes
+            if getattr(shape, 'sessionCreated', False))
+        if signatures:
+            self._sessionShapeRegistry[imageKey] = signatures
+        else:
+            self._sessionShapeRegistry.pop(imageKey, None)
+
+    def restoreCurrentSessionShapes(self):
+        """Restore runtime provenance after reading annotations from disk."""
+        imageKey = self.imageSessionKey()
+        if not imageKey:
+            return
+
+        remembered = Counter(self._sessionShapeRegistry.get(imageKey, {}))
+        rememberedCount = sum(remembered.values())
+        matchedCount = 0
+        for shape in self.canvas.shapes:
+            shape.sessionCreated = False
+            signature = self.sessionShapeSignature(shape)
+            if remembered[signature] > 0:
+                shape.sessionCreated = True
+                remembered[signature] -= 1
+                matchedCount += 1
+
+        # Batch automatic annotation only writes previously unlabelled
+        # images, so every resulting box in that image belongs to this run.
+        pendingCount = self._pendingAutoSessionCounts.pop(imageKey, 0)
+        if pendingCount > 0:
+            for shape in self.canvas.shapes:
+                if pendingCount <= 0:
+                    break
+                if not shape.sessionCreated:
+                    shape.sessionCreated = True
+                    pendingCount -= 1
+
+        # If session-created boxes disappeared during a reload (for example,
+        # model overwrite or discarding unsaved changes), keep the total in
+        # sync with what still exists.
+        missingCount = ((rememberedCount - matchedCount) + pendingCount)
+        if missingCount > 0:
+            self.sessionLabelCount = max(
+                0, self.sessionLabelCount - missingCount)
+        self.rememberCurrentSessionShapes()
+        self.updateLabelStatistics()
+
+    def markGeneratedSessionShapes(self, generatedShapes):
+        """Mark single-image model results after their file is reloaded."""
+        wanted = Counter(
+            self.sessionShapeSignature(shape) for shape in generatedShapes)
+        # Appended model results are saved after existing boxes, so search
+        # backwards to avoid marking an identical older box first.
+        markedCount = 0
+        for shape in reversed(self.canvas.shapes):
+            signature = self.sessionShapeSignature(shape)
+            if wanted[signature] > 0:
+                if not shape.sessionCreated:
+                    markedCount += 1
+                shape.sessionCreated = True
+                wanted[signature] -= 1
+        self.rememberCurrentSessionShapes()
+        return markedCount
 
     def populateModeActions(self):
         tool, menu = self.actions.beginner, self.actions.beginnerContext
@@ -774,6 +903,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.undoSnapshotSignature(current)):
             return
         self.pushUndoSnapshot(previous)
+        self.rememberCurrentSessionShapes()
 
     def pushUndoSnapshot(self, snapshot):
         self._undoStack.append(snapshot)
@@ -854,6 +984,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.dirty = True
             self.actions.save.setEnabled(True)
             self.canvas.update()
+            self.rememberCurrentSessionShapes()
             self.updateLabelStatistics()
         finally:
             self._undoRestoring = False
@@ -869,6 +1000,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.finishUndoOperation()
         self.dirty = True
         self.actions.save.setEnabled(True)
+        self.rememberCurrentSessionShapes()
         self.updateLabelStatistics()
 
     def setCanvasDirty(self):
@@ -919,6 +1051,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.statusBar().showMessage(message, delay)
 
     def resetState(self):
+        self._pendingLabelShortcut = None
+        self.rememberCurrentSessionShapes()
         self.resetUndoHistory()
         self.labelModel.clear()
         self.labelModel.setHorizontalHeaderLabels(["Label", "Extra Info"])
@@ -1006,6 +1140,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions.createRo.setEnabled(True)
         
     def createCancel(self):
+        self._pendingLabelShortcut = None
         self.canvas.setEditing(1)
         self.canvas.restoreCursor()
         self.actions.create.setEnabled(True)
@@ -1061,6 +1196,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.rememberDefaultLabel(self.default_label)
 
     def setLabelEditorActive(self, active):
+        self._labelEditorActive = bool(active)
         navigation_actions = (self.actions.openPrevImg, self.actions.openNextImg)
         if active:
             if self._labelNavigationStates is None:
@@ -1068,6 +1204,12 @@ class MainWindow(QMainWindow, WindowMixin):
                     item.isEnabled() for item in navigation_actions
                 ]
             for item in navigation_actions:
+                item.setEnabled(False)
+            if self._labelShortcutEditorStates is None:
+                self._labelShortcutEditorStates = [
+                    item.isEnabled()
+                    for item in self.labelShortcutActions]
+            for item in self.labelShortcutActions:
                 item.setEnabled(False)
         elif self._labelNavigationStates is not None:
             for item, was_enabled in zip(
@@ -1078,6 +1220,12 @@ class MainWindow(QMainWindow, WindowMixin):
                 self._focusCanvasAfterLabelEdit = False
                 QTimer.singleShot(
                     0, partial(self.canvas.setFocus, Qt.OtherFocusReason))
+        if not active and self._labelShortcutEditorStates is not None:
+            for item, wasEnabled in zip(
+                    self.labelShortcutActions,
+                    self._labelShortcutEditorStates):
+                item.setEnabled(wasEnabled)
+            self._labelShortcutEditorStates = None
 
     def rememberDefaultLabel(self, label):
         if label not in self.labelHist:
@@ -1085,6 +1233,157 @@ class MainWindow(QMainWindow, WindowMixin):
         self.default_label = label
         self.settings[SETTING_DEFAULT_LABEL] = label
         self.settings.save()
+
+    def labelShortcutReservedKeys(self):
+        """Collect menu, toolbar and direct canvas keyboard bindings."""
+        reserved = {}
+        customActions = set(self.labelShortcutActions)
+        for shortcutAction in self.findChildren(QAction):
+            if shortcutAction in customActions:
+                continue
+            description = shortcutAction.text().replace('&', '').replace(
+                '\n', ' ')
+            for sequence in shortcutAction.shortcuts():
+                shortcut = canonical_shortcut(sequence)
+                if shortcut:
+                    reserved.setdefault(shortcut, description)
+
+        canvasKeys = (
+            (Qt.Key_Escape, u'取消当前画框/选择'),
+            (Qt.Key_Return, u'确认或编辑标签'),
+            (Qt.Key_Enter, u'确认或编辑标签'),
+            (Qt.Key_Up, u'向上移动框'),
+            (Qt.Key_Down, u'向下移动框'),
+            (Qt.Key_Z, u'旋转框'),
+            (Qt.Key_X, u'旋转框'),
+            (Qt.Key_C, u'旋转框'),
+            (Qt.Key_V, u'旋转框'),
+            (Qt.Key_F, u'旋转框 90°'),
+            (Qt.Key_R, u'显示/隐藏旋转框'),
+            (Qt.Key_N, u'显示/隐藏普通框'),
+            (Qt.Key_O, u'切换越界模式'),
+            (Qt.Key_B, u'显示/隐藏中心点'),
+            (Qt.Key_Tab, u'切换界面焦点'),
+            (Qt.Key_Backtab, u'切换界面焦点'),
+        )
+        for key, description in canvasKeys:
+            shortcut = canonical_shortcut(QKeySequence(key))
+            if shortcut:
+                reserved.setdefault(shortcut, description)
+        return reserved
+
+    def setLabelShortcutMappings(self, mappings, persist=True,
+                                 discardInvalid=False):
+        """Validate, install and optionally persist label shortcuts."""
+        if isinstance(mappings, dict):
+            candidates = [
+                {'shortcut': shortcut, 'label': label}
+                for shortcut, label in mappings.items()]
+        elif isinstance(mappings, (list, tuple)):
+            candidates = [mapping for mapping in mappings
+                          if isinstance(mapping, dict)]
+        else:
+            candidates = []
+
+        reserved = self.labelShortcutReservedKeys()
+        if discardInvalid:
+            normalized = []
+            for mapping in candidates:
+                try:
+                    normalized = validate_label_shortcuts(
+                        normalized + [mapping], self.predefinedClasses,
+                        reserved)
+                except LabelShortcutValidationError:
+                    continue
+        else:
+            normalized = validate_label_shortcuts(
+                candidates, self.predefinedClasses, reserved)
+
+        for shortcutAction in self.labelShortcutActions:
+            self.removeAction(shortcutAction)
+            shortcutAction.deleteLater()
+        self.labelShortcutActions = []
+        self.labelShortcutMappings = normalized
+
+        for mapping in normalized:
+            shortcut = mapping['shortcut']
+            label = mapping['label']
+            shortcutAction = QAction(
+                u'标签快捷键：%s → %s' % (shortcut, label), self)
+            shortcutAction.setObjectName('labelShortcutAction')
+            shortcutAction.setShortcut(QKeySequence(shortcut))
+            shortcutAction.setShortcutContext(Qt.WindowShortcut)
+            shortcutAction.triggered.connect(partial(
+                self.activateLabelShortcut, shortcut, label))
+            shortcutAction.setEnabled(not self._labelEditorActive)
+            self.addAction(shortcutAction)
+            self.labelShortcutActions.append(shortcutAction)
+
+        self.updateLabelShortcutSettingsButton()
+        if persist or normalized != candidates:
+            self.settings[SETTING_LABEL_SHORTCUTS] = normalized
+            self.settings.save()
+        return normalized
+
+    def updateLabelShortcutSettingsButton(self):
+        count = len(self.labelShortcutMappings)
+        self.labelShortcutSettingsButton.setText(
+            u'标签快捷键设置...（%d）' % count)
+        if count:
+            details = '\n'.join(
+                u'%s → %s' % (mapping['shortcut'], mapping['label'])
+                for mapping in self.labelShortcutMappings)
+        else:
+            details = u'尚未设置标签快捷键。'
+        self.labelShortcutSettingsButton.setToolTip(details)
+
+    def openLabelShortcutSettings(self, _value=False):
+        previousStates = [
+            shortcutAction.isEnabled()
+            for shortcutAction in self.labelShortcutActions]
+        for shortcutAction in self.labelShortcutActions:
+            shortcutAction.setEnabled(False)
+        dialog = LabelShortcutDialog(
+            self.labelShortcutMappings,
+            self.predefinedClasses,
+            self.labelShortcutReservedKeys(),
+            self)
+        if dialog.exec_():
+            self.setLabelShortcutMappings(dialog.validatedMappings)
+            self.status(u'标签快捷键设置已保存。', 8000)
+            return True
+        for shortcutAction, wasEnabled in zip(
+                self.labelShortcutActions, previousStates):
+            shortcutAction.setEnabled(wasEnabled)
+        return False
+
+    def activateLabelShortcut(self, shortcut, label, _checked=False):
+        if self._labelEditorActive or label not in self.predefinedClasses:
+            return False
+        if label not in self.labelHist:
+            self.labelHist.append(label)
+            self.refreshLabelSelectionOrder()
+        self.rememberDefaultLabel(label)
+        self._pendingLabelShortcut = label
+
+        if (not self.filePath or self.canvas.pixmap is None or
+                self.canvas.pixmap.isNull()):
+            self.status(
+                u'快捷键 %s 已选择默认类别 %s；打开图片后请再次按快捷键开始画框。' %
+                (shortcut, label), 8000)
+            return True
+
+        if not self.canvas.drawing():
+            self.canvas.setEditing(0)
+        self.canvas.canDrawRotatedRect = True
+        self.actions.create.setEnabled(False)
+        self.actions.createSo.setEnabled(False)
+        self.actions.createRo.setEnabled(True)
+        self.canvas.setFocus(Qt.ShortcutFocusReason)
+        self.status(
+            u'快捷键 %s → %s：请绘制一个 OBB 框。' %
+            (shortcut, label), 8000)
+        return True
 
     def loadLabelUsage(self, raw_usage):
         raw_usage = raw_usage if isinstance(raw_usage, dict) else {}
@@ -1252,7 +1551,9 @@ class MainWindow(QMainWindow, WindowMixin):
         for action in self.actions.onShapesPresent:
             action.setEnabled(True)
         if sessionCreated:
+            shape.sessionCreated = True
             self.recordSessionLabels(1)
+            self.rememberCurrentSessionShapes()
         else:
             self.updateLabelStatistics()
 
@@ -1266,13 +1567,23 @@ class MainWindow(QMainWindow, WindowMixin):
         self.labelModel.removeRows(index.row(), 1)
         del self.ShapeItemDict[shape]
         del self.ItemShapeDict[item0]
+        if getattr(shape, 'sessionCreated', False):
+            shape.sessionCreated = False
+            self.recordSessionLabels(-1)
+        self.rememberCurrentSessionShapes()
         self.updateLabelStatistics()
 
     def remAllLabels(self):
+        removedSessionCount = sum(
+            1 for shape in self.canvas.shapes
+            if getattr(shape, 'sessionCreated', False))
         self.canvas.deleteAll()
         self.labelModel.clear()
         self.ShapeItemDict.clear()
         self.ItemShapeDict.clear()
+        if removedSessionCount:
+            self.recordSessionLabels(-removedSessionCount)
+        self.rememberCurrentSessionShapes()
         self.updateLabelStatistics()
 
 
@@ -1326,6 +1637,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.addLabel(shape)
 
         self.canvas.loadShapes(s)
+        self.restoreCurrentSessionShapes()
         self.updateLabelStatistics()
 
     def saveLabels(self, annotationFilePath):
@@ -1442,7 +1754,10 @@ class MainWindow(QMainWindow, WindowMixin):
             return
         for shape in newShapes:
             shape.alwaysShowCorner = self.drawCorner.isChecked()
-            self.addLabel(shape, sessionCreated=not cutPaste)
+            self.addLabel(
+                shape,
+                sessionCreated=(not cutPaste or bool(getattr(
+                    shape, 'sessionCreated', False))))
         self.shapeSelectionChanged(True)
         self.setDirty()
         if cutPaste:
@@ -1482,6 +1797,8 @@ class MainWindow(QMainWindow, WindowMixin):
     # Callback functions:
     def newShape(self, continous):
         text = self.default_label
+        shortcutLabel = self._pendingLabelShortcut
+        self._pendingLabelShortcut = None
         extra_text = ""
         if text is not None:
             generate_color = generateColorByText(text)
@@ -1503,8 +1820,12 @@ class MainWindow(QMainWindow, WindowMixin):
                 if item is not None:
                     index = self.labelModel.indexFromItem(item)
                     self.labelList.setCurrentIndex(index)
-                    self._focusCanvasAfterLabelEdit = True
-                    self.labelList.edit(index)
+                    if shortcutLabel == text:
+                        self.canvas.setFocus(Qt.OtherFocusReason)
+                        self.status(u'已创建 %s 标签框。' % text, 5000)
+                    else:
+                        self._focusCanvasAfterLabelEdit = True
+                        self.labelList.edit(index)
 
             self.setDirty()
 
@@ -2016,6 +2337,9 @@ class MainWindow(QMainWindow, WindowMixin):
             text = u'%s：已有标签，已跳过' % filename
         else:
             text = u'%s：处理失败，继续下一张' % filename
+        if state == 'saved' and self.autoAnnotationMode == 'batch':
+            imageKey = self.imageSessionKey(image_path)
+            self._pendingAutoSessionCounts[imageKey] = int(object_count)
         self.autoAnnotationStatus.setText(text)
         self.autoAnnotationStatus.setToolTip(image_path)
 
@@ -2077,10 +2401,12 @@ class MainWindow(QMainWindow, WindowMixin):
         errors = summary.get('errors', [])
         if result is not None:
             self.resetBackSample()
-            self.recordSessionLabels(
-                len(result.get('generated_shapes', [])))
         self.finishAutoAnnotationUi()
         self.refreshAnnotationFileList(reloadCurrent=bool(self.filePath))
+        if result is not None:
+            generatedShapes = result.get('generated_shapes', [])
+            markedCount = self.markGeneratedSessionShapes(generatedShapes)
+            self.recordSessionLabels(markedCount)
         undo_available = self.restoreSingleAutoAnnotationUndo()
         if summary.get('cancelled'):
             if undo_available:
@@ -2202,6 +2528,7 @@ class MainWindow(QMainWindow, WindowMixin):
         settings[SETTING_PAINT_LABEL] = self.paintLabelsOption.isChecked()
         settings[SETTING_DEFAULT_LABEL] = self.default_label
         settings[SETTING_LABEL_USAGE] = self.labelUsage
+        settings[SETTING_LABEL_SHORTCUTS] = self.labelShortcutMappings
         settings[SETTING_ANNOTATION_FORMAT] = self.annotationFormat
         settings.save()
     ## User Dialogs ##

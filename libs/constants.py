@@ -17,6 +17,7 @@ SETTING_DEFAULT_LABEL = 'defaultlabel'
 SETTING_LABEL_USAGE = 'labelusage'
 SETTING_ANNOTATION_FORMAT = 'annotationformat'
 SETTING_AUTO_ANNOTATION_MODEL = 'autoannotationmodel'
+SETTING_LABEL_SHORTCUTS = 'labelshortcuts'
 
 FORMAT_PASCALVOC = 'xml'
 FORMAT_YOLO = 'yolo'
