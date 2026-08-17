@@ -38,6 +38,9 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
 - Repeated initial-letter selection cycles through matching labels in a
   usage-based order instead of alphabetical order.
 - Label frequency and recency are stored in the local settings file.
+- A statistics panel below `Box Labels` shows the project, current-image and
+  current-session box totals. The session total is not persisted and rolls
+  back when a box-creation operation is undone.
 
 ## Canvas and selection
 

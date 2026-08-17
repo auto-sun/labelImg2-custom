@@ -15,6 +15,12 @@ including its Ultralytics integration, is released under GNU AGPL v3.0 in
 ``LICENSE``. See ``NOTICE.md`` for attribution and ``MODIFICATIONS.md`` for a
 detailed list of changes.
 
+Interface preview
+-----------------
+
+.. image:: docs/images/labelimg2-interface-redacted.png
+   :alt: LabelImg2 Custom annotation interface
+
 Downloads
 ---------
 
@@ -83,6 +89,8 @@ Main additions
 * ``Ctrl+C`` / ``Ctrl+X`` / ``Ctrl+V`` box clipboard across images.
 * Automatic label editor after drawing a box.
 * Frequently used labels are prioritised when cycling by initial letter.
+* A panel below ``Box Labels`` shows project, current-image and current-session
+  box totals in real time; the session count resets when the application restarts.
 * Persistent image directory, current image, annotation directory and default
   label.
 * Auto Saving is enabled on first launch and remembers later manual changes.

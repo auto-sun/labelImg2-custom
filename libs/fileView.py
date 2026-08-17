@@ -57,6 +57,20 @@ class CFileListModel(QStringListModel):
 
         return super(CFileListModel, self).setStringList(strings)
 
+    def annotationCount(self, index):
+        """Return the cached object count for one image, or zero."""
+        row = index.row() if index is not None else -1
+        if row < 0 or row >= len(self.dispList):
+            return 0
+        count = self.dispList[row][1]
+        return count if isinstance(count, int) and count > 0 else 0
+
+    def totalAnnotationCount(self):
+        """Return the total number of valid boxes cached by the file list."""
+        return sum(
+            count for _name, count, _visited in self.dispList
+            if isinstance(count, int) and count > 0)
+
     def data(self, index, role):
         item = self.dispList[index.row()]
         pathname, count = item[0], item[1]

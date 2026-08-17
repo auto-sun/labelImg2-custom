@@ -129,6 +129,9 @@ class MainWindow(QMainWindow, WindowMixin):
         self._undoPendingSnapshot = None
         self._undoRestoring = False
         self._singleAutoAnnotationUndoContext = None
+        # Counts boxes created during this application run only.  It is
+        # intentionally not persisted in Settings, so reopening starts at 0.
+        self.sessionLabelCount = 0
         self.autoAnnotationThread = None
         self.autoAnnotationModelPath = settings.get(
             SETTING_AUTO_ANNOTATION_MODEL, '')
@@ -164,8 +167,39 @@ class MainWindow(QMainWindow, WindowMixin):
         myHeader = self.labelList.verticalHeader()
         myHeader.clicked.connect(self.labelHeaderClicked)
 
+        labellistLayout.addWidget(self.labelList, 1)
 
-        labellistLayout.addWidget(self.labelList)
+        self.labelStatisticsGroup = QGroupBox(u'标签统计')
+        self.labelStatisticsGroup.setObjectName('labelStatisticsGroup')
+        statisticsLayout = QGridLayout()
+        statisticsLayout.setContentsMargins(8, 6, 8, 6)
+        statisticsLayout.setHorizontalSpacing(12)
+        statisticsLayout.setVerticalSpacing(4)
+
+        self.projectLabelCount = QLabel('0')
+        self.projectLabelCount.setObjectName('projectLabelCount')
+        self.currentImageLabelCount = QLabel('0')
+        self.currentImageLabelCount.setObjectName('currentImageLabelCount')
+        self.sessionLabelCountDisplay = QLabel('0')
+        self.sessionLabelCountDisplay.setObjectName(
+            'sessionLabelCountDisplay')
+        countDisplays = (
+            self.projectLabelCount,
+            self.currentImageLabelCount,
+            self.sessionLabelCountDisplay,
+        )
+        for display in countDisplays:
+            display.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            display.setMinimumWidth(48)
+
+        statisticsLayout.addWidget(QLabel(u'项目总标签数：'), 0, 0)
+        statisticsLayout.addWidget(self.projectLabelCount, 0, 1)
+        statisticsLayout.addWidget(QLabel(u'当前图片标签数：'), 1, 0)
+        statisticsLayout.addWidget(self.currentImageLabelCount, 1, 1)
+        statisticsLayout.addWidget(QLabel(u'本次工作已打标签数：'), 2, 0)
+        statisticsLayout.addWidget(self.sessionLabelCountDisplay, 2, 1)
+        self.labelStatisticsGroup.setLayout(statisticsLayout)
+        labellistLayout.addWidget(self.labelStatisticsGroup, 0)
 
         self.dock = QDockWidget(u'Box Labels', self)
         self.dock.setObjectName(u'Labels')
@@ -601,6 +635,56 @@ class MainWindow(QMainWindow, WindowMixin):
     def noShapes(self):
         return not self.ItemShapeDict
 
+    def currentImageFileModelIndex(self):
+        """Return the file-list index matching the loaded image."""
+        if not self.filePath:
+            return QModelIndex()
+
+        target = os.path.normcase(os.path.abspath(self.filePath))
+        current = self.filesm.currentIndex()
+        if current.isValid():
+            currentPath = self.fileModel.data(current, Qt.EditRole)
+            if (currentPath and os.path.normcase(os.path.abspath(
+                    str(currentPath))) == target):
+                return current
+
+        for row in range(self.fileModel.rowCount()):
+            index = self.fileModel.index(row)
+            path = self.fileModel.data(index, Qt.EditRole)
+            if (path and os.path.normcase(os.path.abspath(str(path))) ==
+                    target):
+                return index
+        return QModelIndex()
+
+    def updateLabelStatistics(self):
+        """Refresh project, current-image and current-session box counts."""
+        if not hasattr(self, 'projectLabelCount'):
+            return
+
+        currentCount = (len(self.canvas.shapes)
+                        if self.filePath and hasattr(self, 'canvas') else 0)
+        projectCount = self.fileModel.totalAnnotationCount()
+        currentIndex = self.currentImageFileModelIndex()
+        if currentIndex.isValid():
+            projectCount -= self.fileModel.annotationCount(currentIndex)
+            projectCount += currentCount
+        elif self.filePath:
+            # A directly opened image may not yet be represented by the file
+            # list, but its boxes still belong in the visible project total.
+            projectCount += currentCount
+
+        self.projectLabelCount.setText(str(max(0, projectCount)))
+        self.currentImageLabelCount.setText(str(currentCount))
+        self.sessionLabelCountDisplay.setText(
+            str(max(0, self.sessionLabelCount)))
+
+    def recordSessionLabels(self, count):
+        """Count newly created boxes for this application run."""
+        count = int(count or 0)
+        if count > 0:
+            self.sessionLabelCount += count
+        self.updateLabelStatistics()
+
     def populateModeActions(self):
         tool, menu = self.actions.beginner, self.actions.beginnerContext
         self.tools.clear()
@@ -640,6 +724,7 @@ class MainWindow(QMainWindow, WindowMixin):
                        for shape in self.canvas.shapes],
             'selected': selected,
             'back_sample': bool(self.back_sample),
+            'session_label_count': self.sessionLabelCount,
         }
 
     def undoSnapshotSignature(self, snapshot):
@@ -761,12 +846,15 @@ class MainWindow(QMainWindow, WindowMixin):
                         if 0 <= index < len(shapes)]
             self.canvas._setSelectedShapes(selected)
             self.back_sample = bool(snapshot['back_sample'])
+            self.sessionLabelCount = int(snapshot.get(
+                'session_label_count', self.sessionLabelCount))
 
             for actionItem in self.actions.onShapesPresent:
                 actionItem.setEnabled(bool(shapes))
             self.dirty = True
             self.actions.save.setEnabled(True)
             self.canvas.update()
+            self.updateLabelStatistics()
         finally:
             self._undoRestoring = False
             self._undoPendingSnapshot = None
@@ -781,11 +869,13 @@ class MainWindow(QMainWindow, WindowMixin):
         self.finishUndoOperation()
         self.dirty = True
         self.actions.save.setEnabled(True)
+        self.updateLabelStatistics()
 
     def setCanvasDirty(self):
         """Mark an in-progress canvas gesture dirty; commit on release."""
         self.dirty = True
         self.actions.save.setEnabled(True)
+        self.updateLabelStatistics()
 
     def setBackSample(self):
         self.back_sample = True
@@ -841,6 +931,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions.pasteFromClipboard.setEnabled(False)
         self.labelCoordinates.clear()
         self.imageDim.clear()
+        self.updateLabelStatistics()
 
     def labelDataChanged(self, topLeft, bottomRight):
         item0 = self.labelModel.item(topLeft.row(), 0)
@@ -1145,7 +1236,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions.copyToClipboard.setEnabled(selected)
         self.actions.cutToClipboard.setEnabled(selected)
 
-    def addLabel(self, shape):
+    def addLabel(self, shape, sessionCreated=False):
         shape.paintLabel = self.paintLabelsOption.isChecked()
 
         item0 = HashableQStandardItem(shape.label)
@@ -1160,6 +1251,10 @@ class MainWindow(QMainWindow, WindowMixin):
         
         for action in self.actions.onShapesPresent:
             action.setEnabled(True)
+        if sessionCreated:
+            self.recordSessionLabels(1)
+        else:
+            self.updateLabelStatistics()
 
     def remLabel(self, shape):
         if shape is None:
@@ -1171,12 +1266,14 @@ class MainWindow(QMainWindow, WindowMixin):
         self.labelModel.removeRows(index.row(), 1)
         del self.ShapeItemDict[shape]
         del self.ItemShapeDict[item0]
+        self.updateLabelStatistics()
 
     def remAllLabels(self):
         self.canvas.deleteAll()
         self.labelModel.clear()
         self.ShapeItemDict.clear()
         self.ItemShapeDict.clear()
+        self.updateLabelStatistics()
 
 
     def loadLabels(self, shapes):
@@ -1229,6 +1326,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.addLabel(shape)
 
         self.canvas.loadShapes(s)
+        self.updateLabelStatistics()
 
     def saveLabels(self, annotationFilePath):
         def format_shape(s):
@@ -1271,7 +1369,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.beginUndoOperation()
         newShapes = self.canvas.copySelectedShape()
         for shape in newShapes:
-            self.addLabel(shape)
+            self.addLabel(shape, sessionCreated=True)
         if newShapes:
             self.shapeSelectionChanged(True)
             self.setDirty()
@@ -1344,7 +1442,7 @@ class MainWindow(QMainWindow, WindowMixin):
             return
         for shape in newShapes:
             shape.alwaysShowCorner = self.drawCorner.isChecked()
-            self.addLabel(shape)
+            self.addLabel(shape, sessionCreated=not cutPaste)
         self.shapeSelectionChanged(True)
         self.setDirty()
         if cutPaste:
@@ -1358,7 +1456,7 @@ class MainWindow(QMainWindow, WindowMixin):
         return os.path.normcase(os.path.abspath(self.filePath))
 
     def copyShapeByDragging(self, shape):
-        self.addLabel(shape)
+        self.addLabel(shape, sessionCreated=True)
         self.shapeSelectionChanged(True)
         self.setCanvasDirty()
 
@@ -1390,7 +1488,7 @@ class MainWindow(QMainWindow, WindowMixin):
             shape = self.canvas.setLastLabel(text, generate_color, generate_color, extra_text)
             shape.alwaysShowCorner=self.drawCorner.isChecked()
 
-            self.addLabel(shape)
+            self.addLabel(shape, sessionCreated=True)
             if continous:
                 self.recordLabelUsage(text)
             else:
@@ -1605,6 +1703,7 @@ class MainWindow(QMainWindow, WindowMixin):
                     #self.errorMessage("Image info not matched", "The width or height of annotation file is not matched with that of the image")
                     self.saveFile()
 
+            self.updateLabelStatistics()
             self.canvas.setFocus(True)
             return True
         return False
@@ -1933,6 +2032,7 @@ class MainWindow(QMainWindow, WindowMixin):
         if self.autoAnnotationMode == 'single':
             self.singleAutoAnnotationCompleted(summary)
             return
+        self.recordSessionLabels(summary.get('objects', 0))
         self.finishAutoAnnotationUi()
         self.refreshAnnotationFileList(reloadCurrent=bool(self.filePath))
 
@@ -1977,6 +2077,8 @@ class MainWindow(QMainWindow, WindowMixin):
         errors = summary.get('errors', [])
         if result is not None:
             self.resetBackSample()
+            self.recordSessionLabels(
+                len(result.get('generated_shapes', [])))
         self.finishAutoAnnotationUi()
         self.refreshAnnotationFileList(reloadCurrent=bool(self.filePath))
         undo_available = self.restoreSingleAutoAnnotationUndo()
@@ -2156,6 +2258,8 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.fileListView.scrollTo(currentIndex)
         finally:
             self.filesm.blockSignals(False)
+
+        self.updateLabelStatistics()
 
         if reloadCurrent and currentFile and currentFile in imglist:
             self.loadFile(currentFile)
@@ -2369,6 +2473,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.fileModel.setStringList(
             imglist, self.dirname, self.defaultSaveDir,
             self.annotationFormat)
+        self.updateLabelStatistics()
         self.setWindowTitle(__appname__ + ' ' + self.dirname)
         resumeFilePath = os.path.abspath(resumeFilePath) if resumeFilePath else None
         if resumeFilePath in imglist:
@@ -2448,6 +2553,7 @@ class MainWindow(QMainWindow, WindowMixin):
                     self.filesm.blockSignals(True)
                     self.filesm.setCurrentIndex(curIndex, QItemSelectionModel.SelectCurrent)
                     self.filesm.blockSignals(False)
+                self.updateLabelStatistics()
 
     def saveLocal(self, file_path):
         imgFileDir = os.path.dirname(file_path)
@@ -2510,6 +2616,10 @@ class MainWindow(QMainWindow, WindowMixin):
         savedPath = self.annotationPathWithExtension(savedPath)
         if os.path.exists(savedPath):
             os.remove(savedPath)
+            index = self.currentImageFileModelIndex()
+            if index.isValid():
+                self.fileModel.setData(index, None, Qt.BackgroundRole)
+            self.updateLabelStatistics()
             return True
         return False
 
@@ -2564,6 +2674,11 @@ class MainWindow(QMainWindow, WindowMixin):
             return False
 
         self.setClean()
+        index = self.currentImageFileModelIndex()
+        if index.isValid():
+            self.fileModel.setData(
+                index, len(self.canvas.shapes), Qt.BackgroundRole)
+        self.updateLabelStatistics()
         self.statusBar().showMessage(
             'Saved %s to %s' %
             (self.annotationFormatName(), annotationFilePath))
@@ -2629,7 +2744,7 @@ class MainWindow(QMainWindow, WindowMixin):
     def copyShape(self):
         self.beginUndoOperation()
         self.canvas.endMove(copy=True)
-        self.addLabel(self.canvas.selectedShape)
+        self.addLabel(self.canvas.selectedShape, sessionCreated=True)
         self.setDirty()
 
     def moveShape(self):
