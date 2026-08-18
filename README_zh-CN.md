@@ -57,6 +57,7 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 | 切换图片前容易忘记保存 | `View > Auto Saving` 首次启动默认开启 |
 | 图片缩放和框缩放需要不同复杂组合键 | 未选框时滚轮缩放图片，选中框时滚轮缩放框 |
 | 改变标签格式还要另外导出 | 选择新格式后自动批量转换全部已有标签并显示进度 |
+| 背景图片还要手动创建空文件 | 工具栏一键按当前格式生成空 XML/TXT，并标记为 `[BG]` |
 | 未标注图片只能逐张手工画框 | 可加载本地 YOLO/YOLO OBB `.pt` 批量预标注 |
 | 打开标签和设置保存目录是两个入口 | 合并为一个 `Open Annotation Dir` |
 
@@ -257,6 +258,14 @@ data/predefined_classes.txt
 | `Pascal VOC XML` | Pascal VOC `.xml`，支持普通框和旋转框 |
 | `Ultralytics YOLO` | 5 列 `.txt`：`class_id cx cy width height` |
 | `Ultralytics YOLO OBB` | 9 列 `.txt`：`class_id x1 y1 x2 y2 x3 y3 x4 y4` |
+
+上方工具栏的“生成空标签”只处理当前图片，并使用此处正在选中的格式：
+
+- `Pascal VOC XML`：生成带当前图片信息、但不包含 `object` 的空 XML；
+- `Ultralytics YOLO` / `YOLO OBB`：生成零字节 TXT；
+- 当前图片已有框时先询问是否清空，选择取消不会修改画布或文件；
+- 保存失败会自动恢复原来的框；成功后右侧文件名显示 `[BG]`；
+- 清空成功后仍可按 `Ctrl+Z` 恢复原框，再按 `Ctrl+S` 写回标签文件。
 
 保存格式会记住，下次启动仍保持上次选择。手动选择另一种格式时：
 

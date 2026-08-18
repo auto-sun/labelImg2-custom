@@ -96,6 +96,9 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
   successfully; failed and unprocessed files retain their original format.
 - With no existing labels, the save format changes immediately without an
   unnecessary progress dialog.
+- A top-toolbar action writes an empty annotation for the current image using
+  the selected format. It confirms before clearing existing boxes, restores
+  them if saving fails, marks success as background, and remains undoable.
 
 - Pascal VOC XML, standard YOLO and YOLO OBB can be selected as the direct
   per-image save format.

@@ -99,6 +99,10 @@ Main additions
   label.
 * Auto Saving is enabled on first launch and remembers later manual changes.
 * Persistent XML, YOLO or YOLO OBB output-format selection.
+* A top-toolbar action creates an empty annotation for the current image in
+  the selected format: object-free Pascal VOC XML or zero-byte YOLO/YOLO OBB
+  TXT. Existing boxes require confirmation and can be restored with
+  ``Ctrl+Z``.
 * Automatic XML / 5-column YOLO / 9-column YOLO OBB input detection.
 * Background automatic annotation using a local YOLO or YOLO OBB ``.pt``
   model, with progress, cancellation and fuzzy project-class mapping.

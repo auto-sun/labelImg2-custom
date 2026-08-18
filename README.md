@@ -39,6 +39,7 @@
 - 图片文件名按照自然数字顺序排列，例如 `1、2、10、20`。
 - 支持相同子目录结构的图片与标签递归匹配。
 - 可以直接保存 Pascal VOC XML、Ultralytics YOLO 或 Ultralytics YOLO OBB。
+- 上方“生成空标签”可按当前格式为当前图片创建空 XML/TXT；已有框时先确认，完成后显示 `[BG]`，并支持 `Ctrl+Z` 恢复。
 - 手动切换 `Annotation Format` 会批量转换当前数据集的已有标签并显示进度；转换成功后移除旧格式，失败时保留原文件。
 - 打开标签目录后自动识别 XML、YOLO 5 列 TXT、YOLO OBB 9 列 TXT 和空背景 TXT。
 - 支持本地 YOLO/YOLO OBB `.pt` 模型批量自动标注，自动切换输出格式并把模型类别

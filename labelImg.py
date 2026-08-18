@@ -330,6 +330,11 @@ class MainWindow(QMainWindow, WindowMixin):
             None, 'single-auto-annotation.svg',
             u'使用本地 YOLO / YOLO OBB 模型标注当前图片',
             enabled=False)
+        createEmptyAnnotation = action(
+            u'生成空标签', self.createEmptyAnnotation,
+            None, 'tag-black-shape.svg',
+            u'按当前 Annotation Format 为当前图片生成空标签',
+            enabled=False)
 
         formatXml = action(
             'Pascal VOC XML',
@@ -479,6 +484,7 @@ class MainWindow(QMainWindow, WindowMixin):
                                selectAutoAnnotationModel=selectAutoAnnotationModel,
                                autoAnnotate=autoAnnotate,
                                singleAutoAnnotate=singleAutoAnnotate,
+                               createEmptyAnnotation=createEmptyAnnotation,
                                formatXml=formatXml, formatYolo=formatYolo,
                                formatYoloObb=formatYoloObb,
                                zoomActions=zoomActions,
@@ -496,7 +502,8 @@ class MainWindow(QMainWindow, WindowMixin):
                                                create, createSo, createRo, copy,
                                                delete, labelAsBack, deleteLabel),
                               onLoadActive=(
-                                  close, create, singleAutoAnnotate),
+                                  close, create, singleAutoAnnotate,
+                                  createEmptyAnnotation),
                                onShapesPresent=(saveAs,))
         self._labelNavigationStates = None
         self._focusCanvasAfterLabelEdit = False
@@ -563,7 +570,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.tools = self.toolbar('Tools')
         self.actions.beginner = (open, opendir, openAnnotationDir,
-            singleAutoAnnotate, autoAnnotate, verify, save, None,
+            singleAutoAnnotate, autoAnnotate, verify, save,
+            createEmptyAnnotation, None,
             create, createSo, createRo, copy, delete, None,
             zoomIn, zoom, zoomOut, zoomOrg, fitWindow, fitWidth)
 
@@ -2955,6 +2963,46 @@ class MainWindow(QMainWindow, WindowMixin):
             cur = self.filesm.currentIndex()
             self.fileModel.setData(
                 cur, len(self.canvas.shapes), Qt.BackgroundRole)
+
+    def createEmptyAnnotation(self, _value=False):
+        """Create an empty annotation for the current image and format."""
+        if (not self.filePath or self.image.isNull() or
+                self.canvas.pixmap is None or self.canvas.pixmap.isNull()):
+            self.status(u'请先打开一张图片。', 8000)
+            return False
+
+        objectCount = len(self.canvas.shapes)
+        formatName = self.annotationFormatName()
+        if objectCount:
+            answer = QMessageBox.question(
+                self,
+                u'生成空标签',
+                u'当前图片有 %d 个标签框。\n\n'
+                u'继续会清空这些框，并按 %s 格式保存为空标签。\n'
+                u'是否继续？' % (objectCount, formatName),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No)
+            if answer != QMessageBox.Yes:
+                self.status(u'已取消生成空标签。', 5000)
+                return False
+
+        # Reuse the background-sample and normal save paths so XML keeps its
+        # image metadata, TXT remains a true zero-byte YOLO/YOLO OBB file, and
+        # the operation can still be undone with Ctrl+Z.
+        self.labelAsBackground()
+        if not self.saveFile():
+            restored = self.undoLastOperation()
+            if restored:
+                self.status(u'空标签保存失败，已恢复原标签。', 10000)
+            return False
+
+        annotationBase = self.annotationBasePathForImage(self.filePath)
+        annotationPath = self.annotationPathWithExtension(annotationBase)
+        self.status(
+            u'已生成当前图片的 %s 空标签：%s' %
+            (formatName, annotationPath),
+            10000)
+        return True
 
     def saveFileAs(self, _value=False):
         assert not self.image.isNull(), "cannot save empty image"
