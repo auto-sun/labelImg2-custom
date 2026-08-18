@@ -22,12 +22,6 @@
 | v2.3.0 | 空标签、类别快捷键、标签统计、格式批量转换和剪切工作流 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz) |
 | v2.2.0 | Ctrl+Z 撤销；修复自动标注类别精确匹配 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.tar.gz) |
 | v2.1.0 | 新增当前图片自动标注及覆盖/追加选择 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz) |
-| v2.0.2 | 独立仓库发行版，自动标注及全部功能 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.tar.gz) |
-| v2.0.1 | 整体许可证调整为 AGPL-3.0 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.tar.gz) |
-| v2.0.0 | 首次加入本地 YOLO/YOLO OBB 模型自动标注 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.tar.gz) |
-| v1.5.0 | Conda/venv 独立启动器，不含自动标注 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.tar.gz) |
-| v1.4.0 | XML、YOLO、YOLO OBB 直接读写 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.tar.gz) |
-| v1.3.0 | OBB 快捷标注工作流 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.tar.gz) |
 
 [查看所有发行版本](https://github.com/auto-sun/labelImg2-custom/releases) ·
 [查看全部标签](https://github.com/auto-sun/labelImg2-custom/tags) ·
