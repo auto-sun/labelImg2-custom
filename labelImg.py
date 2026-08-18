@@ -44,7 +44,7 @@ from libs.labelView import CLabelView, HashableQStandardItem
 from libs.fileView import CFileView
 
 __appname__ = 'labelImg2'
-__version__ = '2.2.0'
+__version__ = '2.3.0'
 
 # Utility functions and classes.
 

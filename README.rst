@@ -24,7 +24,11 @@ Interface preview
 Downloads
 ---------
 
-* **v2.2.0 (recommended, undo and exact class matching):**
+* **v2.3.0 (recommended, empty labels, custom class shortcuts, statistics,
+  batch format conversion and cut workflow):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz>`__
+* **v2.2.0 (undo and exact class matching):**
   `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip>`__ |
   `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.tar.gz>`__
 * **v2.1.0 (current-image automatic annotation):**

@@ -5,6 +5,8 @@
 
 ## 未发布
 
+## [v2.3.0] - 2026-08-19
+
 ### 新增：当前图片空标签
 
 - 上方工具栏增加“生成空标签”，按当前 `Annotation Format` 为正在查看的图片立即生成空标签。
@@ -163,6 +165,7 @@
 - `v1.1`：上游历史版本。
 - `v1.0`：上游历史版本。
 
+[v2.3.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.3.0
 [v2.2.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.2.0
 [v2.1.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.1.0
 [v2.0.2]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.0.2
