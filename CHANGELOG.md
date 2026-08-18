@@ -5,6 +5,15 @@
 
 ## 未发布
 
+## [v2.3.1] - 2026-08-19
+
+### 新增：自动标注置信度调节
+
+- 在上方工具栏的模型标注按钮旁增加置信度数值框，范围 `0.01–1.00`，默认 `0.25`，步长 `0.05`。
+- 批量“自动标注”和“标注当前图”共用当前数值，并把它直接传给 Ultralytics `conf` 参数。
+- 修改后的置信度保存在本机设置中并跨重启恢复；非法旧值自动回退到 `0.25`。
+- 推理期间锁定数值框，状态栏和完成窗口显示本次实际使用的置信度。
+
 ## [v2.3.0] - 2026-08-19
 
 ### 新增：当前图片空标签
@@ -165,6 +174,7 @@
 - `v1.1`：上游历史版本。
 - `v1.0`：上游历史版本。
 
+[v2.3.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.3.1
 [v2.3.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.3.0
 [v2.2.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.2.0
 [v2.1.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.1.0

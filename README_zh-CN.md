@@ -22,7 +22,8 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 | 版本 | 适用情况 | 下载 |
 | --- | --- | --- |
-| **v2.3.0（推荐）** | 空标签、类别快捷键、标签统计、格式批量转换和剪切工作流 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz) |
+| **v2.3.1（推荐）** | 模型自动标注置信度可调；包含 v2.3.0 的全部功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz) |
+| v2.3.0 | 空标签、类别快捷键、标签统计、格式批量转换和剪切工作流 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz) |
 | v2.2.0 | Ctrl+Z 撤销；修复自动标注类别精确匹配 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.tar.gz) |
 | v2.1.0 | 当前图片自动标注，可选择覆盖或追加 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz) |
 | v2.0.2 | 独立仓库发行版，自动标注和全部功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.tar.gz) |
@@ -81,14 +82,16 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 1. 用 `Open Dir` 打开图片根目录。
 2. 用 `Open Annotation Dir` 选择标签输出根目录。
-3. 点击工具栏“自动标注”，首次使用时选择本地 Ultralytics YOLO 或 YOLO OBB `.pt`。
-4. 程序自动识别普通检测或 OBB 模型。OBB 模型会自动选择 YOLO OBB 格式。
-5. 状态栏显示进度、当前文件和框数量；点击“中止”会在当前图片推理完成后停止。
-6. 完成后查看模型类别到项目类别的映射和相似度，并人工复核标签。
+3. 在模型标注按钮旁调整“置信度”；默认 `0.25`，数值越高通常保留的预测框越少。
+4. 点击工具栏“自动标注”，首次使用时选择本地 Ultralytics YOLO 或 YOLO OBB `.pt`。
+5. 程序自动识别普通检测或 OBB 模型。OBB 模型会自动选择 YOLO OBB 格式。
+6. 状态栏显示进度、当前文件、框数量和本次置信度；点击“中止”会在当前图片推理完成后停止。
+7. 完成后查看模型类别到项目类别的映射和相似度，并人工复核标签。
 
 模型类别会在当前预设类别中选择字符串最相似的一项。例如 `apple` 可匹配
 `apples`，`melon` 可匹配 `name_melon`。已有 XML 或 TXT 标签的图片会被跳过，
-不会覆盖人工标注。默认置信度为 `0.25`。
+不会覆盖人工标注。置信度可在 `0.01–1.00` 之间调整，批量和单张标注共用当前值，
+修改后会保存到本机设置并在下次启动时恢复。
 
 类别匹配始终优先采用完整同名，其次才使用大小写、分隔符、单复数和模糊相似度。
 因此模型类别已经叫 `pipe_row` 时会直接使用预设中的 `pipe_row`，不会因共享单词而匹配到 `Drill_pipe`。

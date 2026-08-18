@@ -18,7 +18,8 @@
 
 | 版本 | 主要内容 | ZIP | TAR.GZ |
 | --- | --- | --- | --- |
-| **v2.3.0（推荐）** | 空标签、类别快捷键、标签统计、格式批量转换和剪切工作流 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz) |
+| **v2.3.1（推荐）** | 模型自动标注置信度可调；包含 v2.3.0 的全部功能 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz) |
+| v2.3.0 | 空标签、类别快捷键、标签统计、格式批量转换和剪切工作流 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz) |
 | v2.2.0 | Ctrl+Z 撤销；修复自动标注类别精确匹配 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.tar.gz) |
 | v2.1.0 | 新增当前图片自动标注及覆盖/追加选择 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz) |
 | v2.0.2 | 独立仓库发行版，自动标注及全部功能 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.tar.gz) |
@@ -32,7 +33,7 @@
 [查看全部标签](https://github.com/auto-sun/labelImg2-custom/tags) ·
 [更新日志](CHANGELOG.md)
 
-`v1.0–v1.2` 是仓库继承的上游历史标签；需要当前完整功能请选择 `v2.3.0`。
+`v1.0–v1.2` 是仓库继承的上游历史标签；需要当前完整功能请选择 `v2.3.1`。
 
 ## 主要改进
 
@@ -45,6 +46,7 @@
 - 打开标签目录后自动识别 XML、YOLO 5 列 TXT、YOLO OBB 9 列 TXT 和空背景 TXT。
 - 支持本地 YOLO/YOLO OBB `.pt` 模型批量自动标注，自动切换输出格式并把模型类别
   模糊匹配到项目类别预设。
+- 上方工具栏可调整模型置信度阈值（`0.01–1.00`），批量和单张标注共用并自动记住设置。
 - 自动标注类别完整同名时强制优先，避免 `pipe_row` 因共享单词误匹配到 `Drill_pipe`。
 - 自动标注在后台运行，状态栏显示进度并提供中止按钮；已有 XML/TXT 不会被覆盖。
 - 顶部“标注当前图”只推理当前图片；已有标签时可选择覆盖、直接添加或取消。
@@ -108,11 +110,12 @@ labelImg.bat --check
 
 1. 使用 `Open Dir` 打开需要预标注的图片根目录。
 2. 使用 `Open Annotation Dir` 选择标签输出根目录。
-3. 点击工具栏“自动标注”；第一次使用时选择本地 YOLO/YOLO OBB `.pt`。
-4. OBB 模型会自动切换到 YOLO OBB，并生成 9 列 `.txt`；普通检测模型生成
+3. 在模型按钮旁调整“置信度”数值；默认 `0.25`，数值越高通常保留的预测框越少。
+4. 点击工具栏“自动标注”；第一次使用时选择本地 YOLO/YOLO OBB `.pt`。
+5. OBB 模型会自动切换到 YOLO OBB，并生成 9 列 `.txt`；普通检测模型生成
    5 列 YOLO `.txt`。
-5. 状态栏显示当前图片和总体进度，需要停止时点击“中止”。
-6. 完成后检查类别映射和相似度，并人工复核所有模型框。
+6. 状态栏显示当前图片、总体进度和本次置信度，需要停止时点击“中止”。
+7. 完成后检查类别映射和相似度，并人工复核所有模型框。
 
 如果只需要重新推理正在查看的图片，点击顶部“标注当前图”。当前图片已有框或标签文件时，
 程序会询问：
@@ -122,8 +125,8 @@ labelImg.bat --check
 - `取消`：不运行模型，也不修改标签。
 
 普通“自动标注”仍是批量模式，只处理尚无 XML/TXT 的图片，不覆盖已有人工标签。
-两种模式的默认置信度均为 `0.25`。模型结果保存为 YOLO/YOLO OBB TXT，同名 XML
-不会被自动删除。
+两种模式共用工具栏中的置信度，范围为 `0.01–1.00`、默认 `0.25`，修改后下次启动
+仍然生效。模型结果保存为 YOLO/YOLO OBB TXT，同名 XML 不会被自动删除。
 单张模式完成后可按 `Ctrl+Z` 撤销整次模型结果，再按 `Ctrl+S` 写回恢复后的标签。
 项目不附带模型权重，请只使用自己训练或获得合法授权的 `.pt` 文件。
 

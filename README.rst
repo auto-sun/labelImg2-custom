@@ -24,7 +24,10 @@ Interface preview
 Downloads
 ---------
 
-* **v2.3.0 (recommended, empty labels, custom class shortcuts, statistics,
+* **v2.3.1 (recommended, adjustable model confidence and all v2.3.0 features):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz>`__
+* **v2.3.0 (empty labels, custom class shortcuts, statistics,
   batch format conversion and cut workflow):**
   `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip>`__ |
   `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz>`__
@@ -191,7 +194,9 @@ overall progress, and its cancel button stops after the current inference
 finishes. Model class names are fuzzily mapped to the most similar current
 project class. The completion dialog lists every mapping for review. Images
 that already have XML or TXT annotations are skipped and never overwritten.
-The default confidence threshold is ``0.25``.
+A persistent confidence control beside the model toolbar actions is shared by
+batch and current-image inference. It accepts ``0.01`` through ``1.00`` and
+defaults to ``0.25``; higher values usually keep fewer predictions.
 
 An exact full class-name match always takes priority over fuzzy shared-token
 matches, so ``pipe_row`` cannot be redirected to ``Drill_pipe``.

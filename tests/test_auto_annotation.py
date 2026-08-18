@@ -5,6 +5,7 @@ import sys
 import tempfile
 import types
 import unittest
+from unittest import mock
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
@@ -13,6 +14,7 @@ from PyQt5.QtWidgets import QApplication
 import labelImg
 from libs.auto_annotation import (AutoAnnotationThread, class_similarity,
                                   match_model_classes, shapes_for_job)
+from libs.constants import SETTING_AUTO_ANNOTATION_CONFIDENCE
 
 
 class FakeBoxes(object):
@@ -28,11 +30,13 @@ class FakeResult(object):
 class FakeYOLO(object):
     task = 'detect'
     names = {0: 'apple'}
+    last_predict_kwargs = None
 
     def __init__(self, _model_path):
         pass
 
-    def predict(self, **_kwargs):
+    def predict(self, **kwargs):
+        type(self).last_predict_kwargs = kwargs
         return [FakeResult()]
 
 
@@ -221,6 +225,35 @@ class AutoAnnotationPolicyTests(unittest.TestCase):
             else:
                 sys.modules['ultralytics'] = previous_module
 
+    def test_thread_passes_selected_confidence_to_ultralytics(self):
+        fake_module = types.ModuleType('ultralytics')
+        fake_module.YOLO = FakeYOLO
+        previous_module = sys.modules.get('ultralytics')
+        sys.modules['ultralytics'] = fake_module
+        FakeYOLO.last_predict_kwargs = None
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                summaries = []
+                thread = AutoAnnotationThread(
+                    'fake.pt',
+                    [{
+                        'image_path': os.path.join(directory, 'image.jpg'),
+                        'annotation_base': os.path.join(directory, 'image'),
+                    }],
+                    ['apples'],
+                    confidence=0.63)
+                thread.completed.connect(summaries.append)
+                thread.run()
+
+                self.assertAlmostEqual(
+                    0.63, FakeYOLO.last_predict_kwargs['conf'])
+                self.assertAlmostEqual(0.63, summaries[0]['confidence'])
+        finally:
+            if previous_module is None:
+                del sys.modules['ultralytics']
+            else:
+                sys.modules['ultralytics'] = previous_module
+
 
 class SingleAutoAnnotationToolbarTests(unittest.TestCase):
     @classmethod
@@ -241,6 +274,71 @@ class SingleAutoAnnotationToolbarTests(unittest.TestCase):
             self.assertIn(action, window.tools.actions())
             self.assertFalse(action.icon().isNull())
             self.assertFalse(action.isEnabled())
+            window.close()
+        finally:
+            labelImg.Settings = original_settings
+
+    def test_confidence_control_is_persistent_and_used_by_both_modes(self):
+        class SavedConfidenceSettings(MemorySettings):
+            def __init__(self):
+                super(SavedConfidenceSettings, self).__init__()
+                self.data[SETTING_AUTO_ANNOTATION_CONFIDENCE] = 0.55
+
+        original_settings = labelImg.Settings
+        labelImg.Settings = SavedConfidenceSettings
+        try:
+            classes_path = os.path.join(
+                os.path.dirname(labelImg.__file__),
+                'data', 'predefined_classes.txt')
+            window = labelImg.MainWindow(
+                defaultPrefdefClassFile=classes_path)
+            control = window.actions.autoAnnotationConfidenceControl
+            spin_box = window.autoAnnotationConfidenceSpinBox
+            self.assertIn(control, window.tools.actions())
+            self.assertAlmostEqual(0.55, spin_box.value())
+
+            spin_box.setValue(0.70)
+            self.assertAlmostEqual(
+                0.70,
+                window.settings.data[SETTING_AUTO_ANNOTATION_CONFIDENCE])
+
+            for mode in ('batch', 'single'):
+                with self.subTest(mode=mode), mock.patch.object(
+                        labelImg, 'AutoAnnotationThread') as thread_class:
+                    thread = thread_class.return_value
+                    thread.isRunning.return_value = False
+                    window.startAutoAnnotationJobs(
+                        [{'image_path': 'image.jpg',
+                          'annotation_base': 'image'}],
+                        mode=mode)
+
+                    self.assertAlmostEqual(
+                        0.70, thread_class.call_args.kwargs['confidence'])
+                    self.assertFalse(spin_box.isEnabled())
+                    window.finishAutoAnnotationUi()
+                    self.assertTrue(spin_box.isEnabled())
+                    window.autoAnnotationThread = None
+
+            window.close()
+        finally:
+            labelImg.Settings = original_settings
+
+    def test_invalid_saved_confidence_falls_back_to_default(self):
+        class InvalidConfidenceSettings(MemorySettings):
+            def __init__(self):
+                super(InvalidConfidenceSettings, self).__init__()
+                self.data[SETTING_AUTO_ANNOTATION_CONFIDENCE] = 'invalid'
+
+        original_settings = labelImg.Settings
+        labelImg.Settings = InvalidConfidenceSettings
+        try:
+            classes_path = os.path.join(
+                os.path.dirname(labelImg.__file__),
+                'data', 'predefined_classes.txt')
+            window = labelImg.MainWindow(
+                defaultPrefdefClassFile=classes_path)
+            self.assertAlmostEqual(
+                0.25, window.autoAnnotationConfidenceSpinBox.value())
             window.close()
         finally:
             labelImg.Settings = original_settings

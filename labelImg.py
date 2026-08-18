@@ -44,7 +44,7 @@ from libs.labelView import CLabelView, HashableQStandardItem
 from libs.fileView import CFileView
 
 __appname__ = 'labelImg2'
-__version__ = '2.3.0'
+__version__ = '2.3.1'
 
 # Utility functions and classes.
 
@@ -149,6 +149,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.autoAnnotationThread = None
         self.autoAnnotationModelPath = settings.get(
             SETTING_AUTO_ANNOTATION_MODEL, '')
+        self.autoAnnotationConfidence = self.normalizeAutoAnnotationConfidence(
+            settings.get(SETTING_AUTO_ANNOTATION_CONFIDENCE, 0.25))
         self.autoAnnotationExistingCount = 0
         self.autoAnnotationMode = None
 
@@ -412,6 +414,26 @@ class MainWindow(QMainWindow, WindowMixin):
 
         showInfo = action('&About', self.showInfoDialog, None, 'info.svg', u'About')
 
+        self.autoAnnotationConfidenceSpinBox = QDoubleSpinBox(self)
+        self.autoAnnotationConfidenceSpinBox.setObjectName(
+            'autoAnnotationConfidenceSpinBox')
+        self.autoAnnotationConfidenceSpinBox.setDecimals(2)
+        self.autoAnnotationConfidenceSpinBox.setRange(0.01, 1.00)
+        self.autoAnnotationConfidenceSpinBox.setSingleStep(0.05)
+        self.autoAnnotationConfidenceSpinBox.setValue(
+            self.autoAnnotationConfidence)
+        self.autoAnnotationConfidenceSpinBox.setPrefix(u'置信度 ')
+        self.autoAnnotationConfidenceSpinBox.setFixedWidth(115)
+        self.autoAnnotationConfidenceSpinBox.setToolTip(
+            u'模型置信度阈值（0.01–1.00）；数值越高，保留的预测框通常越少。')
+        self.autoAnnotationConfidenceSpinBox.valueChanged.connect(
+            self.autoAnnotationConfidenceChanged)
+        autoAnnotationConfidenceControl = QWidgetAction(self)
+        autoAnnotationConfidenceControl.setObjectName(
+            'autoAnnotationConfidenceControl')
+        autoAnnotationConfidenceControl.setDefaultWidget(
+            self.autoAnnotationConfidenceSpinBox)
+
         zoom = QWidgetAction(self)
         zoom.setDefaultWidget(self.zoomWidget)
         self.zoomWidget.setWhatsThis(
@@ -484,6 +506,8 @@ class MainWindow(QMainWindow, WindowMixin):
                                selectAutoAnnotationModel=selectAutoAnnotationModel,
                                autoAnnotate=autoAnnotate,
                                singleAutoAnnotate=singleAutoAnnotate,
+                               autoAnnotationConfidenceControl=(
+                                   autoAnnotationConfidenceControl),
                                createEmptyAnnotation=createEmptyAnnotation,
                                formatXml=formatXml, formatYolo=formatYolo,
                                formatYoloObb=formatYoloObb,
@@ -570,7 +594,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self.tools = self.toolbar('Tools')
         self.actions.beginner = (open, opendir, openAnnotationDir,
-            singleAutoAnnotate, autoAnnotate, verify, save,
+            singleAutoAnnotate, autoAnnotate,
+            autoAnnotationConfidenceControl, verify, save,
             createEmptyAnnotation, None,
             create, createSo, createRo, copy, delete, None,
             zoomIn, zoom, zoomOut, zoomOrg, fitWindow, fitWidth)
@@ -2090,6 +2115,23 @@ class MainWindow(QMainWindow, WindowMixin):
         self.autoAnnotationProgress.setVisible(visible)
         self.autoAnnotationCancelButton.setVisible(visible)
 
+    @staticmethod
+    def normalizeAutoAnnotationConfidence(value):
+        try:
+            confidence = float(value)
+        except (TypeError, ValueError):
+            confidence = 0.25
+        if not math.isfinite(confidence):
+            confidence = 0.25
+        return round(max(0.01, min(1.00, confidence)), 2)
+
+    def autoAnnotationConfidenceChanged(self, value):
+        confidence = self.normalizeAutoAnnotationConfidence(value)
+        self.autoAnnotationConfidence = confidence
+        self.settings[SETTING_AUTO_ANNOTATION_CONFIDENCE] = confidence
+        self.settings.save()
+        self.status(u'自动标注置信度已设为 %.2f。' % confidence, 5000)
+
     def selectAutoAnnotationModel(self, _value=False):
         current_model = self.autoAnnotationModelPath
         if current_model and os.path.isfile(current_model):
@@ -2285,20 +2327,28 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def startAutoAnnotationJobs(self, jobs, mode):
         self.autoAnnotationMode = mode
+        self.autoAnnotationConfidence = self.normalizeAutoAnnotationConfidence(
+            self.autoAnnotationConfidenceSpinBox.value())
         self.autoAnnotationProgress.setRange(0, len(jobs))
         self.autoAnnotationProgress.setValue(0)
         if mode == 'single':
-            self.autoAnnotationStatus.setText(u'加载模型…（当前图片）')
+            self.autoAnnotationStatus.setText(
+                u'加载模型…（当前图片，置信度 %.2f）' %
+                self.autoAnnotationConfidence)
         else:
             self.autoAnnotationStatus.setText(
-                u'加载模型…（待标注 %d 张）' % len(jobs))
-        self.autoAnnotationStatus.setToolTip(self.autoAnnotationModelPath)
+                u'加载模型…（待标注 %d 张，置信度 %.2f）' %
+                (len(jobs), self.autoAnnotationConfidence))
+        self.autoAnnotationStatus.setToolTip(
+            u'%s\n置信度：%.2f' %
+            (self.autoAnnotationModelPath, self.autoAnnotationConfidence))
         self.autoAnnotationCancelButton.setEnabled(True)
         self.autoAnnotationCancelButton.setText(u'中止')
         self.setAutoAnnotationWidgetsVisible(True)
         self.actions.autoAnnotate.setEnabled(False)
         self.actions.singleAutoAnnotate.setEnabled(False)
         self.actions.selectAutoAnnotationModel.setEnabled(False)
+        self.autoAnnotationConfidenceSpinBox.setEnabled(False)
         self.actions.undo.setEnabled(False)
         self.fileListView.setEnabled(False)
         self.canvas.setEnabled(False)
@@ -2307,7 +2357,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.autoAnnotationModelPath,
             jobs,
             self.labelHist,
-            confidence=0.25,
+            confidence=self.autoAnnotationConfidence,
             parent=self)
         thread.modelLoaded.connect(self.autoAnnotationModelLoaded)
         thread.progressChanged.connect(self.autoAnnotationProgressChanged)
@@ -2331,8 +2381,12 @@ class MainWindow(QMainWindow, WindowMixin):
             (item['model_name'], item['project_name'], item['score'] * 100.0)
             for item in mapping_details)
         self.autoAnnotationStatus.setText(
-            u'模型已加载：%s' % self.annotationFormatName(annotation_format))
-        self.autoAnnotationStatus.setToolTip(mapping_text)
+            u'模型已加载：%s（置信度 %.2f）' %
+            (self.annotationFormatName(annotation_format),
+             self.autoAnnotationConfidence))
+        self.autoAnnotationStatus.setToolTip(
+            u'置信度：%.2f\n%s' %
+            (self.autoAnnotationConfidence, mapping_text))
 
     def autoAnnotationProgressChanged(self, done, total, image_path,
                                       object_count, state):
@@ -2349,7 +2403,9 @@ class MainWindow(QMainWindow, WindowMixin):
             imageKey = self.imageSessionKey(image_path)
             self._pendingAutoSessionCounts[imageKey] = int(object_count)
         self.autoAnnotationStatus.setText(text)
-        self.autoAnnotationStatus.setToolTip(image_path)
+        self.autoAnnotationStatus.setToolTip(
+            u'%s\n置信度：%.2f' %
+            (image_path, self.autoAnnotationConfidence))
 
     def cancelAutoAnnotation(self):
         thread = self.autoAnnotationThread
@@ -2382,6 +2438,8 @@ class MainWindow(QMainWindow, WindowMixin):
         message_lines = [
             u'保存格式：%s' % self.annotationFormatName(
                 summary.get('format')),
+            u'置信度：%.2f' % summary.get(
+                'confidence', self.autoAnnotationConfidence),
             u'新生成标签：%d 张，共 %d 个框' %
             (summary.get('saved', 0), summary.get('objects', 0)),
             u'保护并跳过已有标签：%d 张' %
@@ -2401,7 +2459,10 @@ class MainWindow(QMainWindow, WindowMixin):
             QMessageBox.warning(self, title, message)
         else:
             QMessageBox.information(self, title, message)
-        self.status(message_lines[1] + u'；' + message_lines[2], 15000)
+        self.status(
+            message_lines[2] + u'；' + message_lines[3] +
+            u'；' + message_lines[1],
+            15000)
 
     def singleAutoAnnotationCompleted(self, summary):
         results = summary.get('job_results', [])
@@ -2452,6 +2513,8 @@ class MainWindow(QMainWindow, WindowMixin):
             u'处理方式：%s' % policy_name,
             u'保存格式：%s' % self.annotationFormatName(
                 summary.get('format')),
+            u'置信度：%.2f' % summary.get(
+                'confidence', self.autoAnnotationConfidence),
             u'模型新增：%d 个框' % generated_count,
             u'当前图片最终：%d 个框' % final_count,
             u'保存位置：%s' % result.get('annotation_path', ''),
@@ -2486,6 +2549,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions.autoAnnotate.setEnabled(True)
         self.actions.singleAutoAnnotate.setEnabled(bool(self.filePath))
         self.actions.selectAutoAnnotationModel.setEnabled(True)
+        self.autoAnnotationConfidenceSpinBox.setEnabled(True)
         self.fileListView.setEnabled(True)
         self.canvas.setEnabled(bool(self.filePath))
         self.setAutoAnnotationWidgetsVisible(False)
@@ -2537,6 +2601,8 @@ class MainWindow(QMainWindow, WindowMixin):
         settings[SETTING_DEFAULT_LABEL] = self.default_label
         settings[SETTING_LABEL_USAGE] = self.labelUsage
         settings[SETTING_LABEL_SHORTCUTS] = self.labelShortcutMappings
+        settings[SETTING_AUTO_ANNOTATION_CONFIDENCE] = (
+            self.autoAnnotationConfidence)
         settings[SETTING_ANNOTATION_FORMAT] = self.annotationFormat
         settings.save()
     ## User Dialogs ##

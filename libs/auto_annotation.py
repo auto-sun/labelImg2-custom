@@ -365,6 +365,7 @@ class AutoAnnotationThread(QThread):
                 'objects': object_count,
                 'errors': errors,
                 'format': annotation_format,
+                'confidence': self.confidence,
                 'mapping': mapping_details,
                 'job_results': job_results,
             })

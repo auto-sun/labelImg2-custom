@@ -16,6 +16,9 @@ See [CHANGELOG.md](CHANGELOG.md) for the version-by-version release history.
 - Exact full class names always outrank shared-token fuzzy matches.
 - Inference runs in a background thread with status-bar progress and a cancel
   button.
+- A persistent ``0.01`` to ``1.00`` confidence control in the top toolbar is
+  shared by batch and current-image inference and passed to Ultralytics
+  directly.
 - Existing XML/TXT annotations are skipped and never overwritten.
 - A separate top-toolbar action annotates only the current image and prompts
   to overwrite, append or cancel when labels already exist.
