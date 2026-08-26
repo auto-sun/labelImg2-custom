@@ -24,7 +24,10 @@ Interface preview
 Downloads
 ---------
 
-* **v2.3.1 (recommended, adjustable model confidence and all v2.3.0 features):**
+* **v2.3.2 (recommended, file sorting and workflow-state fixes):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.tar.gz>`__
+* **v2.3.1 (adjustable model confidence and all v2.3.0 features):**
   `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip>`__ |
   `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz>`__
 * **v2.3.0 (empty labels, custom class shortcuts, statistics,

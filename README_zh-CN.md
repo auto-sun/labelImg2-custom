@@ -22,7 +22,8 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 | 版本 | 适用情况 | 下载 |
 | --- | --- | --- |
-| **v2.3.1（推荐）** | 模型自动标注置信度可调；包含 v2.3.0 的全部功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz) |
+| **v2.3.2（推荐）** | 修复文件排序、绿色确认状态和类别输入时的 E 键冲突 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.tar.gz) |
+| v2.3.1 | 模型自动标注置信度可调；包含 v2.3.0 的全部功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz) |
 | v2.3.0 | 空标签、类别快捷键、标签统计、格式批量转换和剪切工作流 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz) |
 | v2.2.0 | Ctrl+Z 撤销；修复自动标注类别精确匹配 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.tar.gz) |
 | v2.1.0 | 当前图片自动标注，可选择覆盖或追加 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz) |

@@ -27,7 +27,7 @@ python --version
 ### 方法一：下载 ZIP
 
 1. 推荐直接下载最新稳定版：
-   <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip>
+   <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip>
 2. 其他历史版本见：<https://github.com/auto-sun/labelImg2-custom/releases>
 3. 解压到路径简单、自己有写入权限的位置，例如：
 
@@ -54,10 +54,10 @@ python -m venv .venv
 
 这里直接使用虚拟环境中的 Python，不要求执行激活脚本，可以避开部分电脑的 PowerShell 执行策略问题。
 
-`v2.3.1` 包含本地模型自动标注，因此会同时安装 Ultralytics 和 PyTorch，
+`v2.3.2` 包含本地模型自动标注，因此会同时安装 Ultralytics 和 PyTorch，
 下载体积和安装时间会比旧版本更大。只进行手工标注时仍可正常使用全部原有功能。
 
-`v2.3.1` 整体使用 GNU AGPL v3.0 免费开源；上游 LabelImg2 的 MIT 许可证单独保留在
+`v2.3.2` 整体使用 GNU AGPL v3.0 免费开源；上游 LabelImg2 的 MIT 许可证单独保留在
 `LICENSE-MIT-UPSTREAM`。
 
 ## 四、准备类别文件

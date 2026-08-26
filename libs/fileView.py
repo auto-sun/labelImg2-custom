@@ -2,6 +2,7 @@
 from __future__ import absolute_import
 
 import os
+import re
 import sys
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
@@ -10,11 +11,32 @@ from .constants import FORMAT_PASCALVOC
 from .pascal_voc_io import PascalVocReader, XML_EXT
 from .yolo_obb_io import YOLO_EXT, count_yolo_objects
 
+_NATURAL_TOKEN_RE = re.compile(r'(\d+)')
+
+def natural_path_key(path):
+    """Sort text alphabetically and every digit run by integer value."""
+    normalized = str(path).replace('\\', '/').casefold()
+    tokens = []
+    for token in _NATURAL_TOKEN_RE.split(normalized):
+        if not token:
+            continue
+        if token.isdigit():
+            tokens.append((0, int(token), len(token)))
+        else:
+            tokens.append((1, token))
+    return tuple(tokens)
+
+
 class CFileListModel(QStringListModel):
     def __init__(self, parent = None):
         super(CFileListModel, self).__init__(parent)
         
         self.dispList = []
+
+    @staticmethod
+    def _pathKey(path):
+        """Return a stable key for keeping per-image UI state on refresh."""
+        return os.path.normcase(os.path.abspath(str(path)))
     
     def parseOne(self, s, openedDir=None, defaultSaveDir=None,
                  annotationFormat=FORMAT_PASCALVOC):
@@ -48,11 +70,21 @@ class CFileListModel(QStringListModel):
 
     def setStringList(self, strings, openedDir=None, defaultSaveDir=None,
                       annotationFormat=FORMAT_PASCALVOC):
+        # Rebuilding the list is necessary after model annotation and format
+        # conversion so counts stay current. Keep the green confirmation
+        # state for images that are still present; it is session UI state and
+        # cannot be reconstructed from YOLO/YOLO OBB TXT files.
+        visitedByPath = {}
+        for path, info in zip(self.stringList(), self.dispList):
+            if len(info) > 2 and info[2]:
+                visitedByPath[self._pathKey(path)] = True
+
         self.dispList = []
 
         for s in strings:
             info = self.parseOne(
                 s, openedDir, defaultSaveDir, annotationFormat)
+            info[2] = visitedByPath.get(self._pathKey(s), False)
             self.dispList.append(info)
 
         return super(CFileListModel, self).setStringList(strings)

@@ -5,6 +5,20 @@
 
 ## 未发布
 
+## [v2.3.2] - 2026-08-26
+
+### 修复：模型标注后绿色确认状态
+
+- 模型标注、格式转换等操作刷新文件列表时，按图片完整路径保留已有的绿色确认状态；不同目录中的同名图片不会串用状态。
+
+### 修复：文件列表自然排序
+
+- 图片按相对路径从左到右分段比较：数字段按整数值排序，字母段忽略大小写按字母顺序排序，避免带前导零和长编号的文件名错序。
+
+### 修复：类别首字母选择
+
+- 类别下拉框处于编辑状态时临时禁用 `E` 画 OBB 快捷键，输入 `e` 只会选择以该字母开头的预设类别；退出编辑后自动恢复画框快捷键。
+
 ## [v2.3.1] - 2026-08-19
 
 ### 新增：自动标注置信度调节
@@ -174,6 +188,7 @@
 - `v1.1`：上游历史版本。
 - `v1.0`：上游历史版本。
 
+[v2.3.2]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.3.2
 [v2.3.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.3.1
 [v2.3.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.3.0
 [v2.2.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.2.0

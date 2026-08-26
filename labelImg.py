@@ -18,7 +18,6 @@ from functools import partial
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import QCollator, QLocale
 
 # Add internal libs
 from libs.constants import *
@@ -41,10 +40,10 @@ from libs.labelShortcutDialog import (LabelShortcutDialog,
                                       validate_label_shortcuts)
 
 from libs.labelView import CLabelView, HashableQStandardItem
-from libs.fileView import CFileView
+from libs.fileView import CFileView, natural_path_key
 
 __appname__ = 'labelImg2'
-__version__ = '2.3.1'
+__version__ = '2.3.2'
 
 # Utility functions and classes.
 
@@ -1230,7 +1229,11 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def setLabelEditorActive(self, active):
         self._labelEditorActive = bool(active)
-        navigation_actions = (self.actions.openPrevImg, self.actions.openNextImg)
+        # Plain-letter window shortcuts must yield to the class combo box
+        # while it is accepting first-letter searches.
+        navigation_actions = (self.actions.openPrevImg,
+                              self.actions.openNextImg,
+                              self.actions.createRo)
         if active:
             if self._labelNavigationStates is None:
                 self._labelNavigationStates = [
@@ -2621,14 +2624,10 @@ class MainWindow(QMainWindow, WindowMixin):
                     relativePath = os.path.join(root, file)
                     path = os.path.abspath(relativePath)
                     images.append(path)
-        collator = QCollator()
-        locale = QLocale(QLocale.Chinese)
-        collator.setLocale(locale)
-        collator.setNumericMode(True)
-        def sort_key(s):
-            return collator.sortKey(s)
-        sorted_images = sorted(images, key=sort_key)
-        return sorted_images
+        def sort_key(path):
+            relativePath = os.path.relpath(path, folderPath)
+            return natural_path_key(relativePath)
+        return sorted(images, key=sort_key)
 
     def annotationFormatName(self, annotationFormat=None):
         annotationFormat = annotationFormat or self.annotationFormat

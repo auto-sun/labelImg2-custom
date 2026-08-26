@@ -5,7 +5,7 @@ import unittest
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from PyQt5.QtCore import QPointF
+from PyQt5.QtCore import QPointF, Qt
 from PyQt5.QtGui import QColor, QPixmap
 from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication
@@ -14,6 +14,7 @@ import labelImg
 from libs.constants import SETTING_LABEL_SHORTCUTS
 from libs.labelShortcutDialog import (LabelShortcutValidationError,
                                       validate_label_shortcuts)
+from libs.labelView import CCommonOrderComboBox
 from libs.shape import Shape
 
 
@@ -187,6 +188,36 @@ class LabelShortcutWindowTests(unittest.TestCase):
         self.window.setLabelEditorActive(True)
         self.assertFalse(action.isEnabled())
         self.window.setLabelEditorActive(False)
+        self.assertTrue(action.isEnabled())
+
+    def test_e_selects_class_in_editor_without_starting_obb_drawing(self):
+        action = self.window.actions.createRo
+        action.setEnabled(True)
+        editor = CCommonOrderComboBox(self.window)
+        editor.addItems(self.window.labelHist)
+        expected = next(
+            label for label in self.window.labelHist
+            if label.casefold().startswith('e'))
+
+        self.window.show()
+        self.window.activateWindow()
+        QApplication.setActiveWindow(self.window)
+        editor.show()
+        editor.setFocus()
+        try:
+            self.window.setLabelEditorActive(True)
+            self.assertFalse(action.isEnabled())
+            self.assertTrue(self.window.canvas.editing())
+
+            QTest.keyClick(editor, Qt.Key_E)
+            QApplication.processEvents()
+
+            self.assertEqual(expected, editor.currentText())
+            self.assertTrue(self.window.canvas.editing())
+        finally:
+            self.window.setLabelEditorActive(False)
+            editor.deleteLater()
+
         self.assertTrue(action.isEnabled())
 
     def test_shortcut_box_skips_picker_but_normal_box_opens_it(self):
