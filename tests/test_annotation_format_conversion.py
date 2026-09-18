@@ -7,8 +7,9 @@ from unittest import mock
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from PyQt5.QtCore import QPointF
+from PyQt5.QtCore import QPointF, QElapsedTimer
 from PyQt5.QtGui import QColor, QImage
+from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication
 
 import labelImg
@@ -139,6 +140,16 @@ class AnnotationFormatConversionTests(unittest.TestCase):
             path, [self.shape_dict()], self.imagePath, None)
         return path
 
+    def waitForAnnotationScan(self, window, timeout=5000):
+        QApplication.processEvents()
+        elapsed = QElapsedTimer()
+        elapsed.start()
+        while window.annotationScanTimer.isActive():
+            QApplication.processEvents()
+            QTest.qWait(1)
+            if elapsed.elapsed() > timeout:
+                self.fail('annotation scan did not finish in time')
+
     def create_txt(self, annotation_format):
         path = self.basePath + '.txt'
         save_yolo_annotations(
@@ -232,6 +243,117 @@ class AnnotationFormatConversionTests(unittest.TestCase):
         self.assertFalse(os.path.exists(self.basePath + '.txt'))
         self.assertEqual([], FakeProgressDialog.instances)
         information.assert_not_called()
+        warning.assert_not_called()
+
+    def test_open_annotation_dir_detects_xml_instead_of_stale_global_format(self):
+        self.create_xml()
+        self.window.annotationFormat = FORMAT_YOLO_OBB
+
+        with mock.patch.object(
+                labelImg.QMessageBox, 'warning', return_value=0) as warning:
+            self.window.openAnnotationDirDialog(dirpath=self.annotationDir)
+            self.waitForAnnotationScan(self.window)
+
+        self.assertEqual(FORMAT_PASCALVOC, self.window.annotationFormat)
+        self.assertEqual(
+            FORMAT_PASCALVOC,
+            self.window.settings.get('annotationformat'))
+        warning.assert_not_called()
+
+    def test_open_annotation_dir_defers_bulk_label_parsing(self):
+        self.create_xml()
+        self.window.fileModel.setStringList(
+            [self.imagePath], self.imageDir, self.annotationDir,
+            self.window.annotationFormat, scanAnnotations=False)
+
+        with mock.patch.object(
+                self.window, 'scanAllImages') as image_scan, \
+                mock.patch.object(
+                    self.window, 'inspectAnnotationDirectory') as sync_scan, \
+                mock.patch.object(
+                    self.window.fileModel, 'parseOne') as sync_parse:
+            self.window.openAnnotationDirDialog(dirpath=self.annotationDir)
+
+        image_scan.assert_not_called()
+        sync_scan.assert_not_called()
+        sync_parse.assert_not_called()
+        self.assertTrue(self.window.annotationScanTimer.isActive())
+        self.waitForAnnotationScan(self.window)
+        self.assertEqual(1, self.window.fileModel.totalAnnotationCount())
+
+    def test_startup_saved_directory_overrides_stale_global_format(self):
+        self.create_xml()
+        savedSettings = MemorySettings()
+        savedSettings.data.update({
+            'annotationformat': FORMAT_YOLO_OBB,
+            'savedir': self.annotationDir,
+        })
+        classesPath = os.path.join(
+            os.path.dirname(labelImg.__file__),
+            'data', 'predefined_classes.txt')
+
+        with mock.patch.object(
+                labelImg, 'Settings', return_value=savedSettings):
+            restoredWindow = labelImg.MainWindow(
+                defaultPrefdefClassFile=classesPath)
+        try:
+            self.waitForAnnotationScan(restoredWindow)
+            self.assertEqual(
+                FORMAT_PASCALVOC, restoredWindow.annotationFormat)
+            self.assertEqual(
+                FORMAT_PASCALVOC,
+                savedSettings.get('annotationformat'))
+        finally:
+            restoredWindow.setClean()
+            restoredWindow.close()
+
+    def test_newest_duplicate_is_loaded_then_saved_as_one_format(self):
+        xmlPath = self.create_xml()
+        newerLabel = self.window.labelHist[1]
+        newerShape = self.shape_dict()
+        newerShape['label'] = newerLabel
+        txtPath = self.basePath + '.txt'
+        save_yolo_annotations(
+            txtPath, [newerShape], 120, 80,
+            self.window.labelHist, FORMAT_YOLO_OBB)
+        os.utime(xmlPath, (1000, 1000))
+        os.utime(txtPath, (2000, 2000))
+        self.window.annotationFormat = FORMAT_PASCALVOC
+
+        self.assertTrue(self.window.loadFile(self.imagePath))
+        self.assertEqual([newerLabel], [
+            shape.label for shape in self.window.canvas.shapes])
+        self.assertEqual(txtPath, self.window.loadedAnnotationPath)
+
+        self.assertTrue(self.window.saveFile())
+        self.assertTrue(os.path.isfile(xmlPath))
+        self.assertFalse(os.path.exists(txtPath))
+        self.assertEqual(
+            [newerLabel],
+            [shape[0] for shape in PascalVocReader(xmlPath).getShapes()])
+
+    def test_conversion_uses_newest_duplicate_and_removes_stale_sibling(self):
+        xmlPath = self.create_xml()
+        newerLabel = self.window.labelHist[1]
+        newerShape = self.shape_dict()
+        newerShape['label'] = newerLabel
+        txtPath = self.basePath + '.txt'
+        save_yolo_annotations(
+            txtPath, [newerShape], 120, 80,
+            self.window.labelHist, FORMAT_YOLO_OBB)
+        os.utime(xmlPath, (1000, 1000))
+        os.utime(txtPath, (2000, 2000))
+        self.window.annotationFormat = FORMAT_YOLO_OBB
+
+        result, information, warning = self.change_format(FORMAT_PASCALVOC)
+
+        self.assertTrue(result)
+        self.assertTrue(os.path.isfile(xmlPath))
+        self.assertFalse(os.path.exists(txtPath))
+        self.assertEqual(
+            [newerLabel],
+            [shape[0] for shape in PascalVocReader(xmlPath).getShapes()])
+        information.assert_called_once()
         warning.assert_not_called()
 
     def test_failed_conversion_keeps_the_original_annotation(self):

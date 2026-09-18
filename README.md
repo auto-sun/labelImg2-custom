@@ -18,22 +18,24 @@
 
 | 版本 | 主要内容 | ZIP | TAR.GZ |
 | --- | --- | --- | --- |
-| **v2.3.2（推荐）** | 修复文件排序、绿色确认状态和类别输入时的 E 键冲突 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.tar.gz) |
+| **v2.3.3（推荐）** | 可切换类别文件；修复混合标签双文件；大型 labels 目录非阻塞读取 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.tar.gz) |
+| v2.3.2 | 修复文件排序、绿色确认状态和类别输入时的 E 键冲突 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.tar.gz) |
 | v2.3.1 | 模型自动标注置信度可调；包含 v2.3.0 的全部功能 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz) |
 | v2.3.0 | 空标签、类别快捷键、标签统计、格式批量转换和剪切工作流 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz) |
-| v2.2.0 | Ctrl+Z 撤销；修复自动标注类别精确匹配 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.tar.gz) |
 
 [查看所有发行版本](https://github.com/auto-sun/labelImg2-custom/releases) ·
 [查看全部标签](https://github.com/auto-sun/labelImg2-custom/tags) ·
 [更新日志](CHANGELOG.md)
 
-`v1.0–v1.2` 是仓库继承的上游历史标签；需要当前完整功能请选择 `v2.3.2`。
+`v1.0–v1.2` 是仓库继承的上游历史标签；需要当前完整功能请选择 `v2.3.3`。
 
 ## 主要改进
 
 - 自动恢复上次打开的图片目录、当前进度、标签目录、保存格式和默认类别。
 - 图片文件名按照自然数字顺序排列，例如 `1、2、10、20`。
 - 支持相同子目录结构的图片与标签递归匹配。
+- 可从 `File` 菜单或右侧 `Box Labels` 选择、预览并切换任意 `class.txt`，自动保留最近使用历史。
+- 一万级 labels 目录采用分批读取，文件列表立即显示，标签数量与格式在不阻塞界面的情况下逐步更新。
 - 可以直接保存 Pascal VOC XML、Ultralytics YOLO 或 Ultralytics YOLO OBB。
 - 上方“生成空标签”可按当前格式为当前图片创建空 XML/TXT；已有框时先确认，完成后显示 `[BG]`，并支持 `Ctrl+Z` 恢复。
 - 手动切换 `Annotation Format` 会批量转换当前数据集的已有标签并显示进度；转换成功后移除旧格式，失败时保留原文件。

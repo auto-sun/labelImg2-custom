@@ -24,7 +24,10 @@ Interface preview
 Downloads
 ---------
 
-* **v2.3.2 (recommended, file sorting and workflow-state fixes):**
+* **v2.3.3 (recommended, switchable class files and responsive large datasets):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.tar.gz>`__
+* **v2.3.2 (file sorting and workflow-state fixes):**
   `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip>`__ |
   `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.tar.gz>`__
 * **v2.3.1 (adjustable model confidence and all v2.3.0 features):**
@@ -82,6 +85,8 @@ Edit boxes one at a time          Marquee-select and transform a whole group
 Remember separate wheel controls  Resize selected boxes; otherwise zoom image
 Convert formats after annotation  Batch-convert from ``Annotation Format``
 Manage two annotation commands    One ``Open Annotation Dir`` command
+Switch project classes manually   Preview and reuse recent ``class.txt`` files
+Large labels folder freezes UI    Incrementally scan counts and formats
 Avoid duplicate conversion menus  One bidirectional format workflow
 ================================  ============================================
 

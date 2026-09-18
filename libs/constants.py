@@ -19,6 +19,8 @@ SETTING_ANNOTATION_FORMAT = 'annotationformat'
 SETTING_AUTO_ANNOTATION_MODEL = 'autoannotationmodel'
 SETTING_AUTO_ANNOTATION_CONFIDENCE = 'autoannotationconfidence'
 SETTING_LABEL_SHORTCUTS = 'labelshortcuts'
+SETTING_CLASS_FILE = 'classfile'
+SETTING_CLASS_FILE_HISTORY = 'classfilehistory'
 
 FORMAT_PASCALVOC = 'xml'
 FORMAT_YOLO = 'yolo'

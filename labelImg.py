@@ -5,7 +5,6 @@
 # retain the MIT terms in LICENSE-MIT-UPSTREAM.
 from __future__ import absolute_import
 
-import codecs
 import math
 import os
 import platform
@@ -21,6 +20,7 @@ from PyQt5.QtWidgets import *
 
 # Add internal libs
 from libs.constants import *
+from libs.version import __version__
 from libs.lib import struct, newAction, newIcon, addActions, fmtShortcut, generateColorByText
 from libs.settings import Settings
 from libs.shape import Shape, DEFAULT_LINE_COLOR, DEFAULT_FILL_COLOR
@@ -30,21 +30,22 @@ from libs.labelDialog import LabelDialog
 from libs.labelFile import LabelFile, LabelFileError
 from libs.pascal_voc_io import PascalVocReader, XML_EXT
 from libs.yolo_obb_io import (YoloReader, YoloError, YOLO_EXT,
-                              save_yolo_annotations)
+                              inspect_yolo_file, save_yolo_annotations)
 from libs.annotation_converter import (AnnotationConversionError,
                                        convert_annotation_file)
 from libs.auto_annotation import AutoAnnotationThread
+from libs.annotation_scan import AnnotationScanner, iter_annotation_files
 from libs.labelShortcutDialog import (LabelShortcutDialog,
                                       LabelShortcutValidationError,
                                       canonical_shortcut,
                                       validate_label_shortcuts)
+from libs.classFileDialog import (ClassFileDialog, ClassFileError,
+                                  read_class_file)
 
 from libs.labelView import CLabelView, HashableQStandardItem
 from libs.fileView import CFileView, natural_path_key
 
 __appname__ = 'labelImg2'
-__version__ = '2.3.2'
-
 # Utility functions and classes.
 
 def have_qstring():
@@ -110,8 +111,19 @@ class MainWindow(QMainWindow, WindowMixin):
 
         self._noSelectionSlot = False
 
-        # Load predefined classes to the list
-        self.loadPredefinedClasses(defaultPrefdefClassFile)
+        # Load the last selected class.txt. Keep the bundled file as a safe
+        # fallback when a moved history item no longer exists.
+        self.bundledClassFile = (os.path.abspath(defaultPrefdefClassFile)
+                                 if defaultPrefdefClassFile else '')
+        savedClassFile = settings.get(SETTING_CLASS_FILE, '')
+        self.classFileHistory = ClassFileDialog.normalizeHistory(
+            [savedClassFile, self.bundledClassFile] + list(
+                settings.get(SETTING_CLASS_FILE_HISTORY, []) or []))
+        self.classFilePath = (os.path.abspath(savedClassFile)
+                              if savedClassFile else self.bundledClassFile)
+        if not self.loadPredefinedClasses(self.classFilePath):
+            self.classFilePath = self.bundledClassFile
+            self.loadPredefinedClasses(self.classFilePath)
         self.predefinedClasses = tuple(self.labelHist)
         self.loadLabelUsage(settings.get(SETTING_LABEL_USAGE, {}))
 
@@ -152,6 +164,17 @@ class MainWindow(QMainWindow, WindowMixin):
             settings.get(SETTING_AUTO_ANNOTATION_CONFIDENCE, 0.25))
         self.autoAnnotationExistingCount = 0
         self.autoAnnotationMode = None
+        self.annotationScanTimer = QTimer(self)
+        self.annotationScanTimer.setInterval(0)
+        self.annotationScanTimer.timeout.connect(
+            self.processAnnotationScanBatch)
+        self.annotationScanner = None
+        self.annotationScanIterator = None
+        self.annotationScanMode = None
+        self.annotationScanDone = 0
+        self.annotationScanTotal = 0
+        self.annotationScanShowWarnings = False
+        self.annotationScanLastStatus = QElapsedTimer()
 
         labellistLayout = QVBoxLayout()
         labellistLayout.setContentsMargins(0, 0, 0, 0)
@@ -162,6 +185,11 @@ class MainWindow(QMainWindow, WindowMixin):
         self.diffcButton.stateChanged.connect(self.btnstate)
         self.editButton = QToolButton()
         self.editButton.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.classFileButton = QToolButton()
+        self.classFileButton.setObjectName('classFileButton')
+        self.classFileButton.setIcon(newIcon('tags.svg'))
+        self.classFileButton.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.classFileButton.clicked.connect(self.openClassFileManager)
         self.labelShortcutSettingsButton = QToolButton()
         self.labelShortcutSettingsButton.setObjectName(
             'labelShortcutSettingsButton')
@@ -173,6 +201,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.openLabelShortcutSettings)
 
         labellistLayout.addWidget(self.editButton)
+        labellistLayout.addWidget(self.classFileButton)
         labellistLayout.addWidget(self.labelShortcutSettingsButton)
         labellistLayout.addWidget(self.diffcButton)
 
@@ -318,6 +347,10 @@ class MainWindow(QMainWindow, WindowMixin):
             '&Open Annotation Dir', self.openAnnotationDirDialog,
             'Ctrl+r', 'dir.svg',
             u'Open the directory used to load and save annotations')
+
+        selectClassFile = action(
+            u'选择类别文件...', self.openClassFileManager,
+            None, 'tags.svg', u'预览、选择或切换 class.txt 类别文件')
 
         selectAutoAnnotationModel = action(
             u'选择自动标注模型...', self.selectAutoAnnotationModel,
@@ -502,6 +535,7 @@ class MainWindow(QMainWindow, WindowMixin):
                                fitWindow=fitWindow, fitWidth=fitWidth, play=play,
                                openPrevImg=openPrevImg, openNextImg=openNextImg,
                                openAnnotationDir=openAnnotationDir,
+                               selectClassFile=selectClassFile,
                                selectAutoAnnotationModel=selectAutoAnnotationModel,
                                autoAnnotate=autoAnnotate,
                                singleAutoAnnotate=singleAutoAnnotate,
@@ -566,8 +600,8 @@ class MainWindow(QMainWindow, WindowMixin):
                    (formatXml, formatYolo, formatYoloObb))
 
         addActions(self.menus.file,
-                   (open, opendir, openAnnotationDir,
-                    selectAutoAnnotationModel, singleAutoAnnotate,
+                   (open, opendir, openAnnotationDir, selectClassFile,
+                     selectAutoAnnotationModel, singleAutoAnnotate,
                     autoAnnotate, None,
                     self.menus.annotationFormat,
                     self.menus.recentFiles,
@@ -602,6 +636,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.setLabelShortcutMappings(
             self.labelShortcutMappings, persist=False,
             discardInvalid=True)
+        self.updateClassFileButton()
 
         self.statusBar().showMessage('%s started.' % __appname__)
         self.statusBar().show()
@@ -687,6 +722,15 @@ class MainWindow(QMainWindow, WindowMixin):
         self.statusBar().addPermanentWidget(
             self.autoAnnotationCancelButton)
         self.setAutoAnnotationWidgetsVisible(False)
+
+        # If only a saved labels directory is available, inspect its format in
+        # the background. When an image directory is restored, its own scan
+        # starts shortly and provides counts plus the same format detection.
+        if (self.defaultSaveDir and os.path.isdir(self.defaultSaveDir) and
+                not (self.lastOpenDir and os.path.isdir(self.lastOpenDir)) and
+                not (self.filePath and os.path.isdir(self.filePath))):
+            QTimer.singleShot(0, partial(
+                self.startAnnotationScan, [], False))
 
         # Open Dir if deafult file
         if self.filePath and os.path.isdir(self.filePath):
@@ -1093,6 +1137,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.filePath = None
         self.imageData = None
         self.labelFile = None
+        self.loadedAnnotationPath = None
+        self.loadedAnnotationFormat = None
         self.canvas.resetState()
         self.actions.pasteFromClipboard.setEnabled(False)
         self.labelCoordinates.clear()
@@ -1269,6 +1315,84 @@ class MainWindow(QMainWindow, WindowMixin):
         self.default_label = label
         self.settings[SETTING_DEFAULT_LABEL] = label
         self.settings.save()
+
+    def updateClassFileButton(self):
+        path = self.classFilePath or ''
+        filename = os.path.basename(path) if path else u'未选择'
+        self.classFileButton.setText(
+            u'类别文件：%s（%d）' % (filename, len(self.predefinedClasses)))
+        self.classFileButton.setToolTip(
+            u'当前类别文件：%s\n共 %d 个预设类别。点击可预览或切换。' %
+            (path or u'未选择', len(self.predefinedClasses)))
+
+    def applyClassFile(self, path, classNames=None, historyPaths=None,
+                       persist=True):
+        """Apply a class file without modifying any existing annotations."""
+        absolute = os.path.abspath(str(path or ''))
+        if classNames is None:
+            classNames = read_class_file(absolute)
+        classNames = list(classNames)
+        if not classNames:
+            raise ClassFileError(u'类别文件中没有可用类别。')
+
+        # Existing boxes may contain a class which is not in the newly chosen
+        # project preset. Keep those names available for editing/saving, while
+        # predefinedClasses remains exactly the selected class.txt content.
+        existingLabels = []
+        for shape in getattr(self.canvas, 'shapes', ()):
+            label = getattr(shape, 'label', None)
+            if label and label not in classNames and label not in existingLabels:
+                existingLabels.append(label)
+
+        self.classFilePath = absolute
+        self.classFileHistory = ClassFileDialog.normalizeHistory(
+            [absolute] + list(historyPaths or self.classFileHistory))
+        self.predefinedClasses = tuple(classNames)
+        self.labelHist = classNames + existingLabels
+        for label in self.labelHist:
+            self.labelUsage.setdefault(label, {'count': 0, 'last': 0})
+
+        if self.default_label not in self.predefinedClasses:
+            self.default_label = classNames[0]
+        self.labelDialog.default_label = self.default_label
+        self.labelDialog.updateListItems(self.labelHist)
+        self.refreshLabelSelectionOrder()
+
+        oldShortcutCount = len(self.labelShortcutMappings)
+        self.setLabelShortcutMappings(
+            self.labelShortcutMappings, persist=False, discardInvalid=True)
+        removedShortcutCount = oldShortcutCount - len(
+            self.labelShortcutMappings)
+        self.updateClassFileButton()
+
+        if persist:
+            self.settings[SETTING_CLASS_FILE] = self.classFilePath
+            self.settings[SETTING_CLASS_FILE_HISTORY] = self.classFileHistory
+            self.settings[SETTING_DEFAULT_LABEL] = self.default_label
+            self.settings[SETTING_LABEL_SHORTCUTS] = self.labelShortcutMappings
+            self.settings.save()
+        return removedShortcutCount
+
+    def openClassFileManager(self, _checked=False):
+        dialog = ClassFileDialog(
+            self.classFilePath, self.classFileHistory, self)
+        if not dialog.exec_():
+            return False
+        try:
+            removed = self.applyClassFile(
+                dialog.selectedPath, dialog.classNames,
+                dialog.historyPaths)
+        except ClassFileError as error:
+            self.errorMessage(u'类别文件无效', str(error))
+            return False
+
+        message = u'已切换类别文件：%s，共 %d 个类别。' % (
+            os.path.basename(self.classFilePath),
+            len(self.predefinedClasses))
+        if removed:
+            message += u' 已移除 %d 个不再适用的类别快捷键。' % removed
+        self.status(message, 10000)
+        return True
 
     def labelShortcutReservedKeys(self):
         """Collect menu, toolbar and direct canvas keyboard bindings."""
@@ -2039,19 +2163,27 @@ class MainWindow(QMainWindow, WindowMixin):
             annotationBasePath = self.annotationBasePathForImage(
                 self.filePath)
 
-            xmlPath = annotationBasePath + XML_EXT
-            yoloPath = annotationBasePath + YOLO_EXT
-            annotationCandidates = ((xmlPath, 'xml'), (yoloPath, 'txt'))
-            if self.annotationFormat != FORMAT_PASCALVOC:
-                annotationCandidates = tuple(reversed(annotationCandidates))
+            annotationCandidates = self.annotationCandidatesForImage(
+                self.filePath)
 
             for annotationPath, annotationKind in annotationCandidates:
-                if not os.path.isfile(annotationPath):
-                    continue
                 if annotationKind == 'xml':
                     vocReader = self.loadPascalXMLByFilename(annotationPath)
+                    loadedReader = vocReader
+                    loadedFormat = FORMAT_PASCALVOC
                 else:
-                    self.loadYOLOByFilename(annotationPath)
+                    loadedReader = self.loadYOLOByFilename(annotationPath)
+                    loadedFormat = (
+                        loadedReader.annotation_format
+                        if loadedReader is not None and
+                        loadedReader.annotation_format is not None
+                        else (self.annotationFormat
+                              if self.annotationFormat != FORMAT_PASCALVOC
+                              else None))
+                if loadedReader is None:
+                    continue
+                self.loadedAnnotationPath = annotationPath
+                self.loadedAnnotationFormat = loadedFormat
                 break
 
             if vocReader is not None:
@@ -2212,7 +2344,7 @@ class MainWindow(QMainWindow, WindowMixin):
         if not self.labelHist:
             self.errorMessage(
                 u'项目类别为空',
-                u'请先在 data/predefined_classes.txt 中配置项目类别。')
+                u'请先通过“File > 选择类别文件...”加载项目 class.txt。')
             return
 
         annotation_base = self.annotationBasePathForImage(self.filePath)
@@ -2293,7 +2425,7 @@ class MainWindow(QMainWindow, WindowMixin):
         if not self.labelHist:
             self.errorMessage(
                 u'项目类别为空',
-                u'请先在 data/predefined_classes.txt 中配置项目类别。')
+                u'请先通过“File > 选择类别文件...”加载项目 class.txt。')
             return
 
         if self.dirname and os.path.isdir(self.dirname):
@@ -2566,6 +2698,9 @@ class MainWindow(QMainWindow, WindowMixin):
         thread.deleteLater()
 
     def closeEvent(self, event):
+        self.annotationScanTimer.stop()
+        self.annotationScanIterator = None
+        self.annotationScanner = None
         if (self.autoAnnotationThread is not None and
                 self.autoAnnotationThread.isRunning()):
             self.cancelAutoAnnotation()
@@ -2604,6 +2739,8 @@ class MainWindow(QMainWindow, WindowMixin):
         settings[SETTING_DEFAULT_LABEL] = self.default_label
         settings[SETTING_LABEL_USAGE] = self.labelUsage
         settings[SETTING_LABEL_SHORTCUTS] = self.labelShortcutMappings
+        settings[SETTING_CLASS_FILE] = self.classFilePath
+        settings[SETTING_CLASS_FILE_HISTORY] = self.classFileHistory
         settings[SETTING_AUTO_ANNOTATION_CONFIDENCE] = (
             self.autoAnnotationConfidence)
         settings[SETTING_ANNOTATION_FORMAT] = self.annotationFormat
@@ -2629,6 +2766,201 @@ class MainWindow(QMainWindow, WindowMixin):
             return natural_path_key(relativePath)
         return sorted(images, key=sort_key)
 
+    def annotationCandidatesForImage(self, imagePath):
+        """Return existing labels newest-first, regardless of stale format."""
+        annotationBasePath = self.annotationBasePathForImage(imagePath)
+        candidates = []
+        for path, kind, annotationFormat in (
+                (annotationBasePath + XML_EXT, 'xml', FORMAT_PASCALVOC),
+                (annotationBasePath + YOLO_EXT, 'txt', None)):
+            if not os.path.isfile(path):
+                continue
+            detectedFormat = annotationFormat
+            if kind == 'txt':
+                try:
+                    detectedFormat, _count = inspect_yolo_file(path)
+                except (OSError, UnicodeError, YoloError):
+                    detectedFormat = None
+            candidates.append((path, kind, detectedFormat))
+
+        candidates.sort(
+            key=lambda item: (
+                os.path.getmtime(item[0]),
+                item[2] == self.annotationFormat),
+            reverse=True)
+        return [(path, kind) for path, kind, _format in candidates]
+
+    def inspectAnnotationDirectory(self, dirpath):
+        """Inspect XML/TXT formats without changing any annotation file."""
+        result = {
+            'counts': Counter(),
+            'newest_format': None,
+            'newest_mtime': None,
+            'empty_txt': 0,
+            'errors': [],
+        }
+        if not dirpath or not os.path.isdir(dirpath):
+            return result
+
+        for root, _dirs, files in os.walk(dirpath):
+            for filename in files:
+                path = os.path.join(root, filename)
+                extension = os.path.splitext(filename)[1].lower()
+                annotationFormat = None
+                if extension == XML_EXT:
+                    annotationFormat = FORMAT_PASCALVOC
+                elif extension == YOLO_EXT:
+                    try:
+                        annotationFormat, objectCount = inspect_yolo_file(path)
+                        if annotationFormat is None and objectCount == 0:
+                            result['empty_txt'] += 1
+                    except (OSError, UnicodeError, YoloError) as error:
+                        result['errors'].append((path, str(error)))
+                        continue
+                else:
+                    continue
+
+                if annotationFormat is None:
+                    continue
+                result['counts'][annotationFormat] += 1
+                modified = os.path.getmtime(path)
+                if (result['newest_mtime'] is None or
+                        modified > result['newest_mtime']):
+                    result['newest_mtime'] = modified
+                    result['newest_format'] = annotationFormat
+        return result
+
+    def applyAnnotationFormatWithoutConversion(self, annotationFormat):
+        """Select a detected project format without rewriting its labels."""
+        if annotationFormat not in SUPPORTED_ANNOTATION_FORMATS:
+            return False
+        self.annotationFormat = annotationFormat
+        if hasattr(self, 'annotationFormatActions'):
+            self.annotationFormatActions[annotationFormat].setChecked(True)
+        self.settings[SETTING_ANNOTATION_FORMAT] = annotationFormat
+        self.settings.save()
+        return True
+
+    def applyDetectedAnnotationDirectoryFormat(self, dirpath,
+                                               showWarnings=True):
+        """Apply a directory's actual format instead of a stale global one."""
+        inspection = self.inspectAnnotationDirectory(dirpath)
+        self.applyAnnotationInspection(inspection, showWarnings)
+        return inspection
+
+    def applyAnnotationInspection(self, inspection, showWarnings=True):
+        """Apply results produced by either synchronous or background scan."""
+        detectedFormats = list(inspection['counts'])
+        if len(detectedFormats) == 1:
+            self.applyAnnotationFormatWithoutConversion(detectedFormats[0])
+        elif len(detectedFormats) > 1:
+            preferredFormat = inspection['newest_format']
+            if preferredFormat is not None:
+                self.applyAnnotationFormatWithoutConversion(preferredFormat)
+            if showWarnings:
+                details = ', '.join(
+                    '%s：%d' %
+                    (self.annotationFormatName(annotationFormat), count)
+                    for annotationFormat, count in
+                    sorted(inspection['counts'].items()))
+                QMessageBox.warning(
+                    self,
+                    u'检测到混合标签格式',
+                    u'该标签目录包含多种格式：%s。\n\n'
+                    u'已按最近修改的标签选择 %s。读取同名双文件时也会'
+                    u'优先使用较新的版本；下次保存会清理该图片的旧格式'
+                    u'副本。\n\n如需立即统一整个目录，请在 Annotation '
+                    u'Format 中选择目标格式。' %
+                    (details, self.annotationFormatName()))
+
+        if inspection['errors'] and showWarnings:
+            QMessageBox.warning(
+                self,
+                u'部分标签无法识别',
+                u'有 %d 个 TXT 文件无法识别格式。它们不会被自动修改，'
+                u'请检查文件内容。' % len(inspection['errors']))
+
+    def startAnnotationScan(self, imagePaths=None, showWarnings=False):
+        """Read a few labels per event-loop turn to keep the GUI responsive."""
+        self.annotationScanTimer.stop()
+        paths = list(imagePaths or [])
+        self.annotationScanner = AnnotationScanner(
+            self.dirname, self.defaultSaveDir, self.annotationFormat)
+        if paths:
+            self.annotationScanMode = 'images'
+            self.annotationScanIterator = iter(enumerate(paths))
+            self.annotationScanTotal = len(paths)
+        else:
+            self.annotationScanMode = 'directory'
+            self.annotationScanIterator = iter_annotation_files(
+                self.defaultSaveDir)
+            self.annotationScanTotal = 0
+        self.annotationScanDone = 0
+        self.annotationScanShowWarnings = bool(showWarnings)
+        self.annotationScanLastStatus.start()
+        self.annotationScanTimer.start()
+        return self.annotationScanTimer
+
+    def processAnnotationScanBatch(self):
+        if self.annotationScanIterator is None or self.annotationScanner is None:
+            self.annotationScanTimer.stop()
+            return
+
+        budget = QElapsedTimer()
+        budget.start()
+        processed = 0
+        updatedCounts = False
+        finished = False
+        while processed < 64 and budget.elapsed() < 12:
+            try:
+                item = next(self.annotationScanIterator)
+            except StopIteration:
+                finished = True
+                break
+
+            if self.annotationScanMode == 'images':
+                row, imagePath = item
+                count = self.annotationScanner.inspectImage(imagePath)
+                self.fileModel.updateAnnotationCount(
+                    row, imagePath, count)
+                updatedCounts = True
+            else:
+                self.annotationScanner.inspectStandaloneFile(item)
+            processed += 1
+            self.annotationScanDone += 1
+
+        if updatedCounts:
+            self.updateLabelStatistics()
+        if (self.annotationScanLastStatus.elapsed() >= 400 and
+                not finished):
+            if self.annotationScanTotal:
+                self.status(
+                    u'正在分批读取标签：%d/%d（界面可继续操作）' %
+                    (self.annotationScanDone, self.annotationScanTotal),
+                    1500)
+            else:
+                self.status(
+                    u'正在分批识别标签格式：已检查 %d 个文件…' %
+                    self.annotationScanDone, 1500)
+            self.annotationScanLastStatus.restart()
+        if finished:
+            self.finishAnnotationScan()
+
+    def finishAnnotationScan(self):
+        self.annotationScanTimer.stop()
+        scanner = self.annotationScanner
+        showWarnings = self.annotationScanShowWarnings
+        self.annotationScanIterator = None
+        self.annotationScanner = None
+        if scanner is None:
+            return
+        self.applyAnnotationInspection(scanner.inspection, showWarnings)
+        self.updateLabelStatistics()
+        self.status(
+            u'标签目录读取完成：%s；项目共 %s 个标签框。' %
+            (self.annotationFormatName(),
+             self.projectLabelCount.text()), 10000)
+
     def annotationFormatName(self, annotationFormat=None):
         annotationFormat = annotationFormat or self.annotationFormat
         return {
@@ -2637,20 +2969,29 @@ class MainWindow(QMainWindow, WindowMixin):
             FORMAT_YOLO_OBB: 'YOLO OBB',
         }.get(annotationFormat, annotationFormat)
 
-    def refreshAnnotationFileList(self, reloadCurrent=False):
+    def refreshAnnotationFileList(self, reloadCurrent=False,
+                                  showWarnings=False):
         if not self.dirname or not os.path.isdir(self.dirname):
             if reloadCurrent and self.filePath:
                 currentFile = self.filePath
                 self.loadFile(currentFile)
+            self.startAnnotationScan([], showWarnings)
             return
 
         currentFile = self.filePath
-        imglist = self.scanAllImages(self.dirname)
+        # Changing only the labels directory must not walk the (possibly very
+        # large) image tree again. Reuse the current ordered image list.
+        imglist = list(self.fileModel.stringList())
+        if not imglist:
+            imglist = self.scanAllImages(self.dirname)
         self.filesm.blockSignals(True)
         try:
-            self.fileModel.setStringList(
-                imglist, self.dirname, self.defaultSaveDir,
-                self.annotationFormat)
+            if imglist == list(self.fileModel.stringList()):
+                self.fileModel.resetAnnotationCounts()
+            else:
+                self.fileModel.setStringList(
+                    imglist, self.dirname, self.defaultSaveDir,
+                    self.annotationFormat, scanAnnotations=False)
             if currentFile in imglist:
                 currentIndex = self.fileModel.index(imglist.index(currentFile))
                 self.filesm.setCurrentIndex(
@@ -2663,6 +3004,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         if reloadCurrent and currentFile and currentFile in imglist:
             self.loadFile(currentFile)
+        self.startAnnotationScan(imglist, showWarnings)
 
     def annotationImagesForConversion(self):
         if self.dirname and os.path.isdir(self.dirname):
@@ -2675,13 +3017,16 @@ class MainWindow(QMainWindow, WindowMixin):
         basePath = self.annotationBasePathForImage(imagePath)
         xmlPath = basePath + XML_EXT
         txtPath = basePath + YOLO_EXT
-        candidates = ((xmlPath, txtPath)
-                      if self.annotationFormat == FORMAT_PASCALVOC
-                      else (txtPath, xmlPath))
-        for candidate in candidates:
-            if os.path.isfile(candidate):
-                return candidate
-        return None
+        candidates = [path for path in (xmlPath, txtPath)
+                      if os.path.isfile(path)]
+        if not candidates:
+            return None
+        expectedExtension = self.annotationExtension()
+        return max(
+            candidates,
+            key=lambda path: (
+                os.path.getmtime(path),
+                os.path.splitext(path)[1].lower() == expectedExtension))
 
     def collectAnnotationConversionJobs(self):
         jobs = []
@@ -2794,10 +3139,7 @@ class MainWindow(QMainWindow, WindowMixin):
             conversionSummary = self.convertExistingAnnotations(
                 annotationFormat)
 
-        self.annotationFormat = annotationFormat
-        self.annotationFormatActions[annotationFormat].setChecked(True)
-        self.settings[SETTING_ANNOTATION_FORMAT] = annotationFormat
-        self.settings.save()
+        self.applyAnnotationFormatWithoutConversion(annotationFormat)
 
         self.refreshAnnotationFileList(
             reloadCurrent=bool(self.filePath) and not self.dirty)
@@ -2823,17 +3165,20 @@ class MainWindow(QMainWindow, WindowMixin):
                 '%s - Open Annotation Dir' % __appname__,
                 path,
                 QFileDialog.ShowDirsOnly |
-                QFileDialog.DontResolveSymlinks)
+                QFileDialog.DontResolveSymlinks |
+                QFileDialog.DontUseNativeDialog)
         if not dirpath:
             return
 
         self.defaultSaveDir = os.path.abspath(dirpath)
         self.settings[SETTING_SAVE_DIR] = self.defaultSaveDir
         self.settings.save()
-        self.refreshAnnotationFileList(reloadCurrent=bool(self.filePath))
+
+        self.refreshAnnotationFileList(
+            reloadCurrent=bool(self.filePath), showWarnings=True)
         self.status(
-            'Annotation directory: %s | Save format: %s' %
-            (self.defaultSaveDir, self.annotationFormatName()),
+            u'标签目录已打开，正在后台读取标签数量和格式：%s' %
+            self.defaultSaveDir,
             10000)
 
     def changeSavedirDialog(self, _value=False):
@@ -2872,8 +3217,9 @@ class MainWindow(QMainWindow, WindowMixin):
         imglist = self.scanAllImages(dirpath)
         self.fileModel.setStringList(
             imglist, self.dirname, self.defaultSaveDir,
-            self.annotationFormat)
+            self.annotationFormat, scanAnnotations=False)
         self.updateLabelStatistics()
+        self.startAnnotationScan(imglist, False)
         self.setWindowTitle(__appname__ + ' ' + self.dirname)
         resumeFilePath = os.path.abspath(resumeFilePath) if resumeFilePath else None
         if resumeFilePath in imglist:
@@ -2995,6 +3341,16 @@ class MainWindow(QMainWindow, WindowMixin):
             return root + expectedExtension
         return annotationFilePath + expectedExtension
 
+    def staleAnnotationSibling(self, annotationFilePath):
+        """Return the other-format sibling for a saved XML/TXT label."""
+        root, extension = os.path.splitext(annotationFilePath)
+        extension = extension.lower()
+        if extension == XML_EXT:
+            return root + YOLO_EXT
+        if extension == YOLO_EXT:
+            return root + XML_EXT
+        return None
+
     def saveFile(self, _value=False):
         if not self.filePath:
             return False
@@ -3113,6 +3469,26 @@ class MainWindow(QMainWindow, WindowMixin):
                 (annotationFilePath, error))
             return False
 
+        # A successful save is also a safe format conversion for this image.
+        # Remove only the same-stem alternate extension, after the new file is
+        # fully written, so XML and TXT cannot silently diverge again.
+        stalePath = self.staleAnnotationSibling(annotationFilePath)
+        if stalePath and os.path.isfile(stalePath):
+            try:
+                os.remove(stalePath)
+            except OSError as error:
+                self.status(
+                    u'标签已保存，但旧格式文件清理失败：%s' % error,
+                    10000)
+                QMessageBox.warning(
+                    self,
+                    u'旧格式标签未清理',
+                    u'新标签已经安全保存，但无法删除旧格式文件：\n%s\n\n%s' %
+                    (stalePath, error))
+
+        self.loadedAnnotationPath = annotationFilePath
+        self.loadedAnnotationFormat = self.annotationFormat
+
         self.setClean()
         index = self.currentImageFileModelIndex()
         if index.isValid():
@@ -3193,14 +3569,12 @@ class MainWindow(QMainWindow, WindowMixin):
         self.setDirty()
 
     def loadPredefinedClasses(self, predefClassesFile):
-        if os.path.exists(predefClassesFile) is True:
-            with codecs.open(predefClassesFile, 'r', 'utf8') as f:
-                for line in f:
-                    line = line.strip()
-                    if self.labelHist is None:
-                        self.labelHist = [line]
-                    else:
-                        self.labelHist.append(line)
+        self.labelHist = []
+        try:
+            self.labelHist.extend(read_class_file(predefClassesFile))
+        except ClassFileError:
+            return False
+        return True
 
     def loadPascalXMLByFilename(self, xmlPath):
         if self.filePath is None:

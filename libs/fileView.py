@@ -12,6 +12,7 @@ from .pascal_voc_io import PascalVocReader, XML_EXT
 from .yolo_obb_io import YOLO_EXT, count_yolo_objects
 
 _NATURAL_TOKEN_RE = re.compile(r'(\d+)')
+PENDING_ANNOTATION_COUNT = -1
 
 def natural_path_key(path):
     """Sort text alphabetically and every digit run by integer value."""
@@ -32,6 +33,7 @@ class CFileListModel(QStringListModel):
         super(CFileListModel, self).__init__(parent)
         
         self.dispList = []
+        self._totalAnnotationCount = 0
 
     @staticmethod
     def _pathKey(path):
@@ -69,7 +71,8 @@ class CFileListModel(QStringListModel):
         return [os.path.split(s)[1], None, False]
 
     def setStringList(self, strings, openedDir=None, defaultSaveDir=None,
-                      annotationFormat=FORMAT_PASCALVOC):
+                      annotationFormat=FORMAT_PASCALVOC,
+                      scanAnnotations=True):
         # Rebuilding the list is necessary after model annotation and format
         # conversion so counts stay current. Keep the green confirmation
         # state for images that are still present; it is session UI state and
@@ -82,12 +85,51 @@ class CFileListModel(QStringListModel):
         self.dispList = []
 
         for s in strings:
-            info = self.parseOne(
-                s, openedDir, defaultSaveDir, annotationFormat)
+            if scanAnnotations:
+                info = self.parseOne(
+                    s, openedDir, defaultSaveDir, annotationFormat)
+            else:
+                # Display the image immediately. Annotation counts are filled
+                # by the background scanner so large projects never block the
+                # GUI while every XML/TXT is opened.
+                info = [os.path.split(s)[1],
+                        PENDING_ANNOTATION_COUNT, False]
             info[2] = visitedByPath.get(self._pathKey(s), False)
             self.dispList.append(info)
 
+        self._totalAnnotationCount = sum(
+            info[1] for info in self.dispList
+            if isinstance(info[1], int) and info[1] > 0)
         return super(CFileListModel, self).setStringList(strings)
+
+    def updateAnnotationCount(self, row, imagePath, count):
+        """Apply one background scan result without marking it verified."""
+        if row < 0 or row >= len(self.dispList):
+            return False
+        index = self.index(row)
+        modelPath = self.data(index, Qt.EditRole)
+        if self._pathKey(modelPath) != self._pathKey(imagePath):
+            return False
+        info = self.dispList[row]
+        oldCount = info[1] if isinstance(info[1], int) else 0
+        newCount = count if isinstance(count, int) else None
+        self._totalAnnotationCount -= max(0, oldCount)
+        self._totalAnnotationCount += max(0, newCount or 0)
+        info[1] = newCount
+        self.dispList[row] = info
+        self.dataChanged.emit(
+            index, index, [Qt.DisplayRole, Qt.BackgroundRole])
+        return True
+
+    def resetAnnotationCounts(self):
+        """Clear cached counts without rebuilding a large QStringListModel."""
+        for info in self.dispList:
+            info[1] = PENDING_ANNOTATION_COUNT
+        self._totalAnnotationCount = 0
+        if self.rowCount():
+            self.dataChanged.emit(
+                self.index(0), self.index(self.rowCount() - 1),
+                [Qt.DisplayRole, Qt.BackgroundRole])
 
     def annotationCount(self, index):
         """Return the cached object count for one image, or zero."""
@@ -99,15 +141,15 @@ class CFileListModel(QStringListModel):
 
     def totalAnnotationCount(self):
         """Return the total number of valid boxes cached by the file list."""
-        return sum(
-            count for _name, count, _visited in self.dispList
-            if isinstance(count, int) and count > 0)
+        return self._totalAnnotationCount
 
     def data(self, index, role):
         item = self.dispList[index.row()]
         pathname, count = item[0], item[1]
         if role == Qt.DisplayRole:
-            if count is None:
+            if count == PENDING_ANNOTATION_COUNT:
+                res_str = '%s […]' % (pathname,)
+            elif count is None:
                 res_str = '%s [0]' % (pathname,)
             else:
                 if count == 0:
@@ -136,6 +178,10 @@ class CFileListModel(QStringListModel):
         if role == Qt.BackgroundRole:
             if index.row() < len(self.dispList):
                 info = self.dispList[index.row()]
+                oldCount = info[1] if isinstance(info[1], int) else 0
+                newCount = value if isinstance(value, int) else 0
+                self._totalAnnotationCount -= max(0, oldCount)
+                self._totalAnnotationCount += max(0, newCount)
                 info[1] = value
                 info[2] = True
                 self.dispList[index.row()] = info

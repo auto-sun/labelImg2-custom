@@ -22,7 +22,8 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 | 版本 | 适用情况 | 下载 |
 | --- | --- | --- |
-| **v2.3.2（推荐）** | 修复文件排序、绿色确认状态和类别输入时的 E 键冲突 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.tar.gz) |
+| **v2.3.3（推荐）** | 可切换类别文件；修复混合标签双文件；大型 labels 目录非阻塞读取 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.tar.gz) |
+| v2.3.2 | 修复文件排序、绿色确认状态和类别输入时的 E 键冲突 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.tar.gz) |
 | v2.3.1 | 模型自动标注置信度可调；包含 v2.3.0 的全部功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz) |
 | v2.3.0 | 空标签、类别快捷键、标签统计、格式批量转换和剪切工作流 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz) |
 | v2.2.0 | Ctrl+Z 撤销；修复自动标注类别精确匹配 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.tar.gz) |
@@ -49,6 +50,8 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 | 每次启动重新选择图片目录 | 自动恢复上次打开的数据集 |
 | 重新寻找上次标到哪一张 | 自动定位到上次正在处理的图片 |
 | Open Dir 后标签目录被重置 | 始终保留上次明确选择的标签目录 |
+| 不同项目需要手动覆盖预设类别 | 选择并预览任意 `class.txt`，保留最近使用历史 |
+| 一万张图片选择 labels 后界面卡死 | 文件列表立即显示，标签数量与格式分批读取 |
 | `1、10、100、2` 顺序混乱 | 使用自然数字顺序排列图片 |
 | 每画一个框都要重新双击类别 | 画完框自动打开类别选择器 |
 | 少数常用类别仍要反复搜索 | 可把多个无冲突按键直接绑定到 `class.txt` 预设类别 |

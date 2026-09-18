@@ -54,15 +54,15 @@ python -m venv .venv
 
 这里直接使用虚拟环境中的 Python，不要求执行激活脚本，可以避开部分电脑的 PowerShell 执行策略问题。
 
-`v2.3.2` 包含本地模型自动标注，因此会同时安装 Ultralytics 和 PyTorch，
+`v2.3.3` 包含本地模型自动标注，因此会同时安装 Ultralytics 和 PyTorch，
 下载体积和安装时间会比旧版本更大。只进行手工标注时仍可正常使用全部原有功能。
 
-`v2.3.2` 整体使用 GNU AGPL v3.0 免费开源；上游 LabelImg2 的 MIT 许可证单独保留在
+`v2.3.3` 整体使用 GNU AGPL v3.0 免费开源；上游 LabelImg2 的 MIT 许可证单独保留在
 `LICENSE-MIT-UPSTREAM`。
 
 ## 四、准备类别文件
 
-默认类别文件是：
+程序自带的默认类别文件是：
 
 ```text
 data\predefined_classes.txt
@@ -79,11 +79,10 @@ Stem_Canker
 
 YOLO 和 YOLO OBB 的类别编号从 `0` 开始，严格按照这个文件的行顺序生成。正式标注开始后不要随意交换类别顺序。
 
-如果不想修改仓库默认文件，也可以指定自己的类别文件：
-
-```powershell
-.\.venv\Scripts\python.exe labelImg.py "" "D:\my_dataset\classes.txt"
-```
+推荐不要覆盖仓库默认文件。启动后点击 `File > 选择类别文件...`，或点击右侧
+`Box Labels` 中的“类别文件”按钮，选择项目自己的 `class.txt`。选择窗口会先预览
+类别 ID、名称和总数，并保存最近使用的 12 个文件供不同项目切换；下次启动自动恢复
+上次选择。
 
 ## 五、启动程序
 
@@ -179,7 +178,7 @@ labels\train\day1\001.txt
 4. 完成后查看类别映射结果，并逐张人工复核模型生成的框。
 
 OBB 模型会自动选择 YOLO OBB 格式。模型自己的类别名会匹配到当前
-`predefined_classes.txt` 中最相似的类别。已有 XML/TXT 的图片不会被覆盖。
+所选 `class.txt` 中最相似的类别。已有 XML/TXT 的图片不会被覆盖。
 完整同名类别始终优先；例如模型类别 `pipe_row` 会直接映射到预设中的 `pipe_row`。
 
 只想处理当前图片时，点击顶部“标注当前图”。如果当前图已有标签，选择：

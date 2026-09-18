@@ -338,6 +338,9 @@ class AutoAnnotationThread(QThread):
                         image_height,
                         self.project_classes,
                         annotation_format)
+                    stale_xml_path = annotation_base + XML_EXT
+                    if os.path.isfile(stale_xml_path):
+                        os.remove(stale_xml_path)
                     saved += 1
                     object_count += len(shapes)
                     if job.get('return_shapes'):

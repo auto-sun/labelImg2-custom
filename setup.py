@@ -3,12 +3,14 @@
 
 from setuptools import setup, find_packages
 from libs.version import __version__
+from pathlib import Path
 
-with open('README.rst') as readme_file:
+with open('README.rst', encoding='utf-8') as readme_file:
     readme = readme_file.read()
 
-with open('HISTORY.rst') as history_file:
-    history = history_file.read()
+history_path = Path('HISTORY.rst')
+history = (history_path.read_text(encoding='utf-8')
+           if history_path.is_file() else '')
 
 requirements = [
     # TODO: Different OS have different requirements

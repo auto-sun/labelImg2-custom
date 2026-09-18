@@ -168,6 +168,8 @@ class AutoAnnotationPolicyTests(unittest.TestCase):
                 annotation_base = os.path.join(directory, 'image')
                 with open(annotation_base + '.txt', 'w', encoding='utf-8') as stream:
                     stream.write('0 0.05 0.05 0.02 0.02\n')
+                with open(annotation_base + '.xml', 'w', encoding='utf-8') as stream:
+                    stream.write('<annotation/>\n')
                 summaries = []
                 thread = AutoAnnotationThread(
                     'fake.pt',
@@ -187,6 +189,7 @@ class AutoAnnotationPolicyTests(unittest.TestCase):
                     lines = stream.read().splitlines()
                 self.assertEqual(1, len(lines))
                 self.assertNotIn('0.05 0.05', lines[0])
+                self.assertFalse(os.path.exists(annotation_base + '.xml'))
         finally:
             if previous_module is None:
                 del sys.modules['ultralytics']

@@ -150,12 +150,19 @@ def convert_annotation_file(image_path, source_path, target_format,
     except (LabelFileError, YoloError, OSError, UnicodeError, ValueError) as error:
         raise AnnotationConversionError(str(error))
 
-    if (os.path.normcase(os.path.abspath(source_path)) !=
-            os.path.normcase(os.path.abspath(target_path))):
+    target_key = os.path.normcase(os.path.abspath(target_path))
+    stale_paths = {
+        base_path + XML_EXT,
+        base_path + YOLO_EXT,
+    }
+    for stale_path in stale_paths:
+        if (os.path.normcase(os.path.abspath(stale_path)) == target_key or
+                not os.path.isfile(stale_path)):
+            continue
         try:
-            os.remove(source_path)
+            os.remove(stale_path)
         except OSError as error:
             raise AnnotationConversionError(
                 'Converted to %s but could not remove %s: %s' %
-                (target_path, source_path, error))
+                (target_path, stale_path, error))
     return target_path, len(shapes)
