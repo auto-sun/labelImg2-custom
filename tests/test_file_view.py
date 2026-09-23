@@ -7,11 +7,16 @@ import unittest
 from unittest import mock
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication
 
-from libs.fileView import CFileListModel
+from libs.fileView import CFileListModel, CFileView
 
 
 class FileListConfirmationStateTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
     def test_deferred_refresh_does_not_open_annotation_files(self):
         with tempfile.TemporaryDirectory() as directory:
             image = os.path.join(directory, '1.jpg')
@@ -69,7 +74,47 @@ class FileListConfirmationStateTests(unittest.TestCase):
 
             model.setStringList([second])
 
-            self.assertFalse(model.dispList[0][2])
+        self.assertFalse(model.dispList[0][2])
+
+    def test_review_mark_is_pale_red_and_survives_reordering(self):
+        with tempfile.TemporaryDirectory() as directory:
+            first = os.path.join(directory, '1.jpg')
+            second = os.path.join(directory, '2.jpg')
+            model = CFileListModel()
+            model.setStringList([first, second], scanAnnotations=False)
+            model.setData(model.index(0), 3, Qt.BackgroundRole)
+            self.assertTrue(model.setFlagged(model.index(0), True))
+            self.assertEqual(
+                '#ffd2d2',
+                model.data(model.index(0), Qt.BackgroundRole).color().name())
+
+            model.setStringList([second, first], scanAnnotations=False)
+
+            self.assertFalse(model.isFlagged(model.index(0)))
+            self.assertTrue(model.isFlagged(model.index(1)))
+            self.assertTrue(model.dispList[1][2])
+            self.assertTrue(model.setFlagged(model.index(1), False))
+            self.assertEqual([], model.flaggedPaths())
+
+    def test_selected_review_mark_still_paints_red(self):
+        with tempfile.TemporaryDirectory() as directory:
+            view = CFileView()
+            view.resize(260, 100)
+            model = view.model()
+            model.setStringList(
+                [os.path.join(directory, 'review.jpg')],
+                scanAnnotations=False)
+            index = model.index(0)
+            model.setFlagged(index, True)
+            view.setCurrentIndex(index)
+            view.show()
+            self.app.processEvents()
+
+            rect = view.visualRect(index)
+            image = view.viewport().grab().toImage()
+            color = image.pixelColor(rect.right() - 10, rect.center().y())
+            self.assertGreater(color.red(), color.green() + 20)
+            view.close()
 
 
 if __name__ == '__main__':

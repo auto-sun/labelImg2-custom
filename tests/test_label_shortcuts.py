@@ -220,6 +220,76 @@ class LabelShortcutWindowTests(unittest.TestCase):
 
         self.assertTrue(action.isEnabled())
 
+    def test_chinese_class_can_be_selected_by_full_pinyin(self):
+        editor = CCommonOrderComboBox(self.window)
+        editor.addItems([u'苹果', u'火龙果', u'黄瓜'])
+        editor.show()
+        editor.setFocus()
+        try:
+            QTest.keyClicks(editor, 'huolongguo')
+            self.assertEqual(u'火龙果', editor.currentText())
+        finally:
+            editor.deleteLater()
+
+    def test_chinese_class_can_be_selected_by_pinyin_initials(self):
+        editor = CCommonOrderComboBox(self.window)
+        editor.addItems([u'苹果', u'火龙果', u'黄瓜'])
+        editor.show()
+        editor.setFocus()
+        try:
+            QTest.keyClicks(editor, 'hlg')
+            self.assertEqual(u'火龙果', editor.currentText())
+        finally:
+            editor.deleteLater()
+
+    def test_same_pinyin_initial_keeps_common_usage_order(self):
+        self.window.labelHist = [u'火龙果', u'黄瓜', u'葡萄']
+        self.window.labelUsage = {
+            u'火龙果': {'count': 1, 'last': 1},
+            u'黄瓜': {'count': 4, 'last': 4},
+            u'葡萄': {'count': 2, 'last': 2},
+        }
+
+        self.assertEqual(
+            [u'黄瓜', u'火龙果', u'葡萄'],
+            self.window.labelSelectionOrder())
+
+    def test_editor_shortcut_changes_class_without_starting_drawing(self):
+        self.window.setLabelShortcutMappings(
+            [{'shortcut': '1', 'label': 'SafeHat'}])
+        shape = make_shape()
+        shape.label = 'person'
+        self.window.canvas.shapes.append(shape)
+        self.window.addLabel(shape)
+        index = self.window.labelModel.index(0, 0)
+
+        self.window.show()
+        self.window.labelList.setCurrentIndex(index)
+        self.window.labelList.edit(index)
+        QApplication.processEvents()
+        editor = self.window.labelList.findChild(CCommonOrderComboBox)
+        self.assertIsNotNone(editor)
+        self.assertTrue(self.window._labelEditorActive)
+
+        QTest.keyClick(editor, Qt.Key_1)
+        QApplication.processEvents()
+
+        self.assertEqual('SafeHat', shape.label)
+        self.assertTrue(self.window.canvas.editing())
+        self.assertIsNone(self.window._pendingLabelShortcut)
+        self.assertFalse(self.window.labelShortcutActions[0].isEnabled())
+
+    def test_shortcut_widgets_do_not_accept_ime_composition(self):
+        editor = CCommonOrderComboBox(self.window)
+        try:
+            self.assertFalse(editor.testAttribute(Qt.WA_InputMethodEnabled))
+            self.assertFalse(self.window.canvas.testAttribute(
+                Qt.WA_InputMethodEnabled))
+            self.assertFalse(self.window.fileListView.testAttribute(
+                Qt.WA_InputMethodEnabled))
+        finally:
+            editor.deleteLater()
+
     def test_shortcut_box_skips_picker_but_normal_box_opens_it(self):
         editCalls = []
         originalEdit = self.window.labelList.edit

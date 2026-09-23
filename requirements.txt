@@ -4,3 +4,5 @@ pyqt5
 lxml
 opencv-python
 ultralytics>=8.3
+Send2Trash>=1.8.3
+pypinyin>=0.53

@@ -18,16 +18,16 @@
 
 | 版本 | 主要内容 | ZIP | TAR.GZ |
 | --- | --- | --- | --- |
-| **v2.3.3（推荐）** | 可切换类别文件；修复混合标签双文件；大型 labels 目录非阻塞读取 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.tar.gz) |
+| **v2.4.0（推荐）** | 拼音选类、待确认标记、刷新列表、回收站删除与右键菜单定位修复 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.4.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.4.0.tar.gz) |
+| v2.3.3 | 可切换类别文件；修复混合标签双文件；大型 labels 目录非阻塞读取 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.tar.gz) |
 | v2.3.2 | 修复文件排序、绿色确认状态和类别输入时的 E 键冲突 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.tar.gz) |
 | v2.3.1 | 模型自动标注置信度可调；包含 v2.3.0 的全部功能 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz) |
-| v2.3.0 | 空标签、类别快捷键、标签统计、格式批量转换和剪切工作流 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz) |
 
 [查看所有发行版本](https://github.com/auto-sun/labelImg2-custom/releases) ·
 [查看全部标签](https://github.com/auto-sun/labelImg2-custom/tags) ·
 [更新日志](CHANGELOG.md)
 
-`v1.0–v1.2` 是仓库继承的上游历史标签；需要当前完整功能请选择 `v2.3.3`。
+`v1.0–v1.2` 是仓库继承的上游历史标签；需要当前完整功能请选择 `v2.4.0`。
 
 ## 主要改进
 
@@ -100,7 +100,7 @@ labelImg.bat --check
 4. 建议在 `View` 菜单开启 `Auto Saving`。
 5. 按 `E` 绘制旋转框，画完后直接输入类别首字母。
 6. 使用 `Z / X / C / V / F` 调整角度，选中框时滚轮调整大小。
-7. 按 `Ctrl+S` 保存，使用 `D` 或右方向键进入下一张。
+7. 按 `Ctrl+S` 保存，使用 `D` 或下方向键进入下一张。
 
 ## 模型自动标注
 
@@ -133,7 +133,8 @@ labelImg.bat --check
 | `E` | 进入或退出 OBB 绘制 |
 | `Ctrl+S` | 保存当前标签 |
 | `A / D` | 上一张 / 下一张 |
-| `左 / 右方向键` | 上一张 / 下一张 |
+| `上 / 下方向键` | 上一张 / 下一张（选中框时用于上下微调） |
+| `四个方向键（已选框）` | 将选中框向对应方向微调 1 像素 |
 | `Ctrl+C / Ctrl+X / Ctrl+V` | 复制 / 剪切 / 粘贴选中框 |
 | `Ctrl+Z` | 撤销上一步框操作（每张图片最多 50 步） |
 | `Ctrl+D` | 直接复制选中框 |
@@ -146,6 +147,11 @@ labelImg.bat --check
 `1` 绑定到 `SafeHat`。程序只允许选择当前 `class.txt` 中的类别，并会拒绝与现有功能或
 其他自定义映射冲突的键位。保存后按 `1` 即可直接进入一次 `SafeHat` 的 OBB 绘制状态，
 设置会在下次启动时自动恢复。
+
+双击已有框的类别后，可输入中文类别的拼音（例如 `huolongguo` 查找“火龙果”），
+或按已设置的类别快捷键直接修改当前框。右侧 File List 右键可将暂时无法确定类别的图片
+标记为淡红色“待确认”；再次右键可取消标记，刷新或重启后标记仍在。中文输入法开启时，
+画布和这些快捷键控件仍可直接接收按键。
 
 ## 标签目录匹配示例
 

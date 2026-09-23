@@ -21,6 +21,7 @@ SETTING_AUTO_ANNOTATION_CONFIDENCE = 'autoannotationconfidence'
 SETTING_LABEL_SHORTCUTS = 'labelshortcuts'
 SETTING_CLASS_FILE = 'classfile'
 SETTING_CLASS_FILE_HISTORY = 'classfilehistory'
+SETTING_FLAGGED_IMAGES = 'flaggedimages'
 
 FORMAT_PASCALVOC = 'xml'
 FORMAT_YOLO = 'yolo'

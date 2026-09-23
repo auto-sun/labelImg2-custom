@@ -2,9 +2,21 @@
 from __future__ import absolute_import
 
 import sys
+from functools import lru_cache
+from pypinyin import lazy_pinyin
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
+from .shortcut_input import disable_ime_for_shortcuts
+
+
+@lru_cache(maxsize=4096)
+def label_search_keys(label):
+    """Match Chinese names by full pinyin and pinyin initials."""
+    syllables = lazy_pinyin(label)
+    return (label.casefold(),
+            ''.join(syllables).casefold(),
+            ''.join(syllable[:1] for syllable in syllables).casefold())
 
 class HashableQStandardItem(QStandardItem):
     def __init__(self, text):
@@ -19,23 +31,58 @@ class CCommonOrderComboBox(QComboBox):
 
     def __init__(self, parent=None):
         super(CCommonOrderComboBox, self).__init__(parent)
+        disable_ime_for_shortcuts(self)
         self._lastSearchKey = None
         self._lastSearchTime = 0
         self._matchPosition = -1
+        self._searchPrefix = ''
+        self._shortcutLabels = {}
+
+    def focusInEvent(self, event):
+        super(CCommonOrderComboBox, self).focusInEvent(event)
+        disable_ime_for_shortcuts(self)
+
+    def setShortcutMappings(self, mappings):
+        self._shortcutLabels = {
+            str(mapping['shortcut']).casefold(): mapping['label']
+            for mapping in mappings}
+
+    def matchesPrefix(self, prefix):
+        return [index for index in range(self.count())
+                if any(key.startswith(prefix)
+                       for key in label_search_keys(self.itemText(index)))]
 
     def keyPressEvent(self, event):
+        shortcut = QKeySequence(
+            int(event.modifiers()) | int(event.key())).toString(
+                QKeySequence.PortableText).casefold()
+        mappedLabel = self._shortcutLabels.get(shortcut)
+        if mappedLabel is not None:
+            index = self.findText(mappedLabel)
+            if index >= 0:
+                self.setCurrentIndex(index)
+                event.accept()
+                return
+
         text = event.text().casefold()
-        if len(text) == 1 and text.isalpha():
-            matches = [
-                index for index in range(self.count())
-                if self.itemText(index).casefold().startswith(text)
-            ]
+        if (len(text) == 1 and text.isalpha() and
+                not event.modifiers() & (
+                    Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)):
+            now = QDateTime.currentMSecsSinceEpoch()
+            withinTimeout = now - self._lastSearchTime <= self.searchTimeoutMs
+            repeated = (withinTimeout and text == self._lastSearchKey and
+                        self._searchPrefix == text)
+            prefix = (self._searchPrefix + text
+                      if withinTimeout and self._searchPrefix and not repeated
+                      else text)
+            matches = self.matchesPrefix(prefix)
+            if not matches and prefix != text:
+                prefix = text
+                matches = self.matchesPrefix(prefix)
             if matches:
-                now = QDateTime.currentMSecsSinceEpoch()
-                repeated = (text == self._lastSearchKey and
-                            now - self._lastSearchTime <= self.searchTimeoutMs)
                 self._matchPosition = ((self._matchPosition + 1) % len(matches)
                                        if repeated else 0)
+                self._searchPrefix = prefix
                 self._lastSearchKey = text
                 self._lastSearchTime = now
                 self.setCurrentIndex(matches[self._matchPosition])
@@ -51,12 +98,14 @@ class CComboBoxDelegate(QStyledItemDelegate):
     def __init__(self, parent, listItem):
         super(CComboBoxDelegate, self).__init__(parent)
         self.listItem = listItem
+        self.shortcutMappings = []
 
     def updateListItem(self, listItem):
         self.listItem = listItem
 
     def createEditor(self, parent, option, index):
         editor = CCommonOrderComboBox(parent)
+        editor.setShortcutMappings(self.shortcutMappings)
         for i in self.listItem:
             editor.addItem(i)
         editor.currentIndexChanged.connect(self.editorIndexChanged)
@@ -186,6 +235,7 @@ class CLabelView(QTableView):
     toggleEdit = pyqtSignal(bool)
     def __init__(self, labelHist, parent = None):
         super(CLabelView, self).__init__(parent)
+        disable_ime_for_shortcuts(self)
         
         header = CHeaderView(Qt.Vertical, self)
         self.setVerticalHeader(header)
@@ -206,6 +256,10 @@ class CLabelView(QTableView):
         
         self.sm = self.selectionModel()
 
+    def focusInEvent(self, event):
+        super(CLabelView, self).focusInEvent(event)
+        disable_ime_for_shortcuts(self)
+
     def extraChanged(self, str):
         self.extraEditing.emit(self.sm.currentIndex(), str)
 
@@ -216,6 +270,9 @@ class CLabelView(QTableView):
 
     def updateLabelList(self, labelHist):
         self.label_delegate.updateListItem(labelHist)
+
+    def updateShortcutMappings(self, mappings):
+        self.label_delegate.shortcutMappings = list(mappings)
 
     def keyPressEvent(self, e):
         key = e.key()

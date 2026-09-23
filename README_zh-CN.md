@@ -22,7 +22,8 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 | 版本 | 适用情况 | 下载 |
 | --- | --- | --- |
-| **v2.3.3（推荐）** | 可切换类别文件；修复混合标签双文件；大型 labels 目录非阻塞读取 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.tar.gz) |
+| **v2.4.0（推荐）** | 拼音选类、待确认标记、刷新列表、回收站删除与右键菜单定位修复 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.4.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.4.0.tar.gz) |
+| v2.3.3 | 可切换类别文件；修复混合标签双文件；大型 labels 目录非阻塞读取 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.tar.gz) |
 | v2.3.2 | 修复文件排序、绿色确认状态和类别输入时的 E 键冲突 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.tar.gz) |
 | v2.3.1 | 模型自动标注置信度可调；包含 v2.3.0 的全部功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz) |
 | v2.3.0 | 空标签、类别快捷键、标签统计、格式批量转换和剪切工作流 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz) |
@@ -77,7 +78,7 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 6. 类别下拉框自动打开，直接输入类别首字母。
 7. 使用 `Z/X/C/V/F` 调整旋转角度。
 8. 如果框大小不合适，保持选中并滚动鼠标滚轮。
-9. 按 `Ctrl+S` 保存，使用 `D` 或右方向键进入下一张。
+9. 按 `Ctrl+S` 保存，使用 `D` 或下方向键进入下一张。
 10. 再按 `E` 开始绘制下一个 OBB。
 
 相较于原来的操作，这个流程不需要反复双击类别、切换工具、重新选择目录或寻找标注进度。
@@ -167,9 +168,9 @@ data/predefined_classes.txt
 | `Ctrl+Z` | 撤销当前图片的上一步框操作（最多 50 步） |
 | `Ctrl+D` | 直接复制全部选中框 |
 | `Delete` | 删除全部选中框 |
-| `A` / 左方向键 | 上一张图片 |
-| `D` / 右方向键 | 下一张图片 |
-| 上 / 下方向键 | 将选中框移动一个像素 |
+| `A` / 上方向键 | 上一张图片（选中框时上方向键用于微调框） |
+| `D` / 下方向键 | 下一张图片（选中框时下方向键用于微调框） |
+| 四个方向键（已选框） | 将选中框向对应方向移动一个像素 |
 | `Z` / `X` | 逆时针大步/小步旋转 |
 | `C` / `V` | 顺时针小步/大步旋转 |
 | `F` | 顺时针旋转 90 度 |
@@ -177,6 +178,9 @@ data/predefined_classes.txt
 | `Ctrl+R` | 打开标签目录，同时作为读取和保存目录 |
 
 为了防止误触，`W` 创建普通矩形框的快捷键已取消，但界面中的普通框按钮仍然保留。
+双击已有框的类别后，可输入中文类别的拼音（如 `huolongguo` 对应“火龙果”），
+也可直接按已设置的类别快捷键修改该框类别。右侧 `File List` 右键可将拿不准的图片
+标记为淡红色“待确认”，稍后再回来处理；再次右键可取消标记。
 撤销历史按图片独立保存；切换图片后会清空，避免把上一张图片的框恢复到当前图片。
 
 ### 自定义常用类别快捷键
@@ -193,7 +197,7 @@ data/predefined_classes.txt
 
 保存后按对应键，会把该类别设为当前默认类别并直接进入一次 OBB 绘制。画完后自动返回
 选框/角度调整状态，不再弹出类别选择器；需要再画同类框时再次按相同快捷键。映射会保存
-到本机设置并在下次启动时恢复。类别选择器正在编辑时，自定义快捷键会暂时禁用，输入
+到本机设置并在下次启动时恢复。类别选择器正在编辑时，按已设置的快捷键会直接修改当前框类别，输入
 数字或字母不会误触画框。
 
 ## 多选和批量调整

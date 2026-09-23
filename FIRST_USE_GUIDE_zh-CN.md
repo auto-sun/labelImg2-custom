@@ -54,10 +54,10 @@ python -m venv .venv
 
 这里直接使用虚拟环境中的 Python，不要求执行激活脚本，可以避开部分电脑的 PowerShell 执行策略问题。
 
-`v2.3.3` 包含本地模型自动标注，因此会同时安装 Ultralytics 和 PyTorch，
+`v2.4.0` 包含本地模型自动标注，因此会同时安装 Ultralytics 和 PyTorch，
 下载体积和安装时间会比旧版本更大。只进行手工标注时仍可正常使用全部原有功能。
 
-`v2.3.3` 整体使用 GNU AGPL v3.0 免费开源；上游 LabelImg2 的 MIT 许可证单独保留在
+`v2.4.0` 整体使用 GNU AGPL v3.0 免费开源；上游 LabelImg2 的 MIT 许可证单独保留在
 `LICENSE-MIT-UPSTREAM`。
 
 ## 四、准备类别文件

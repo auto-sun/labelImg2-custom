@@ -24,7 +24,10 @@ Interface preview
 Downloads
 ---------
 
-* **v2.3.3 (recommended, switchable class files and responsive large datasets):**
+* **v2.4.0 (recommended, faster file-list workflow and context-menu fix):**
+  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.4.0.zip>`__ |
+  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.4.0.tar.gz>`__
+* **v2.3.3 (switchable class files and responsive large datasets):**
   `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.zip>`__ |
   `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.tar.gz>`__
 * **v2.3.2 (file sorting and workflow-state fixes):**

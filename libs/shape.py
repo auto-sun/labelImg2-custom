@@ -31,7 +31,10 @@ class Shape(object):
     vertex_fill_color = DEFAULT_VERTEX_FILL_COLOR
     hvertex_fill_color = DEFAULT_HVERTEX_FILL_COLOR
     point_type = P_ROUND
-    point_size = 8
+    # Keep resize handles comfortably visible on high-resolution displays.
+    # Canvas uses a matching screen-space hit radius, so the visual handle and
+    # the clickable area grow together.
+    point_size = 12
     scale = 1.0
 
     def __init__(self, label=None, line_color=None, difficult=False, paintLabel=False, extra_label=''):
@@ -57,7 +60,7 @@ class Shape(object):
         self._highlightMode = self.NEAR_VERTEX
         self._highlightSettings = {
             self.NEAR_VERTEX: (4, self.P_ROUND),
-            self.MOVE_VERTEX: (1.5, self.P_SQUARE),
+            self.MOVE_VERTEX: (1.75, self.P_SQUARE),
         }
 
         self._closed = False

@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import *
 from .constants import FORMAT_PASCALVOC
 from .pascal_voc_io import PascalVocReader, XML_EXT
 from .yolo_obb_io import YOLO_EXT, count_yolo_objects
+from .shortcut_input import disable_ime_for_shortcuts
 
 _NATURAL_TOKEN_RE = re.compile(r'(\d+)')
 PENDING_ANNOTATION_COUNT = -1
@@ -34,6 +35,7 @@ class CFileListModel(QStringListModel):
         
         self.dispList = []
         self._totalAnnotationCount = 0
+        self._flaggedPaths = set()
 
     @staticmethod
     def _pathKey(path):
@@ -143,6 +145,35 @@ class CFileListModel(QStringListModel):
         """Return the total number of valid boxes cached by the file list."""
         return self._totalAnnotationCount
 
+    def setFlaggedPaths(self, paths):
+        """Restore review marks by full path so sorting and refresh keep them."""
+        self._flaggedPaths = {
+            self._pathKey(path) for path in paths if isinstance(path, str)}
+        if self.rowCount():
+            self.dataChanged.emit(
+                self.index(0), self.index(self.rowCount() - 1),
+                [Qt.BackgroundRole, Qt.ToolTipRole])
+
+    def flaggedPaths(self):
+        return sorted(self._flaggedPaths)
+
+    def isFlagged(self, index):
+        if index is None or not index.isValid():
+            return False
+        return self._pathKey(self.data(index, Qt.EditRole)) in self._flaggedPaths
+
+    def setFlagged(self, index, flagged):
+        if index is None or not index.isValid():
+            return False
+        key = self._pathKey(self.data(index, Qt.EditRole))
+        if flagged:
+            self._flaggedPaths.add(key)
+        else:
+            self._flaggedPaths.discard(key)
+        self.dataChanged.emit(
+            index, index, [Qt.BackgroundRole, Qt.ToolTipRole])
+        return True
+
     def data(self, index, role):
         item = self.dispList[index.row()]
         pathname, count = item[0], item[1]
@@ -158,8 +189,12 @@ class CFileListModel(QStringListModel):
                     res_str = '%s [%d]' % (pathname, count)
             return res_str
         elif role == Qt.ToolTipRole:
-            return super(CFileListModel, self).data(index, Qt.EditRole)
+            path = super(CFileListModel, self).data(index, Qt.EditRole)
+            return (u'待确认标签\n%s' % path
+                    if self.isFlagged(index) else path)
         elif role == Qt.BackgroundRole:
+            if self.isFlagged(index):
+                return QBrush(QColor(255, 210, 210))
             if item[1] is None: # or item[1] == 0:
                 brush = QBrush(Qt.transparent)
             else:
@@ -198,16 +233,66 @@ class CFileItemEditDelegate(QStyledItemDelegate):
         editor.setReadOnly(True)
         return editor
 
+    def paint(self, painter, option, index):
+        if index.model().isFlagged(index):
+            # Keep the review color visible even while this row is selected.
+            option = QStyleOptionViewItem(option)
+            option.palette.setColor(
+                QPalette.Highlight, QColor(255, 210, 210))
+            option.palette.setColor(
+                QPalette.HighlightedText,
+                option.palette.color(QPalette.Text))
+        super(CFileItemEditDelegate, self).paint(painter, option, index)
+
 
 class CFileView(QListView):
+    deleteImageRequested = pyqtSignal()
+
     def __init__(self, parent = None):
         super(CFileView, self).__init__(parent)
+        self.rightClickSelectionInProgress = False
         
         model = CFileListModel(self)
         self.setModel(model)
+        disable_ime_for_shortcuts(self)
 
         delegate = CFileItemEditDelegate(self)
         self.setItemDelegateForColumn(0, delegate)
-        
-        
+
+    def focusInEvent(self, event):
+        super(CFileView, self).focusInEvent(event)
+        disable_ime_for_shortcuts(self)
+
+    def event(self, event):
+        # The main window also uses Delete for removing selected boxes.  Claim
+        # the shortcut only while File List itself has focus so the two
+        # operations never conflict.
+        if (event.type() == QEvent.ShortcutOverride and
+                event.key() == Qt.Key_Delete):
+            event.accept()
+            return True
+        return super(CFileView, self).event(event)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Delete and self.currentIndex().isValid():
+            event.accept()
+            self.deleteImageRequested.emit()
+            return
+        navigationKey = event.key() in (Qt.Key_Up, Qt.Key_Down)
+        super(CFileView, self).keyPressEvent(event)
+        if navigationKey and self.currentIndex().isValid():
+            # Loading the new image focuses the canvas; keep keyboard list
+            # navigation active so repeated Up/Down presses remain usable.
+            self.setFocus(Qt.ShortcutFocusReason)
+
+    def mousePressEvent(self, event):
+        # Loading a newly clicked image gives focus to the canvas. Restore it
+        # after the synchronous selection change so a following Delete key is
+        # handled by File List, as the user expects.
+        self.rightClickSelectionInProgress = event.button() == Qt.RightButton
+        try:
+            super(CFileView, self).mousePressEvent(event)
+        finally:
+            self.rightClickSelectionInProgress = False
+        self.setFocus(Qt.MouseFocusReason)
 

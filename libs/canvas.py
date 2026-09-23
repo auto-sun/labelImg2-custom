@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import *
 from .shape import Shape
 from .lib import distance
 from libs.labelFile import LabelFile
+from .shortcut_input import disable_ime_for_shortcuts
 import math
 
 CURSOR_DEFAULT = Qt.ArrowCursor
@@ -28,6 +29,7 @@ class Canvas(QWidget):
     shapeChangeStarted = pyqtSignal()
     shapeChangeFinished = pyqtSignal()
     drawingPolygon = pyqtSignal(bool)
+    imageNavigationRequested = pyqtSignal(int)
 
     hideRRect = pyqtSignal(bool)
     hideNRect = pyqtSignal(bool)
@@ -43,6 +45,7 @@ class Canvas(QWidget):
     CONTINUECREATE = 2
 
     epsilon = 7.0
+    VERTEX_HIT_RADIUS = 12.0
     WHEEL_SHAPE_SCALE_STEP = 1.05
     MIN_SHAPE_EDGE = 2.0
 
@@ -92,6 +95,7 @@ class Canvas(QWidget):
         # Set widget options.
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.WheelFocus)
+        disable_ime_for_shortcuts(self)
         self.verified = False
 
         self.canDrawRotatedRect = True
@@ -122,6 +126,10 @@ class Canvas(QWidget):
         self._clearMarqueeSelection()
         self._clearCtrlCopyDrag()
         self.restoreCursor()
+
+    def focusInEvent(self, ev):
+        super(Canvas, self).focusInEvent(ev)
+        disable_ime_for_shortcuts(self)
 
     def isVisible(self, shape):
         return self.visible.get(shape, True)
@@ -318,7 +326,7 @@ class Canvas(QWidget):
         for shape in reversed([s for s in self.shapes if self.isVisible(s)]):
             # Look for a nearby vertex to highlight. If that fails,
             # check if we happen to be inside a shape.
-            index = shape.nearestVertex(pos, self.epsilon / self.scale if self.scale > 1 else self.epsilon)
+            index = shape.nearestVertex(pos, self.vertexHitRadius())
             if index is not None:
                 if self.selectedVertex():
                     self.hShape.highlightClear()
@@ -1207,6 +1215,10 @@ class Canvas(QWidget):
         # print "d %.2f, m %d, %.2f" % (d, m, d - m)
         return distance(p1 - p2) < self.epsilon
 
+    def vertexHitRadius(self):
+        """Return a constant screen-space corner hit radius in image units."""
+        return self.VERTEX_HIT_RADIUS / max(float(self.scale), 0.01)
+
     def intersectionPoint(self, p1, p2):
         # Cycle through each image edge in clockwise fashion,
         # and find the one intersecting the current line segment.
@@ -1384,10 +1396,28 @@ class Canvas(QWidget):
             else:
                 if len(self.shapes) > 0:
                     self.selectShape(self.shapes[0])
-        elif key == Qt.Key_Up and self.selectedShape:
-            self.moveOnePixel('Up')
-        elif key == Qt.Key_Down and self.selectedShape:
-            self.moveOnePixel('Down')
+        elif key == Qt.Key_Left and self.selectedShape:
+            self.moveOnePixel('Left')
+            ev.accept()
+            return
+        elif key == Qt.Key_Right and self.selectedShape:
+            self.moveOnePixel('Right')
+            ev.accept()
+            return
+        elif key == Qt.Key_Up:
+            if self.selectedShape:
+                self.moveOnePixel('Up')
+            elif self.editing():
+                self.imageNavigationRequested.emit(-1)
+            ev.accept()
+            return
+        elif key == Qt.Key_Down:
+            if self.selectedShape:
+                self.moveOnePixel('Down')
+            elif self.editing():
+                self.imageNavigationRequested.emit(1)
+            ev.accept()
+            return
         elif key == Qt.Key_Z and self.selectedShape and\
              self.selectedShape.isRotated and not self.rotateOutOfBound(0.1):
             self.shapeChangeStarted.emit()
