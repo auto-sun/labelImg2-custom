@@ -1,6 +1,6 @@
 # LabelImg2 Custom 小白首次使用流程
 
-本文按“第一次接触 Python 和 LabelImg2”的情况编写，从下载和安装开始，一直到保存 YOLO OBB 标签。
+本文从下载安装包开始，介绍第一次打开数据集、选择类别和保存 YOLO OBB 标签的完整流程。
 
 ## 使用前注意
 
@@ -8,59 +8,18 @@
 
 1. YOLO 和 YOLO OBB 的 `class_id` 由类别文件的行顺序决定，开始正式标注后不要随意调整类别顺序。
 2. `View > Auto Saving` 默认开启。手动关闭后，如果当前图片有未保存修改，切换图片会先询问是否放弃修改。
-3. 当前推荐通过 `requirements.txt` 安装依赖后直接运行 `labelImg.py`，不要使用旧的 `setup.py` 安装。
+3. 安装包包含全部运行依赖，但不包含模型 `.pt` 权重；自动标注时请选择自己拥有使用权的模型。
 
-## 一、准备 Python
+## 一、下载并安装
 
-建议安装 64 位 Python 3.10、3.11 或 3.12。安装 Python 时勾选 `Add Python to PATH`。
+1. [下载 v2.5.0 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.0/LabelImg2Custom-2.5.0-Setup.exe)。
+2. 双击安装包，按向导完成安装。默认安装到当前用户目录，不需要管理员权限。
+3. 从开始菜单打开 `LabelImg2 Custom`。如果 Windows 显示“未知发布者”，请先核对文件确实来自本项目的 GitHub Release；安装包目前没有代码签名。
 
-安装完成后打开 PowerShell，检查：
+本安装包包含 CPU 版自动标注环境。程序整体按 GNU AGPL v3.0 免费开源发行，
+上游 LabelImg2 的 MIT 许可证保留在 `LICENSE-MIT-UPSTREAM`。
 
-```powershell
-python --version
-```
-
-能看到 Python 版本号即可继续。
-
-## 二、下载项目
-
-### 方法一：下载 ZIP
-
-1. 推荐直接下载最新稳定版：
-   <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip>
-2. 其他历史版本见：<https://github.com/auto-sun/labelImg2-custom/releases>
-3. 解压到路径简单、自己有写入权限的位置，例如：
-
-```text
-D:\LabelImg2-custom
-```
-
-### 方法二：使用 Git
-
-```powershell
-git clone https://github.com/auto-sun/labelImg2-custom.git
-cd labelImg2-custom
-```
-
-## 三、建立独立环境并安装依赖
-
-在项目目录空白处按住 `Shift` 后点击鼠标右键，选择“在此处打开 PowerShell”，依次执行：
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-```
-
-这里直接使用虚拟环境中的 Python，不要求执行激活脚本，可以避开部分电脑的 PowerShell 执行策略问题。
-
-`v2.4.0` 包含本地模型自动标注，因此会同时安装 Ultralytics 和 PyTorch，
-下载体积和安装时间会比旧版本更大。只进行手工标注时仍可正常使用全部原有功能。
-
-`v2.4.0` 整体使用 GNU AGPL v3.0 免费开源；上游 LabelImg2 的 MIT 许可证单独保留在
-`LICENSE-MIT-UPSTREAM`。
-
-## 四、准备类别文件
+## 二、准备类别文件
 
 程序自带的默认类别文件是：
 
@@ -79,45 +38,12 @@ Stem_Canker
 
 YOLO 和 YOLO OBB 的类别编号从 `0` 开始，严格按照这个文件的行顺序生成。正式标注开始后不要随意交换类别顺序。
 
-推荐不要覆盖仓库默认文件。启动后点击 `File > 选择类别文件...`，或点击右侧
+推荐不要修改程序自带的默认类别文件。启动后点击 `File > 选择类别文件...`，或点击右侧
 `Box Labels` 中的“类别文件”按钮，选择项目自己的 `class.txt`。选择窗口会先预览
 类别 ID、名称和总数，并保存最近使用的 12 个文件供不同项目切换；下次启动自动恢复
 上次选择。
 
-## 五、启动程序
-
-```powershell
-.\.venv\Scripts\python.exe labelImg.py
-```
-
-程序窗口标题显示 `labelImg2`，说明启动成功。
-
-环境安装完成后可以直接双击项目根目录中的 `labelImg.bat`。启动器不会调用 Windows `py/pyw`，因此不受系统 Python 注册表影响。
-
-自动选择顺序：
-
-1. 项目目录中的 `.venv`；
-2. 名为 `labelimg2` 的 Conda 环境；
-3. 当前已经激活且依赖完整的其他 Conda 环境。
-
-需要明确指定环境时：
-
-```bat
-labelImg.bat --venv
-labelImg.bat --conda
-```
-
-只检查环境、不打开窗口：
-
-```bat
-labelImg.bat --check
-labelImg.bat --check --venv
-labelImg.bat --check --conda
-```
-
-显式指定模式时不会回退到另一种环境：`--venv` 缺失会直接提示创建 `.venv`，`--conda` 缺失会直接提示创建名为 `labelimg2` 的 Conda 环境。
-
-## 六、第一次打开数据集
+## 三、第一次打开数据集
 
 建议的数据结构：
 
@@ -158,7 +84,7 @@ labels\train\day1\001.txt
 - 空 `.txt`：背景图，文件列表显示 `[BG]`。
 - XML 与 TXT 同时存在时，优先读取当前选择格式对应的文件。
 
-## 七、推荐的 YOLO OBB 标注流程
+## 四、推荐的 YOLO OBB 标注流程
 
 1. 按 `E` 进入旋转框绘制状态；再次按 `E` 可以退出。
 2. 在图片上拖出矩形框。
@@ -170,9 +96,9 @@ labels\train\day1\001.txt
 8. 按 `D` 或右方向键进入下一张；按 `A` 或左方向键返回上一张。
 9. 再按 `E` 画下一个框。
 
-## 八、使用模型自动标注（可选）
+## 五、使用模型自动标注（可选）
 
-1. 先按第六节打开图片目录和标签目录。
+1. 先按第三节打开图片目录和标签目录。
 2. 点击工具栏“自动标注”。第一次运行会要求选择本地 YOLO 或 YOLO OBB `.pt`。
 3. 等待状态栏进度完成；需要停止时点击状态栏的“中止”。
 4. 完成后查看类别映射结果，并逐张人工复核模型生成的框。
@@ -192,7 +118,7 @@ OBB 模型会自动选择 YOLO OBB 格式。模型自己的类别名会匹配到
 
 仓库不提供模型权重，请使用自己训练或合法授权的模型。
 
-## 九、复制、多选和平移
+## 六、复制、多选和平移
 
 - `Ctrl+C`：复制当前选中的一个或多个框。
 - `Ctrl+X`：剪切当前选中的一个或多个框；第一次粘贴保持原位置，剪切和粘贴都可撤销。
@@ -207,7 +133,7 @@ OBB 模型会自动选择 YOLO OBB 格式。模型自己的类别名会匹配到
 - `Delete`：删除全部选中框。
 - `Alt + 鼠标左键拖动`：平移画布。
 
-## 十、保存格式说明
+## 七、保存格式说明
 
 手动切换保存格式会同时转换当前数据集已有标签。新文件写入成功后才删除旧格式；失败文件仍保留原标签。进度窗口可中止，未处理文件不会改变。模型自动标注根据模型类型选择 YOLO 或 YOLO OBB 时，不会触发这项人工标签批量转换。
 
@@ -235,11 +161,11 @@ class_id x1 y1 x2 y2 x3 y3 x4 y4
 
 坐标均为 `0～1` 的归一化坐标，能够保留四个顶点和倾斜方向。
 
-## 十一、批量转换已有标签
+## 八、批量转换已有标签
 
 先打开图片目录和标签目录，再通过 `File > Annotation Format` 选择目标格式。程序会把当前数据集已有标签批量转换为 XML、YOLO 或 YOLO OBB，并显示进度。旧的 `Export to` 菜单已经移除，不再需要选择单独的导出目录。
 
-## 十二、重新打开后的恢复
+## 九、重新打开后的恢复
 
 正常关闭 LabelImg2 后，下次启动会恢复：
 

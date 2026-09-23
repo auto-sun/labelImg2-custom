@@ -14,20 +14,14 @@
 
 ![LabelImg2 Custom 标注界面](docs/images/labelimg2-interface-redacted.png)
 
-## 版本下载
+## 下载与安装
 
-| 版本 | 主要内容 | ZIP | TAR.GZ |
-| --- | --- | --- | --- |
-| **v2.4.0（推荐）** | 拼音选类、待确认标记、刷新列表、回收站删除与右键菜单定位修复 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.4.0.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.4.0.tar.gz) |
-| v2.3.3 | 可切换类别文件；修复混合标签双文件；大型 labels 目录非阻塞读取 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.tar.gz) |
-| v2.3.2 | 修复文件排序、绿色确认状态和类别输入时的 E 键冲突 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.tar.gz) |
-| v2.3.1 | 模型自动标注置信度可调；包含 v2.3.0 的全部功能 | [下载 ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip) | [下载 TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz) |
+[下载 Windows 安装包 v2.5.0（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.0/LabelImg2Custom-2.5.0-Setup.exe)
 
-[查看所有发行版本](https://github.com/auto-sun/labelImg2-custom/releases) ·
-[查看全部标签](https://github.com/auto-sun/labelImg2-custom/tags) ·
-[更新日志](CHANGELOG.md)
-
-`v1.0–v1.2` 是仓库继承的上游历史标签；需要当前完整功能请选择 `v2.4.0`。
+双击安装后从开始菜单启动即可，无需配置 Python、Conda 或其他运行环境。
+安装包包含 CPU 版模型推理依赖，但不包含 `.pt` 模型权重；自动标注时请选择自己的模型。
+安装包未提供代码签名，Windows 可能显示“未知发布者”。
+历史修改记录见 [更新日志](CHANGELOG.md)；旧版本不再作为发行版提供下载。
 
 ## 主要改进
 
@@ -47,7 +41,7 @@
 - 自动标注在后台运行，状态栏显示进度并提供中止按钮；已有 XML/TXT 不会被覆盖。
 - 顶部“标注当前图”只推理当前图片；已有标签时可选择覆盖、直接添加或取消。
 - 单张模型标注完成后可按 `Ctrl+Z` 整体撤销，再按 `Ctrl+S` 保存恢复结果。
-- `E` 进入或退出 OBB 绘制，画完自动选中新框并打开类别选择。
+- 工具栏选择普通框或 OBB 后，按 `E` 进入或退出对应类型的绘制；原有画框按钮仍可直接使用。
 - 可在右侧 `Box Labels` 配置多个“快捷键 → class.txt 预设类别”；按键后直接绘制一次对应类别的 OBB，并自动记住设置。
 - 常用类别优先，减少同首字母类别的重复查找。
 - 支持框的复制粘贴、跨图片原位置粘贴、框选多选、整体移动和批量删除。
@@ -57,40 +51,11 @@
 - `Alt + 鼠标左键拖动`平移画布。
 - 未开启自动保存时，切换含未保存修改的图片会先弹出确认提示。
 
-## 快速安装
+## 首次使用
 
-需要 64 位 Python 3.10、3.11 或 3.12。在项目目录打开 PowerShell：
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe labelImg.py
-```
-
-安装完成后可以直接双击 `labelImg.bat`。启动器不会使用 Windows `py/pyw` 注册信息，并按以下顺序自动选择：
-
-1. 项目目录中的 `.venv`；
-2. 名为 `labelimg2` 的 Conda 环境；
-3. 当前已经激活且依赖完整的其他 Conda 环境。
-
-也可以显式指定，两个环境互不影响：
-
-```bat
-labelImg.bat --venv
-labelImg.bat --conda
-labelImg.bat --check
-```
-
-`--venv` 只使用项目 `.venv`，`--conda` 只使用 Conda 的 `labelimg2` 环境，`--check` 只显示将使用的环境而不启动程序。
-
-指定自己的类别文件：
-
-```powershell
-.\.venv\Scripts\python.exe labelImg.py "" "D:\my_dataset\classes.txt"
-```
-
-类别编号从 `0` 开始，按照类别文件的行顺序确定。正式标注后不要随意交换类别顺序。
+安装完成后，在 `File > 选择类别文件...` 中选择项目自己的 `class.txt`，
+确认预览中的类别名称和顺序。类别编号从 `0` 开始；正式标注后不要随意交换顺序。
+完整操作步骤见 [小白首次使用流程](FIRST_USE_GUIDE_zh-CN.md)。
 
 ## 推荐的 YOLO OBB 流程
 
@@ -98,7 +63,7 @@ labelImg.bat --check
 2. 使用 `File > Open Annotation Dir` 选择标签根目录。
 3. 在 `File > Annotation Format` 中选择 `Ultralytics YOLO OBB`；已有标签会显示进度并批量转换。
 4. 建议在 `View` 菜单开启 `Auto Saving`。
-5. 按 `E` 绘制旋转框，画完后直接输入类别首字母。
+5. 在工具栏选择“框型：OBB”，按 `E` 绘制旋转框，画完后直接输入类别首字母。
 6. 使用 `Z / X / C / V / F` 调整角度，选中框时滚轮调整大小。
 7. 按 `Ctrl+S` 保存，使用 `D` 或下方向键进入下一张。
 
@@ -130,7 +95,7 @@ labelImg.bat --check
 
 | 快捷键 | 功能 |
 | --- | --- |
-| `E` | 进入或退出 OBB 绘制 |
+| `E` | 按工具栏当前选择的普通框或 OBB 类型进入/退出绘制 |
 | `Ctrl+S` | 保存当前标签 |
 | `A / D` | 上一张 / 下一张 |
 | `上 / 下方向键` | 上一张 / 下一张（选中框时用于上下微调） |

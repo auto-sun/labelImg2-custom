@@ -439,7 +439,24 @@ class MainWindow(QMainWindow, WindowMixin):
         createSo.setVisible(False)
 
         createRo = action('Create\nRotatedRBox', self.createRoShape,
-                        'e', 'rectRo.png', u'Draw a new RotatedRBox', enabled=False)        
+                        None, 'rectRo.png', u'Draw a new RotatedRBox', enabled=False)
+
+        self.boxTypeComboBox = QComboBox(self)
+        self.boxTypeComboBox.setObjectName('boxTypeComboBox')
+        self.boxTypeComboBox.addItem(u'框型：普通框', 'rect')
+        self.boxTypeComboBox.addItem(u'框型：OBB', 'obb')
+        self.boxTypeComboBox.setCurrentIndex(1)
+        self.boxTypeComboBox.setFixedWidth(115)
+        self.boxTypeComboBox.setToolTip(
+            u'选择按 E 绘制的框类型；旁边的画框按钮仍可直接使用。')
+        boxTypeControl = QWidgetAction(self)
+        boxTypeControl.setObjectName('boxTypeControl')
+        boxTypeControl.setDefaultWidget(self.boxTypeComboBox)
+
+        drawSelectedBox = action(
+            u'按所选类型画框', self.drawSelectedBox,
+            'e', None, u'按 E 绘制工具栏选中的普通框或 OBB；再按 E 退出',
+            enabled=False)
         
         delete = action('Delete\nRectBox', self.deleteSelectedShape,
                         'Delete', 'cancel2.svg', u'Delete', enabled=False)
@@ -557,7 +574,9 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions = struct(save=save, saveAs=saveAs, open=open, close=close,
                               deleteImage=deleteImage, flagImage=flagImage,
                               resetAll = resetAll,
-                              create=create, createSo=createSo, createRo=createRo, delete=delete, 
+                              create=create, createSo=createSo, createRo=createRo,
+                              drawSelectedBox=drawSelectedBox,
+                              boxTypeControl=boxTypeControl, delete=delete,
                               labelAsBack=labelAsBack, deleteLabel=deleteLabel, edit=edit, copy=copy,
                               copyToClipboard=copyToClipboard,
                               cutToClipboard=cutToClipboard,
@@ -592,7 +611,8 @@ class MainWindow(QMainWindow, WindowMixin):
                                                create, createSo, createRo, copy,
                                                delete, labelAsBack, deleteLabel),
                               onLoadActive=(
-                                  close, create, singleAutoAnnotate,
+                                  close, create, drawSelectedBox,
+                                  singleAutoAnnotate,
                                   createEmptyAnnotation),
                                onShapesPresent=(saveAs,))
         self._labelNavigationStates = None
@@ -671,7 +691,7 @@ class MainWindow(QMainWindow, WindowMixin):
             singleAutoAnnotate, autoAnnotate,
             autoAnnotationConfidenceControl, verify, save,
             createEmptyAnnotation, None,
-            create, createSo, createRo, copy, delete, None,
+            boxTypeControl, create, createSo, createRo, copy, delete, None,
             zoomIn, zoom, zoomOut, zoomOrg, fitWindow, fitWidth)
 
         self.setLabelShortcutMappings(
@@ -945,7 +965,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas.menus[0].clear()
         addActions(self.canvas.menus[0], menu)
         self.menus.edit.clear()
-        actions = (self.actions.create, self.actions.createSo, self.actions.createRo) 
+        actions = (self.actions.drawSelectedBox, self.actions.create,
+                   self.actions.createSo, self.actions.createRo)
         addActions(self.menus.edit, actions + self.actions.editMenu)
 
     def copyShapeForUndo(self, shape):
@@ -1234,6 +1255,7 @@ class MainWindow(QMainWindow, WindowMixin):
         QMessageBox.information(self, u'About', msg)
 
     def createShape(self):
+        self.boxTypeComboBox.setCurrentIndex(0)
         self.canvas.setEditing(0)
         self.canvas.canDrawRotatedRect = False
         self.actions.create.setEnabled(False)
@@ -1248,21 +1270,36 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions.createRo.setEnabled(False)
 
     def createRoShape(self):
-        # E acts as a toggle for rotated-box drawing mode.
+        self.boxTypeComboBox.setCurrentIndex(1)
+        # The toolbar button also toggles its own drawing mode.
         if self.canvas.drawing() and self.canvas.canDrawRotatedRect:
-            self.canvas.current = None
-            self.canvas.line.points = []
-            self.canvas.setHiding(False)
-            self.canvas.update()
-            self.createCancel()
+            self.cancelBoxDrawing()
             return
 
         self.canvas.setEditing(0)
         self.canvas.canDrawRotatedRect = True
         self.actions.create.setEnabled(False)
         self.actions.createSo.setEnabled(False)
-        # Keep this action enabled so pressing E again can leave drawing mode.
+        # Keep this button enabled so clicking it again can leave drawing mode.
         self.actions.createRo.setEnabled(True)
+
+    def drawSelectedBox(self):
+        """Toggle drawing with the box type chosen in the toolbar."""
+        if self.canvas.drawing() or self.canvas.continueDrawing():
+            self.cancelBoxDrawing()
+            return
+        if self.boxTypeComboBox.currentData() == 'rect':
+            self.createShape()
+        else:
+            self.createRoShape()
+        self.canvas.setFocus(Qt.ShortcutFocusReason)
+
+    def cancelBoxDrawing(self):
+        self.canvas.current = None
+        self.canvas.line.points = []
+        self.canvas.setHiding(False)
+        self.canvas.update()
+        self.createCancel()
         
     def createCancel(self):
         self._pendingLabelShortcut = None
@@ -1365,7 +1402,8 @@ class MainWindow(QMainWindow, WindowMixin):
         # while it is accepting first-letter searches.
         navigation_actions = (self.actions.openPrevImg,
                               self.actions.openNextImg,
-                              self.actions.createRo)
+                              self.actions.createRo,
+                              self.actions.drawSelectedBox)
         if active:
             if self._labelNavigationStates is None:
                 self._labelNavigationStates = [
@@ -3882,7 +3920,9 @@ class MainWindow(QMainWindow, WindowMixin):
         self.settings.reset()
         self.close()
         proc = QProcess()
-        proc.startDetached(os.path.abspath(__file__))
+        program = (sys.executable if getattr(sys, 'frozen', False)
+                   else os.path.abspath(__file__))
+        proc.startDetached(program)
 
     def mayContinue(self):
         return not (self.dirty and not self.discardChangesDialog())
@@ -4037,12 +4077,12 @@ def get_main_app(argv=[]):
     
     app.setApplicationName(__appname__)
     app.setWindowIcon(newIcon("tag-black-shape.svg"))
+    app_dir = os.path.dirname(os.path.abspath(__file__))
     
     # Usage : labelImg.py image predefClassFile saveDir
     win = MainWindow(argv[1] if len(argv) >= 2 else None,
                      argv[2] if len(argv) >= 3 else os.path.join(
-                         os.path.dirname(sys.argv[0]),
-                         'data', 'predefined_classes.txt'),
+                         app_dir, 'data', 'predefined_classes.txt'),
                      argv[3] if len(argv) >= 4 else None)
     win.show()
     return app, win

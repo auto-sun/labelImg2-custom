@@ -18,29 +18,14 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 ![LabelImg2 Custom 标注界面](docs/images/labelimg2-interface-redacted.png)
 
-## 版本下载
+## 下载与安装
 
-| 版本 | 适用情况 | 下载 |
-| --- | --- | --- |
-| **v2.4.0（推荐）** | 拼音选类、待确认标记、刷新列表、回收站删除与右键菜单定位修复 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.4.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.4.0.tar.gz) |
-| v2.3.3 | 可切换类别文件；修复混合标签双文件；大型 labels 目录非阻塞读取 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.tar.gz) |
-| v2.3.2 | 修复文件排序、绿色确认状态和类别输入时的 E 键冲突 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.tar.gz) |
-| v2.3.1 | 模型自动标注置信度可调；包含 v2.3.0 的全部功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz) |
-| v2.3.0 | 空标签、类别快捷键、标签统计、格式批量转换和剪切工作流 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz) |
-| v2.2.0 | Ctrl+Z 撤销；修复自动标注类别精确匹配 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.tar.gz) |
-| v2.1.0 | 当前图片自动标注，可选择覆盖或追加 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz) |
-| v2.0.2 | 独立仓库发行版，自动标注和全部功能 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.tar.gz) |
-| v2.0.1 | 整体许可证调整为 AGPL-3.0 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.tar.gz) |
-| v2.0.0 | 首次加入本地模型自动标注 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.tar.gz) |
-| v1.5.0 | 独立 Conda/venv 启动器，不含自动标注 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.tar.gz) |
-| v1.4.0 | XML、YOLO、YOLO OBB 直接读写 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.tar.gz) |
-| v1.3.0 | OBB 快捷标注工作流 | [ZIP](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.zip) / [TAR.GZ](https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.tar.gz) |
+[下载 Windows 安装包 v2.5.0（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.0/LabelImg2Custom-2.5.0-Setup.exe)
 
-[全部发行版本](https://github.com/auto-sun/labelImg2-custom/releases) ·
-[全部标签](https://github.com/auto-sun/labelImg2-custom/tags) ·
-[更新日志](CHANGELOG.md)
-
-`v1.0–v1.2` 是上游历史标签，不包含当前完整的自定义功能。
+双击安装后从开始菜单启动即可，无需配置 Python、Conda 或依赖包。
+安装包内含 CPU 版自动标注依赖，但不附带 `.pt` 模型权重。
+安装包未签名，Windows 可能提示“未知发布者”。
+旧版不再作为发行版提供下载，历史功能变化保留在 [更新日志](CHANGELOG.md)。
 
 ## 这个修改版方便在哪里
 
@@ -72,7 +57,7 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 1. 打开图片文件夹，按 `Ctrl+R` 选择标签目录。
 2. 在 `File > Annotation Format` 选择 XML、YOLO 或 YOLO OBB；如果已有标签，程序会自动批量转换。
-3. 按 `E` 进入 OBB 绘制状态。
+3. 在工具栏选择“框型：OBB”，按 `E` 进入 OBB 绘制状态。
 4. 在图片上画一个旋转框。
 5. 松开鼠标后程序自动退出连续绘制，并选中新框。
 6. 类别下拉框自动打开，直接输入类别首字母。
@@ -113,34 +98,9 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 项目不附带模型文件，请只使用自行训练或具有合法使用权的权重。`.pt` 已被 Git 忽略，
 放在项目目录中也不会随正常提交上传。
 
-## 安装和启动
+## 首次使用
 
-建议使用 Python 3.8 或更高版本。
-
-```powershell
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-python labelImg.py
-```
-
-`labelImg.bat` 同时支持项目 `.venv` 和 Conda：
-
-```bat
-labelImg.bat             自动选择可用环境
-labelImg.bat --venv     强制使用项目 .venv
-labelImg.bat --conda    强制使用名为 labelimg2 的 Conda 环境
-labelImg.bat --check    只检查并显示环境
-```
-
-自动模式依次尝试项目 `.venv`、名为 `labelimg2` 的 Conda、当前激活的其他 Conda 环境，并且不再依赖 Windows `py/pyw`。
-
-如果需要指定自己的类别文件：
-
-```powershell
-python labelImg.py "" "路径\classes.txt"
-```
-
+安装后在 `File > 选择类别文件...` 中选择并预览项目自己的 `class.txt`。
 仓库内的默认示例类别文件是：
 
 ```text
@@ -153,7 +113,7 @@ data/predefined_classes.txt
 
 | 操作 | 功能 |
 | --- | --- |
-| `E` | 进入或退出旋转框 OBB 绘制状态 |
+| `E` | 按工具栏当前选择的普通框或 OBB 类型进入/退出绘制 |
 | 鼠标滚轮（未选框） | 缩放图片 |
 | 鼠标滚轮（已选框） | 以框中心等比例缩放选中框 |
 | `Alt + 鼠标左键拖动` | 平移画布 |

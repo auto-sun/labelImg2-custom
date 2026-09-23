@@ -3,6 +3,13 @@
 本项目从 `v1.3.0` 开始记录自定义版本。`v1.0`、`v1.1` 和 `v1.2`
 是仓库继承的上游历史标签，不包含当前完整的自定义功能。
 
+## [v2.5.0] - 2026-09-23
+
+- 新增可安装的 64 位 Windows EXE 安装包，内含 Python、PyQt5、CPU 版 PyTorch、Ultralytics 等运行依赖；安装后无需配置 Conda 或 venv。安装版设置保存在用户 AppData，避免安装目录写入权限问题。
+- 工具栏增加“框型：普通框 / OBB”选择器；`E` 根据当前选择开始画框，再按一次退出画框状态，默认仍选 OBB。
+- 原有工具栏普通框和 OBB 一键画框按钮保留；点击按钮也会同步选择相应框型，之后按 `E` 继续使用该类型。
+- 类别下拉框编辑期间 `E` 仍用于按首字母选类，不会触发画框。
+
 ## [v2.4.0] - 2026-09-23
 
 ### 新增：中文拼音选类、类别编辑快捷键和待确认图片
@@ -251,16 +258,17 @@
 - `v1.1`：上游历史版本。
 - `v1.0`：上游历史版本。
 
-[v2.4.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.4.0
-[v2.3.3]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.3.3
-[v2.3.2]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.3.2
-[v2.3.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.3.1
-[v2.3.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.3.0
-[v2.2.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.2.0
-[v2.1.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.1.0
-[v2.0.2]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.0.2
-[v2.0.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.0.1
-[v2.0.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.0.0
+[v2.5.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.0
+[v2.4.0]: https://github.com/auto-sun/labelImg2-custom/tree/v2.4.0
+[v2.3.3]: https://github.com/auto-sun/labelImg2-custom/tree/v2.3.3
+[v2.3.2]: https://github.com/auto-sun/labelImg2-custom/tree/v2.3.2
+[v2.3.1]: https://github.com/auto-sun/labelImg2-custom/tree/v2.3.1
+[v2.3.0]: https://github.com/auto-sun/labelImg2-custom/tree/v2.3.0
+[v2.2.0]: https://github.com/auto-sun/labelImg2-custom/tree/v2.2.0
+[v2.1.0]: https://github.com/auto-sun/labelImg2-custom/tree/v2.1.0
+[v2.0.2]: https://github.com/auto-sun/labelImg2-custom/tree/v2.0.2
+[v2.0.1]: https://github.com/auto-sun/labelImg2-custom/tree/v2.0.1
+[v2.0.0]: https://github.com/auto-sun/labelImg2-custom/tree/v2.0.0
 [v1.5.0]: https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.zip
 [v1.4.0]: https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.zip
 [v1.3.0]: https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.zip

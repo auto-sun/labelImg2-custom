@@ -24,51 +24,13 @@ Interface preview
 Downloads
 ---------
 
-* **v2.4.0 (recommended, faster file-list workflow and context-menu fix):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.4.0.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.4.0.tar.gz>`__
-* **v2.3.3 (switchable class files and responsive large datasets):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.3.tar.gz>`__
-* **v2.3.2 (file sorting and workflow-state fixes):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.2.tar.gz>`__
-* **v2.3.1 (adjustable model confidence and all v2.3.0 features):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.1.tar.gz>`__
-* **v2.3.0 (empty labels, custom class shortcuts, statistics,
-  batch format conversion and cut workflow):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.3.0.tar.gz>`__
-* **v2.2.0 (undo and exact class matching):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.2.0.tar.gz>`__
-* **v2.1.0 (current-image automatic annotation):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.1.0.tar.gz>`__
-* **v2.0.2 (standalone repository and all earlier custom features):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.2.tar.gz>`__
-* **v2.0.1 (AGPL-3.0 licensing update):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.1.tar.gz>`__
-* **v2.0.0 (first automatic-annotation release):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v2.0.0.tar.gz>`__
-* **v1.5.0 (isolated Conda/venv launcher):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.5.0.tar.gz>`__
-* **v1.4.0 (direct XML, YOLO and YOLO OBB I/O):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.4.0.tar.gz>`__
-* **v1.3.0 (fast OBB workflow):**
-  `ZIP <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.zip>`__ |
-  `TAR.GZ <https://github.com/auto-sun/labelImg2-custom/archive/refs/tags/v1.3.0.tar.gz>`__
+`Download the v2.5.0 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.0/LabelImg2Custom-2.5.0-Setup.exe>`__.
 
-See `all releases <https://github.com/auto-sun/labelImg2-custom/releases>`__,
-`all tags <https://github.com/auto-sun/labelImg2-custom/tags>`__, and the
-`changelog <CHANGELOG.md>`__. Tags v1.0 through v1.2 are inherited upstream
-history and do not contain the complete custom feature set.
+Double-click the installer and launch the app from the Start menu. No Python,
+Conda or separate dependency installation is required. The installer includes
+CPU inference libraries but not your ``.pt`` model weights. Previous releases
+are no longer offered; historical changes remain in the `changelog
+<CHANGELOG.md>`__.
 
 Why this derivative is more convenient
 ---------------------------------------
@@ -131,35 +93,11 @@ Main additions
 Installation
 ------------
 
-Python 3.8 or newer is recommended.
-
-.. code:: console
-
-   python -m venv .venv
-   .venv\Scripts\activate
-   pip install -r requirements.txt
-   python labelImg.py
-
-The Windows launcher supports both a project virtual environment and Conda:
-
-.. code:: console
-
-   labelImg.bat             Auto-select a usable environment
-   labelImg.bat --venv     Force the project .venv
-   labelImg.bat --conda    Force the Conda environment named labelimg2
-   labelImg.bat --check    Print the selected environment without launching
-
-Auto mode tries the project ``.venv``, the Conda environment named
-``labelimg2``, then another currently active Conda environment. It does
-not use the Windows ``py/pyw`` launcher registry.
-
-To load a predefined class file:
-
-.. code:: console
-
-   python labelImg.py "" "path\to\classes.txt"
-
-The bundled fallback class list is ``data/predefined_classes.txt``.
+Install the EXE linked above and launch LabelImg2 Custom from the Start menu.
+Use ``File > Select Class File`` to preview and choose your project's
+``class.txt``. Class IDs start at 0 and follow file order; avoid changing the
+order after annotation starts. The bundled fallback list is
+``data/predefined_classes.txt``.
 
 Key controls
 ------------
@@ -167,7 +105,7 @@ Key controls
 ==============================  =============================================
 Control                         Behaviour
 ==============================  =============================================
-``E``                           Enter/leave rotated OBB drawing mode
+``E``                           Enter/leave drawing for the selected box type
 Mouse wheel, no box selected    Zoom the image
 Mouse wheel, box selected       Resize the selected box or selected group
 ``Alt + left drag``             Pan the canvas
@@ -180,8 +118,8 @@ Drag a selected box             Move the selected box or selected group
 ``Ctrl+Z``                      Undo the last box operation (up to 50 steps)
 ``Ctrl+D``                      Duplicate selected boxes
 ``Delete``                      Delete selected boxes
-``A`` / left arrow              Previous image
-``D`` / right arrow             Next image
+``A`` / up arrow                Previous image
+``D`` / down arrow              Next image
 ``Z`` / ``X``                   Rotate counter-clockwise (large/small step)
 ``C`` / ``V``                   Rotate clockwise (small/large step)
 ``F``                           Rotate 90 degrees clockwise

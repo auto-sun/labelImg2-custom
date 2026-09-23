@@ -5,10 +5,17 @@ import sys
 
 class Settings(object):
     def __init__(self):
-        # Always keep one settings file beside labelImg.py, independent of the
-        # current working directory or the shortcut used to launch the app.
+        # Source runs keep their existing settings beside labelImg.py;
+        # installed/frozen runs use the writable per-user profile.
         self.data = {}
         app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+        if getattr(sys, 'frozen', False):
+            # Installers normally place program files in a read-only location.
+            # Keep each user's preferences outside the installed application.
+            app_dir = os.path.join(
+                os.environ.get('APPDATA') or
+                os.path.join(os.path.expanduser('~'), 'AppData', 'Roaming'),
+                'LabelImg2Custom')
         if sys.version_info < (3, 0, 0):
             self.path = os.path.join(app_dir, 'labelImg2Settings2.pkl')
         else:
@@ -27,6 +34,7 @@ class Settings(object):
 
     def save(self):
         if self.path:
+            os.makedirs(os.path.dirname(self.path), exist_ok=True)
             with open(self.path, 'wb') as f:
                 pickle.dump(self.data, f, pickle.HIGHEST_PROTOCOL)
                 #json.dump(self.data, f)

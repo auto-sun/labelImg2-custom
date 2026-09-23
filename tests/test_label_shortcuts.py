@@ -142,6 +142,61 @@ class LabelShortcutWindowTests(unittest.TestCase):
         self.assertTrue(self.window.canvas.drawing())
         self.assertTrue(self.window.canvas.canDrawRotatedRect)
 
+    def test_e_uses_toolbar_box_type_and_toggles_drawing(self):
+        self.window.toggleActions(True)
+        self.window.show()
+        self.window.activateWindow()
+        QApplication.setActiveWindow(self.window)
+        self.window.canvas.setFocus()
+
+        self.assertEqual('obb', self.window.boxTypeComboBox.currentData())
+        QTest.keyClick(self.window.canvas, Qt.Key_E)
+        self.assertTrue(self.window.canvas.drawing())
+        self.assertTrue(self.window.canvas.canDrawRotatedRect)
+        QTest.keyClick(self.window.canvas, Qt.Key_E)
+        self.assertTrue(self.window.canvas.editing())
+
+        self.window.boxTypeComboBox.setCurrentIndex(0)
+        self.window.canvas.setFocus()
+        QTest.keyClick(self.window.canvas, Qt.Key_E)
+        self.assertTrue(self.window.canvas.drawing())
+        self.assertFalse(self.window.canvas.canDrawRotatedRect)
+        self.window.canvas.current = Shape()
+        self.window.canvas.line.points = [QPointF(10, 10)]
+        QTest.keyClick(self.window.canvas, Qt.Key_E)
+        self.assertTrue(self.window.canvas.editing())
+        self.assertIsNone(self.window.canvas.current)
+        self.assertEqual([], self.window.canvas.line.points)
+
+    def test_toolbar_draw_buttons_still_start_their_own_box_type(self):
+        self.window.toggleActions(True)
+        self.assertIn(
+            self.window.actions.boxTypeControl,
+            self.window.tools.actions())
+        self.window.actions.create.trigger()
+        self.assertTrue(self.window.canvas.drawing())
+        self.assertFalse(self.window.canvas.canDrawRotatedRect)
+        self.assertEqual('rect', self.window.boxTypeComboBox.currentData())
+
+        self.window.actions.drawSelectedBox.trigger()
+        self.window.actions.createRo.trigger()
+        self.assertTrue(self.window.canvas.drawing())
+        self.assertTrue(self.window.canvas.canDrawRotatedRect)
+        self.assertEqual('obb', self.window.boxTypeComboBox.currentData())
+
+    def test_e_starts_selected_type_when_toolbar_selector_has_focus(self):
+        self.window.toggleActions(True)
+        self.window.show()
+        self.window.activateWindow()
+        QApplication.setActiveWindow(self.window)
+        self.window.boxTypeComboBox.setCurrentIndex(0)
+        self.window.boxTypeComboBox.setFocus()
+
+        QTest.keyClick(self.window.boxTypeComboBox, Qt.Key_E)
+
+        self.assertTrue(self.window.canvas.drawing())
+        self.assertFalse(self.window.canvas.canDrawRotatedRect)
+
     def test_existing_and_direct_shortcuts_cannot_be_overridden(self):
         self.window.setLabelShortcutMappings(
             [{'shortcut': '1', 'label': 'SafeHat'}])
@@ -190,8 +245,8 @@ class LabelShortcutWindowTests(unittest.TestCase):
         self.window.setLabelEditorActive(False)
         self.assertTrue(action.isEnabled())
 
-    def test_e_selects_class_in_editor_without_starting_obb_drawing(self):
-        action = self.window.actions.createRo
+    def test_e_selects_class_in_editor_without_starting_drawing(self):
+        action = self.window.actions.drawSelectedBox
         action.setEnabled(True)
         editor = CCommonOrderComboBox(self.window)
         editor.addItems(self.window.labelHist)

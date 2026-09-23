@@ -3,13 +3,16 @@ from __future__ import absolute_import
 
 from math import sqrt
 import hashlib
+import os
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 
 
 def newIcon(icon):
-    return QIcon('img/' + icon)
+    asset_dir = os.path.abspath(os.path.join(
+        os.path.dirname(__file__), os.pardir, 'img'))
+    return QIcon(os.path.join(asset_dir, icon))
 
 
 def newButton(text, icon=None, slot=None):
