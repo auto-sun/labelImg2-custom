@@ -3,6 +3,11 @@
 本项目从 `v1.3.0` 开始记录自定义版本。`v1.0`、`v1.1` 和 `v1.2`
 是仓库继承的上游历史标签，不包含当前完整的自定义功能。
 
+## [v2.5.3] - 2026-09-25
+
+- 修复 `Ctrl+Shift+L` 虽能开启“Paint Labels”，却只绘制通常为空的 Extra Info、看不到框类别名的问题；现在显示类别名，并在有 Extra Info 时一并显示。
+- 切换标签文字或修改框类别后立即刷新画布，靠近图片顶边的标签文字也会留在画布内。
+
 ## [v2.5.2] - 2026-09-25
 
 - 修复 v2.5.1 Windows 安装包启动时可能出现的 `No module named 'pkg_resources.extern'` 错误；改用单一 Python 环境打包并验证安装版真正打开主窗口，而不是只判断进程仍在运行。
@@ -269,6 +274,7 @@
 - `v1.1`：上游历史版本。
 - `v1.0`：上游历史版本。
 
+[v2.5.3]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.3
 [v2.5.2]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.2
 [v2.5.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.1
 [v2.5.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.0

@@ -12,7 +12,7 @@
 
 ## 一、下载并安装
 
-1. [下载 v2.5.2 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.2/LabelImg2Custom-2.5.2-Setup.exe)。
+1. [下载 v2.5.3 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.3/LabelImg2Custom-2.5.3-Setup.exe)。
 2. 双击安装包，按向导完成安装。默认安装到当前用户目录，不需要管理员权限。
 3. 从开始菜单打开 `LabelImg2 Custom`。如果 Windows 显示“未知发布者”，请先核对文件确实来自本项目的 GitHub Release；安装包目前没有代码签名。
 

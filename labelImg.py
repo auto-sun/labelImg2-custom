@@ -1272,6 +1272,7 @@ class MainWindow(QMainWindow, WindowMixin):
             if sys.version_info < (3, 0, 0):
                 shape.extra_label = shape.extra_label.toPyObject()
         self.setDirty()
+        self.canvas.update()
         
         return
 
@@ -4080,6 +4081,7 @@ class MainWindow(QMainWindow, WindowMixin):
         paintLabelsOptionChecked = self.paintLabelsOption.isChecked()
         for shape in self.canvas.shapes:
             shape.paintLabel = paintLabelsOptionChecked
+        self.canvas.update()
 
 
 def find_matching_files(dir_a, dir_b):

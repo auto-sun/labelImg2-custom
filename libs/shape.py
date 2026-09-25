@@ -155,11 +155,15 @@ class Shape(object):
                     font.setPointSizeF(20/self.scale) # TODO : max
                     font.setBold(False)
                     painter.setFont(font)
-                    # TODO: optimize
-                    if(self.label == None):
-                        self.label = ""
+                    label_text = str(self.label or '').strip()
+                    extra_text = str(self.extra_label or '').strip()
+                    if extra_text:
+                        label_text = ('%s (%s)' % (label_text, extra_text)
+                                      if label_text else extra_text)
                     painter.setPen(QColor(255,0,0))
-                    painter.drawText(int(min_x), int(min_y), self.extra_label)
+                    if label_text:
+                        baseline = max(min_y, QFontMetricsF(font).ascent())
+                        painter.drawText(int(min_x), int(baseline), label_text)
                     painter.setPen(pen)
                     
             if self.fill:

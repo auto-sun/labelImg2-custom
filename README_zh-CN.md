@@ -20,7 +20,7 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.5.2（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.2/LabelImg2Custom-2.5.2-Setup.exe)
+[下载 Windows 安装包 v2.5.3（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.3/LabelImg2Custom-2.5.3-Setup.exe)
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或依赖包。
 安装包内含 CPU 版自动标注依赖，但不附带 `.pt` 模型权重。
