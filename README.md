@@ -16,16 +16,17 @@
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.5.0（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.0/LabelImg2Custom-2.5.0-Setup.exe)
+[下载 Windows 安装包 v2.5.1（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.1/LabelImg2Custom-2.5.1-Setup.exe)
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或其他运行环境。
 安装包包含 CPU 版模型推理依赖，但不包含 `.pt` 模型权重；自动标注时请选择自己的模型。
 安装包未提供代码签名，Windows 可能显示“未知发布者”。
-历史修改记录见 [更新日志](CHANGELOG.md)；旧版本不再作为发行版提供下载。
+历史修改记录见 [更新日志](CHANGELOG.md)；以本页链接指向的版本为最新推荐版。
 
 ## 主要改进
 
 - 自动恢复上次打开的图片目录、当前进度、标签目录、保存格式和默认类别。
+- 工具栏在较窄窗口自动分行，设置窗口随屏幕大小调整；文件和文件夹选择使用 Windows 原生窗口。
 - 图片文件名按照自然数字顺序排列，例如 `1、2、10、20`。
 - 支持相同子目录结构的图片与标签递归匹配。
 - 可从 `File` 菜单或右侧 `Box Labels` 选择、预览并切换任意 `class.txt`，自动保留最近使用历史。

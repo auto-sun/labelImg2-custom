@@ -20,12 +20,12 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.5.0（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.0/LabelImg2Custom-2.5.0-Setup.exe)
+[下载 Windows 安装包 v2.5.1（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.1/LabelImg2Custom-2.5.1-Setup.exe)
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或依赖包。
 安装包内含 CPU 版自动标注依赖，但不附带 `.pt` 模型权重。
 安装包未签名，Windows 可能提示“未知发布者”。
-旧版不再作为发行版提供下载，历史功能变化保留在 [更新日志](CHANGELOG.md)。
+历史功能变化保留在 [更新日志](CHANGELOG.md)；以本页链接指向的版本为最新推荐版。
 
 ## 这个修改版方便在哪里
 
@@ -33,6 +33,8 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 | 常见操作负担 | 修改后的便捷操作 |
 | --- | --- |
+| 高 DPI 或窄窗口中工具栏文字被截断 | 控件按文字调整宽度，空间不足时工具栏自动分行 |
+| 设置窗口太小、文件选择窗口样式不统一 | 设置窗口随屏幕调整，使用 Windows 原生文件选择窗口 |
 | 每次启动重新选择图片目录 | 自动恢复上次打开的数据集 |
 | 重新寻找上次标到哪一张 | 自动定位到上次正在处理的图片 |
 | Open Dir 后标签目录被重置 | 始终保留上次明确选择的标签目录 |

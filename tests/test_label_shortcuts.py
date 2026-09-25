@@ -172,7 +172,7 @@ class LabelShortcutWindowTests(unittest.TestCase):
         self.window.toggleActions(True)
         self.assertIn(
             self.window.actions.boxTypeControl,
-            self.window.tools.actions())
+            self.window.editTools.actions())
         self.window.actions.create.trigger()
         self.assertTrue(self.window.canvas.drawing())
         self.assertFalse(self.window.canvas.canDrawRotatedRect)

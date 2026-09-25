@@ -24,13 +24,16 @@ Interface preview
 Downloads
 ---------
 
-`Download the v2.5.0 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.0/LabelImg2Custom-2.5.0-Setup.exe>`__.
+`Download the v2.5.1 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.1/LabelImg2Custom-2.5.1-Setup.exe>`__.
 
 Double-click the installer and launch the app from the Start menu. No Python,
 Conda or separate dependency installation is required. The installer includes
-CPU inference libraries but not your ``.pt`` model weights. Previous releases
-are no longer offered; historical changes remain in the `changelog
+CPU inference libraries but not your ``.pt`` model weights. Historical changes
+remain in the `changelog
 <CHANGELOG.md>`__.
+
+Version 2.5.1 improves high-DPI and narrow-window layouts, enlarges settings
+dialogs, and uses native Windows file and folder pickers.
 
 Why this derivative is more convenient
 ---------------------------------------

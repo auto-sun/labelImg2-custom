@@ -3,6 +3,11 @@
 本项目从 `v1.3.0` 开始记录自定义版本。`v1.0`、`v1.1` 和 `v1.2`
 是仓库继承的上游历史标签，不包含当前完整的自定义功能。
 
+## [v2.5.1] - 2026-09-25
+
+- 按屏幕可用尺寸调整主窗口和类别/快捷键设置窗口的初始大小；窄窗口下顶部工具栏自动分行，避免“置信度”“框型”和缩放文字被裁切。
+- 文件与文件夹选择统一使用 Windows 原生资源管理器样式；选择类别文件仍只显示 `.txt`，图片和标签目录选择不变。
+
 ## [v2.5.0] - 2026-09-23
 
 - 新增可安装的 64 位 Windows EXE 安装包，内含 Python、PyQt5、CPU 版 PyTorch、Ultralytics 等运行依赖；安装后无需配置 Conda 或 venv。安装版设置保存在用户 AppData，避免安装目录写入权限问题。
@@ -258,6 +263,7 @@
 - `v1.1`：上游历史版本。
 - `v1.0`：上游历史版本。
 
+[v2.5.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.1
 [v2.5.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.0
 [v2.4.0]: https://github.com/auto-sun/labelImg2-custom/tree/v2.4.0
 [v2.3.3]: https://github.com/auto-sun/labelImg2-custom/tree/v2.3.3

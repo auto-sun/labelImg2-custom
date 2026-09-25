@@ -120,11 +120,11 @@ class ClassFileWindowTests(unittest.TestCase):
         self.assertTrue(dialog.applyButton.isEnabled())
         dialog.close()
 
-    def test_browse_picker_avoids_native_image_thumbnail_scanning(self):
+    def test_browse_picker_uses_native_file_manager_with_txt_filter(self):
         dialog = ClassFileDialog(
             self.customPath, [self.bundledPath], self.window)
         picker = dialog.createBrowseDialog(self.temporary.name)
-        self.assertTrue(picker.testOption(QFileDialog.DontUseNativeDialog))
+        self.assertFalse(picker.testOption(QFileDialog.DontUseNativeDialog))
         if hasattr(QFileDialog, 'DontUseCustomDirectoryIcons'):
             self.assertTrue(picker.testOption(
                 QFileDialog.DontUseCustomDirectoryIcons))

@@ -6,11 +6,13 @@ from __future__ import absolute_import
 
 import os
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtWidgets import (QAbstractItemView, QDialog, QDialogButtonBox,
                              QFileDialog, QHBoxLayout, QHeaderView, QLabel,
                              QMessageBox, QPushButton, QComboBox,
                              QTableWidget, QTableWidgetItem, QVBoxLayout)
+
+from .ui_geometry import available_screen_geometry, responsive_dialog_size
 
 
 class ClassFileError(ValueError):
@@ -74,7 +76,6 @@ class ClassFileDialog(QDialog):
             [current_path] + list(history_paths or []))
 
         self.setWindowTitle(u'选择类别文件')
-        self.setMinimumSize(650, 470)
         layout = QVBoxLayout(self)
 
         note = QLabel(
@@ -130,6 +131,12 @@ class ClassFileDialog(QDialog):
         self.buttonBox.rejected.connect(self.reject)
 
         self.rebuildHistoryCombo(current_path)
+        available = available_screen_geometry(self).size()
+        initial = responsive_dialog_size(
+            available, minimum_desired=QSize(680, 500))
+        self.setMinimumSize(min(560, initial.width()),
+                            min(390, initial.height()))
+        self.resize(initial)
 
     @classmethod
     def normalizeHistory(cls, paths):
@@ -194,15 +201,10 @@ class ClassFileDialog(QDialog):
         self.rebuildHistoryCombo(path)
 
     def createBrowseDialog(self, start_directory=''):
-        """Create a lightweight picker which does not thumbnail image files.
-
-        The Windows native picker may enumerate icons/thumbnails for every
-        image beside class.txt. In large datasets that can make the whole app
-        appear frozen even though class switching itself does not scan images.
-        """
+        """Use Windows Explorer's native picker, filtered to class TXT files."""
         picker = QFileDialog(self, u'选择 class.txt')
-        # These options must be set before configuring the remaining picker.
-        picker.setOption(QFileDialog.DontUseNativeDialog, True)
+        # Set options before configuring the picker, as required by Qt.
+        picker.setOption(QFileDialog.DontUseNativeDialog, False)
         if hasattr(QFileDialog, 'DontUseCustomDirectoryIcons'):
             picker.setOption(QFileDialog.DontUseCustomDirectoryIcons, True)
         picker.setAcceptMode(QFileDialog.AcceptOpen)

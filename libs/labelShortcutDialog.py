@@ -11,6 +11,8 @@ from PyQt5.QtWidgets import (QAbstractItemView, QComboBox, QDialog,
                              QLabel, QMessageBox, QPushButton,
                              QKeySequenceEdit, QTableWidget, QVBoxLayout)
 
+from .ui_geometry import available_screen_geometry, responsive_dialog_size
+
 
 class LabelShortcutValidationError(ValueError):
     pass
@@ -67,7 +69,6 @@ class LabelShortcutDialog(QDialog):
         self.reserved = dict(reserved or {})
         self.validatedMappings = []
         self.setWindowTitle(u'标签快捷键设置')
-        self.setMinimumWidth(580)
 
         layout = QVBoxLayout(self)
         note = QLabel(
@@ -86,6 +87,8 @@ class LabelShortcutDialog(QDialog):
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setMinimumHeight(max(header.sizeHint().height(),
+                                    self.fontMetrics().height() + 12))
         layout.addWidget(self.table)
 
         rowButtons = QHBoxLayout()
@@ -107,6 +110,12 @@ class LabelShortcutDialog(QDialog):
         for mapping in mappings or ():
             self.addRow(mapping.get('shortcut', ''), mapping.get('label'))
 
+        available = available_screen_geometry(self).size()
+        initial = responsive_dialog_size(available)
+        self.setMinimumSize(min(580, initial.width()),
+                            min(400, initial.height()))
+        self.resize(initial)
+
     def addRow(self, shortcut='', label=None):
         row = self.table.rowCount()
         self.table.insertRow(row)
@@ -126,6 +135,10 @@ class LabelShortcutDialog(QDialog):
             lambda _checked=False, button=removeButton:
             self.removeButtonRow(button))
         self.table.setCellWidget(row, 2, removeButton)
+        self.table.setRowHeight(
+            row, max(shortcutEditor.sizeHint().height(),
+                     labelEditor.sizeHint().height(),
+                     removeButton.sizeHint().height()) + 8)
         self.table.setCurrentCell(row, 0)
         shortcutEditor.setFocus(Qt.OtherFocusReason)
 

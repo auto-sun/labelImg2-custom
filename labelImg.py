@@ -42,6 +42,7 @@ from libs.labelShortcutDialog import (LabelShortcutDialog,
 from libs.classFileDialog import (ClassFileDialog, ClassFileError,
                                   read_class_file)
 from libs.trash_utils import TrashError, move_to_trash
+from libs.ui_geometry import available_screen_geometry
 
 from libs.labelView import (CLabelView, HashableQStandardItem,
                             label_search_keys)
@@ -70,12 +71,7 @@ class WindowMixin(object):
         toolbar = QToolBar(title)
         toolbar.setObjectName(u'%sToolBar' % title)
         if actions:
-            if isinstance(action, QWidgetAction):
-                return super(ToolBar, self).addAction(action)
-            btn = QToolButton()
-            btn.setDefaultAction(action)
-            btn.setToolButtonStyle(Qt.ToolButtonIconOnly)
-            toolbar.addWidget(btn)
+            addActions(toolbar, actions)
         self.addToolBar(Qt.TopToolBarArea, toolbar)
         return toolbar
 
@@ -446,7 +442,10 @@ class MainWindow(QMainWindow, WindowMixin):
         self.boxTypeComboBox.addItem(u'框型：普通框', 'rect')
         self.boxTypeComboBox.addItem(u'框型：OBB', 'obb')
         self.boxTypeComboBox.setCurrentIndex(1)
-        self.boxTypeComboBox.setFixedWidth(115)
+        self.boxTypeComboBox.setSizeAdjustPolicy(
+            QComboBox.AdjustToContents)
+        self.boxTypeComboBox.setSizePolicy(
+            QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.boxTypeComboBox.setToolTip(
             u'选择按 E 绘制的框类型；旁边的画框按钮仍可直接使用。')
         boxTypeControl = QWidgetAction(self)
@@ -495,7 +494,10 @@ class MainWindow(QMainWindow, WindowMixin):
         self.autoAnnotationConfidenceSpinBox.setValue(
             self.autoAnnotationConfidence)
         self.autoAnnotationConfidenceSpinBox.setPrefix(u'置信度 ')
-        self.autoAnnotationConfidenceSpinBox.setFixedWidth(115)
+        self.autoAnnotationConfidenceSpinBox.setMinimumWidth(
+            self.autoAnnotationConfidenceSpinBox.sizeHint().width() + 8)
+        self.autoAnnotationConfidenceSpinBox.setSizePolicy(
+            QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.autoAnnotationConfidenceSpinBox.setToolTip(
             u'模型置信度阈值（0.01–1.00）；数值越高，保留的预测框通常越少。')
         self.autoAnnotationConfidenceSpinBox.valueChanged.connect(
@@ -687,10 +689,13 @@ class MainWindow(QMainWindow, WindowMixin):
             action('&Move here', self.moveShape)))
 
         self.tools = self.toolbar('Tools')
+        self.editTools = self.toolbar('Drawing')
+        self._toolbarLayoutPending = False
         self.actions.beginner = (open, opendir, openAnnotationDir,
             singleAutoAnnotate, autoAnnotate,
             autoAnnotationConfidenceControl, verify, save,
-            createEmptyAnnotation, None,
+            createEmptyAnnotation)
+        self.actions.drawingToolbar = (
             boxTypeControl, create, createSo, createRo, copy, delete, None,
             zoomIn, zoom, zoomOut, zoomOrg, fitWindow, fitWidth)
 
@@ -722,8 +727,23 @@ class MainWindow(QMainWindow, WindowMixin):
             else:
                 self.recentFiles = recentFileQStringList = settings.get(SETTING_RECENT_FILES)
 
-        size = settings.get(SETTING_WIN_SIZE, QSize(600, 500))
-        position = settings.get(SETTING_WIN_POSE, QPoint(0, 0))
+        available = available_screen_geometry(self)
+        defaultSize = QSize(
+            min(1200, max(760, int(available.width() * 0.86))),
+            min(820, max(520, int(available.height() * 0.85))))
+        size = settings.get(SETTING_WIN_SIZE, defaultSize)
+        if not isinstance(size, QSize):
+            size = defaultSize
+        size = QSize(
+            min(available.width(), max(min(760, available.width()),
+                                       size.width())),
+            min(available.height(), max(min(520, available.height()),
+                                        size.height())))
+        position = settings.get(SETTING_WIN_POSE)
+        if not isinstance(position, QPoint) or not available.contains(
+                QRect(position, size)):
+            position = available.center() - QPoint(
+                size.width() // 2, size.height() // 2)
         self.resize(size)
         self.move(position)
         saveDir = settings.get(SETTING_SAVE_DIR, None)
@@ -960,14 +980,34 @@ class MainWindow(QMainWindow, WindowMixin):
     def populateModeActions(self):
         tool, menu = self.actions.beginner, self.actions.beginnerContext
         self.tools.clear()
-        
+        self.editTools.clear()
         addActions(self.tools, tool)
+        addActions(self.editTools, self.actions.drawingToolbar)
+        self.scheduleToolbarLayout()
         self.canvas.menus[0].clear()
         addActions(self.canvas.menus[0], menu)
         self.menus.edit.clear()
         actions = (self.actions.drawSelectedBox, self.actions.create,
                    self.actions.createSo, self.actions.createRo)
         addActions(self.menus.edit, actions + self.actions.editMenu)
+
+    def scheduleToolbarLayout(self):
+        if not self._toolbarLayoutPending:
+            self._toolbarLayoutPending = True
+            QTimer.singleShot(0, self.updateToolbarLayout)
+
+    def updateToolbarLayout(self):
+        self._toolbarLayoutPending = False
+        if not self.tools.actions() or not self.editTools.actions():
+            return
+        required = (self.tools.sizeHint().width() +
+                    self.editTools.sizeHint().width() + 16)
+        shouldBreak = self.width() < required
+        if shouldBreak != self.toolBarBreak(self.editTools):
+            if shouldBreak:
+                self.insertToolBarBreak(self.editTools)
+            else:
+                self.removeToolBarBreak(self.editTools)
 
     def copyShapeForUndo(self, shape):
         """Create an independent shape copy for an undo snapshot."""
@@ -2329,10 +2369,12 @@ class MainWindow(QMainWindow, WindowMixin):
         return False
 
     def resizeEvent(self, event):
-        if self.canvas and not self.image.isNull()\
+        if getattr(self, 'canvas', None) and not self.image.isNull()\
            and self.zoomMode != self.MANUAL_ZOOM:
             self.adjustScale()
         super(MainWindow, self).resizeEvent(event)
+        if hasattr(self, 'editTools'):
+            self.scheduleToolbarLayout()
 
     def paintCanvas(self):
         if self.image.isNull():
@@ -3379,8 +3421,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 '%s - Open Annotation Dir' % __appname__,
                 path,
                 QFileDialog.ShowDirsOnly |
-                QFileDialog.DontResolveSymlinks |
-                QFileDialog.DontUseNativeDialog)
+                QFileDialog.DontResolveSymlinks)
         if not dirpath:
             return
 
@@ -4073,6 +4114,9 @@ def get_main_app(argv=[]):
     Standard boilerplate Qt application code.
     Do everything but app.exec_() -- so that we can test the application in one thread
     """
+    if QApplication.instance() is None:
+        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     app = QApplication(argv)
     
     app.setApplicationName(__appname__)

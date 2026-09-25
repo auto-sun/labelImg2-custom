@@ -19,7 +19,8 @@ class ZoomWidget(QSpinBox):
         self.setAttribute(Qt.WA_InputMethodEnabled, False)
 
     def minimumSizeHint(self):
-        height = super(ZoomWidget, self).minimumSizeHint().height()
+        base = super(ZoomWidget, self).minimumSizeHint()
         fm = QFontMetrics(self.font())
-        width = fm.width(str(self.maximum()))
-        return QSize(width, height)
+        width = fm.horizontalAdvance(
+            str(self.maximum()) + self.suffix()) + 24
+        return QSize(max(base.width(), width), base.height())
