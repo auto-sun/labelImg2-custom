@@ -13,3 +13,8 @@
 Windows 打包脚本是 `build_windows.ps1`，安装向导定义为 `LabelImg2Custom.iss`。
 简体中文 Inno Setup 语言文件的来源及维护者信息保留在
 `ChineseSimplified.isl` 文件头部。普通用户只需下载安装包，不需要运行这些脚本。
+
+打包必须使用一个独立、完整的 Python 环境（当前使用 Python 3.10.20），
+不要通过 `PYTHONPATH` 混用另一个环境的 PyInstaller 或项目依赖。
+脚本会检查主要依赖是否都来自同一个 `sys.prefix`，并在生成安装器前实际启动
+打包后的 EXE，确认主窗口出现且没有“Unhandled exception”报错窗口。

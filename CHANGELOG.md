@@ -3,6 +3,12 @@
 本项目从 `v1.3.0` 开始记录自定义版本。`v1.0`、`v1.1` 和 `v1.2`
 是仓库继承的上游历史标签，不包含当前完整的自定义功能。
 
+## [v2.5.2] - 2026-09-25
+
+- 修复 v2.5.1 Windows 安装包启动时可能出现的 `No module named 'pkg_resources.extern'` 错误；改用单一 Python 环境打包并验证安装版真正打开主窗口，而不是只判断进程仍在运行。
+- 安装升级时，如桌面已有 LabelImg2 Custom 快捷方式，会重新写入指向新版 EXE 的快捷方式和图标；没有快捷方式的用户仍可自行选择是否创建。
+- v2.5.1 的界面适配和 Windows 原生文件选择窗口继续保留。建议已下载 v2.5.1 的用户升级到 v2.5.2。
+
 ## [v2.5.1] - 2026-09-25
 
 - 按屏幕可用尺寸调整主窗口和类别/快捷键设置窗口的初始大小；窄窗口下顶部工具栏自动分行，避免“置信度”“框型”和缩放文字被裁切。
@@ -263,6 +269,7 @@
 - `v1.1`：上游历史版本。
 - `v1.0`：上游历史版本。
 
+[v2.5.2]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.2
 [v2.5.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.1
 [v2.5.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.0
 [v2.4.0]: https://github.com/auto-sun/labelImg2-custom/tree/v2.4.0

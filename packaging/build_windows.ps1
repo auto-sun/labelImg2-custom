@@ -28,9 +28,28 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Python 3.10.0 is not supported by this PyInstaller build; use Python 3.10.20 or a newer compatible release.'
 }
 
-& $PythonExe -c 'import PyInstaller, PyQt5, cv2, lxml, ultralytics, torch, pypinyin, send2trash, yamlloader'
+$dependencyCheck = @'
+import importlib
+import sys
+from pathlib import Path
+
+prefix = Path(sys.prefix).resolve()
+names = ('PyInstaller', 'PyQt5', 'cv2', 'lxml', 'ultralytics',
+         'torch', 'pypinyin', 'send2trash', 'yamlloader')
+outside = []
+for name in names:
+    module = importlib.import_module(name)
+    path = Path(module.__file__).resolve()
+    if not path.is_relative_to(prefix):
+        outside.append('%s: %s' % (name, path))
+if outside:
+    raise SystemExit('Dependencies outside the build environment:\n' +
+                     '\n'.join(outside))
+print('Build dependencies verified in', prefix)
+'@
+& $PythonExe -c $dependencyCheck
 if ($LASTEXITCODE -ne 0) {
-    throw 'The build Python environment is missing a required dependency.'
+    throw 'Build dependencies are missing or mixed across Python environments.'
 }
 
 $iconPath = Join-Path $projectRoot 'build\LabelImg2Custom.ico'
@@ -39,12 +58,18 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Could not generate the application icon.'
 }
 
-& $PythonExe -m PyInstaller --noconfirm `
+& $PythonExe -m PyInstaller --clean --noconfirm `
     --distpath (Join-Path $projectRoot 'dist') `
     --workpath (Join-Path $projectRoot 'build\pyinstaller') `
     (Join-Path $projectRoot 'packaging\LabelImg2Custom.spec')
 if ($LASTEXITCODE -ne 0) {
     throw 'PyInstaller failed.'
+}
+
+& (Join-Path $PSScriptRoot 'smoke_test_windows.ps1') `
+    (Join-Path $projectRoot 'dist\LabelImg2Custom\LabelImg2Custom.exe')
+if (-not $?) {
+    throw 'The packaged executable did not pass the startup smoke test.'
 }
 
 $appVersion = & $PythonExe -c 'from libs.version import __version__; print(__version__)'

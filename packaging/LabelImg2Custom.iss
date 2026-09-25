@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "2.5.1"
+  #define AppVersion "2.5.2"
 #endif
 
 #define AppName "LabelImg2 Custom"
@@ -42,7 +42,14 @@ Source: "..\dist\LabelImg2Custom\*"; DestDir: "{app}"; Flags: ignoreversion recu
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExe}"; Check: ShouldCreateDesktopIcon
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "启动 {#AppName}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function ShouldCreateDesktopIcon(): Boolean;
+begin
+  Result := WizardIsTaskSelected('desktopicon') or
+    FileExists(ExpandConstant('{autodesktop}\{#AppName}.lnk'));
+end;
