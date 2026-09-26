@@ -7,12 +7,12 @@
 正式标注前请先了解下面几点：
 
 1. YOLO 和 YOLO OBB 的 `class_id` 由类别文件的行顺序决定，开始正式标注后不要随意调整类别顺序。
-2. `View > Auto Saving` 默认开启。手动关闭后，如果当前图片有未保存修改，切换图片会先询问是否放弃修改。
+2. `Settings > Auto Saving` 默认开启。手动关闭后，如果当前图片有未保存修改，切换图片会先询问是否放弃修改。
 3. 安装包包含全部运行依赖，但不包含模型 `.pt` 权重；自动标注时请选择自己拥有使用权的模型。
 
 ## 一、下载并安装
 
-1. [下载 v2.5.3 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.3/LabelImg2Custom-2.5.3-Setup.exe)。
+1. [下载 v2.6.0 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.0/LabelImg2Custom-2.6.0-Setup.exe)。
 2. 双击安装包，按向导完成安装。默认安装到当前用户目录，不需要管理员权限。
 3. 从开始菜单打开 `LabelImg2 Custom`。如果 Windows 显示“未知发布者”，请先核对文件确实来自本项目的 GitHub Release；安装包目前没有代码签名。
 
@@ -63,12 +63,12 @@ my_dataset\
 
 1. 点击 `File > Open Dir`，选择图片根目录，例如 `my_dataset\images`。
 2. 点击 `File > Open Annotation Dir`，选择标签根目录，例如 `my_dataset\labels`。
-3. 点击 `File > Annotation Format`，选择需要直接保存的格式：
+3. 点击 `Settings > Annotation Format`，选择需要直接保存的格式：
    - `Pascal VOC XML`
    - `Ultralytics YOLO`
    - `Ultralytics YOLO OBB`
    如果标签目录中已经有标签，程序会显示进度并把全部对应标签转换成新格式；没有标签则直接提示修改成功。
-4. `View > Auto Saving` 默认开启；如果手动关闭，切换未保存图片时程序会弹出确认提示。
+4. `Settings > Auto Saving` 默认开启；如果手动关闭，切换未保存图片时程序会弹出确认提示。
 
 图片和标签可以具有相同的多层子目录。程序会按相对路径递归对应，例如：
 
@@ -163,7 +163,7 @@ class_id x1 y1 x2 y2 x3 y3 x4 y4
 
 ## 八、批量转换已有标签
 
-先打开图片目录和标签目录，再通过 `File > Annotation Format` 选择目标格式。程序会把当前数据集已有标签批量转换为 XML、YOLO 或 YOLO OBB，并显示进度。旧的 `Export to` 菜单已经移除，不再需要选择单独的导出目录。
+先打开图片目录和标签目录，再通过 `Settings > Annotation Format` 选择目标格式。程序会把当前数据集已有标签批量转换为 XML、YOLO 或 YOLO OBB，并显示进度。旧的 `Export to` 菜单已经移除，不再需要选择单独的导出目录。
 
 ## 九、重新打开后的恢复
 

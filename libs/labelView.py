@@ -194,6 +194,11 @@ class CHeaderView(QHeaderView):
         del self.isChecked[start]
         return super(CHeaderView, self).rowsAboutToBeRemoved(parent, start, end)
 
+    def setSectionChecked(self, logicalIndex, checked):
+        if 0 <= logicalIndex < len(self.isChecked):
+            self.isChecked[logicalIndex] = 1 if checked else 0
+            self.viewport().update()
+
     def paintSection(self, painter, rect, logicalIndex):
         self._y_offset = int((rect.height()-self._width)/2.)
         

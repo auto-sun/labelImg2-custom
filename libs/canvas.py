@@ -28,6 +28,7 @@ class Canvas(QWidget):
     shapeCopied = pyqtSignal(object)
     shapeChangeStarted = pyqtSignal()
     shapeChangeFinished = pyqtSignal()
+    shapeVisibilityChanged = pyqtSignal(object, bool)
     drawingPolygon = pyqtSignal(bool)
     imageNavigationRequested = pyqtSignal(int)
 
@@ -101,7 +102,10 @@ class Canvas(QWidget):
         self.canDrawRotatedRect = True
         self.hideRotated = False
         self.hideNormal = False
-        self.canOutOfBounding = True
+        # Geometry editing must never place an annotation outside the image.
+        # Retain the attribute for compatibility with older call sites, but
+        # do not allow the old O-key escape hatch to weaken this invariant.
+        self.canOutOfBounding = False
         self.showCenter = False
         
         #self.setAttribute(Qt.WA_PaintOnScreen)
@@ -248,7 +252,7 @@ class Canvas(QWidget):
             self.overrideCursor(CURSOR_DRAW)
             if self.current:
                 color = self.drawingLineColor
-                if self.outOfPixmap(pos):
+                if len(self.current) > 1 and self.outOfPixmap(pos):
                     # Don't allow the user to draw outside the pixmap.
                     # Project the point to the pixmap's edges.
                     pos = self.intersectionPoint(self.current[-1], pos)
@@ -307,6 +311,8 @@ class Canvas(QWidget):
                 if len(self.selectedShapes) > 1:
                     dp = pos - self.prevPoint
                     if dp:
+                        dp = self._boundedTranslation(
+                            self.selectedShapes, dp)
                         for sh in self.selectedShapes:
                             sh.moveBy(dp)
                             sh.close()
@@ -411,7 +417,7 @@ class Canvas(QWidget):
                 return
 
         if (ev.button() == Qt.LeftButton and self.editing() and
-                not self.outOfPixmap(pos) and self._shapeAt(pos) is None and
+                self._shapeAt(pos) is None and
                 not self.selectedVertex()):
             additive = bool(
                 ev.modifiers() & (Qt.ControlModifier | Qt.ShiftModifier)
@@ -631,7 +637,7 @@ class Canvas(QWidget):
             if pos_diff.y() < 0:
                 self.current.direction = math.pi
             self.finalise()
-        elif not self.outOfPixmap(pos):
+        else:
             self.current = Shape()
             self.current.highlightCorner=True
             self.current.addPoint(pos)
@@ -860,29 +866,9 @@ class Canvas(QWidget):
             return -angle
 
     def boundedMoveShape(self, shape, pos):
-        if shape.isRotated and self.canOutOfBounding:
-            c = shape.center
-            dp = pos - self.prevPoint
-            dc = c + dp
-            if dc.x() < 0:
-                dp -= QPointF(min(0,dc.x()), 0)
-            if dc.y() < 0:                
-                dp -= QPointF(0, min(0,dc.y()))                
-            if dc.x() >= self.pixmap.width():
-                dp += QPointF(min(0, self.pixmap.width() - 1  - dc.x()), 0) # TODO
-            if dc.y() >= self.pixmap.height():
-                dp += QPointF(0, min(0, self.pixmap.height() - 1 - dc.y())) # TODO
-        else:
-            if self.outOfPixmap(pos):
-                return False  # No need to move
-            o1 = pos + self.offsets[0]
-            if self.outOfPixmap(o1):
-                pos -= QPointF(min(0, o1.x()), min(0, o1.y()))
-            o2 = pos + self.offsets[1]
-            if self.outOfPixmap(o2):
-                pos += QPointF(min(0, self.pixmap.width() - 1 - o2.x()),
-                            min(0, self.pixmap.height() - 1 - o2.y()))
-            dp = pos - self.prevPoint
+        if self.pixmap is None or self.pixmap.isNull():
+            return False
+        dp = self._boundedTranslation([shape], pos - self.prevPoint)
         # The next line tracks the new position of the cursor
         # relative to the shape, but also results in making it
         # a bit "shaky" when nearing the border and allows it to
@@ -890,10 +876,27 @@ class Canvas(QWidget):
         #self.calculateOffsets(self.selectedShape, pos)
         if dp:
             shape.moveBy(dp)
-            self.prevPoint = pos
             shape.close()
-            return True
-        return False
+        self.prevPoint = pos
+        return bool(dp)
+
+    def _boundedTranslation(self, shapes, delta):
+        """Clamp a translation so every selected vertex stays on the image."""
+        shapes = [shape for shape in shapes if shape is not None]
+        if not shapes or self.pixmap is None or self.pixmap.isNull():
+            return QPointF()
+        points = [point for shape in shapes for point in shape.points]
+        if not points:
+            return QPointF()
+        left = min(point.x() for point in points)
+        right = max(point.x() for point in points)
+        top = min(point.y() for point in points)
+        bottom = max(point.y() for point in points)
+        dx = min(max(float(delta.x()), -left),
+                 float(self.pixmap.width()) - right)
+        dy = min(max(float(delta.y()), -top),
+                 float(self.pixmap.height()) - bottom)
+        return QPointF(dx, dy)
 
     def boundedMoveShape2(self, shape, pos):
         if self.outOfPixmap(pos):
@@ -1193,6 +1196,18 @@ class Canvas(QWidget):
     def finalise(self, continous=False):
         if self.current is None:
             return
+        if self.pixmap is not None and not self.pixmap.isNull():
+            self.current.points = [
+                self._boundedPixmapPoint(point)
+                for point in self.current.points]
+            self.current.close()
+            bounds = self.current.boundingRect()
+            if (bounds.width() < self.MIN_SHAPE_EDGE or
+                    bounds.height() < self.MIN_SHAPE_EDGE):
+                self.current = None
+                self.drawingPolygon.emit(False)
+                self.update()
+                return
         if self.current.points[0] == self.current.points[-1]:
             self.current = None
             self.drawingPolygon.emit(False)
@@ -1453,16 +1468,14 @@ class Canvas(QWidget):
             self.shapeMoved.emit()
             self.shapeChangeFinished.emit()
             self.update()
-        elif key == Qt.Key_R:
-            self.hideRotated = not self.hideRotated
-            self.hideRRect.emit(self.hideRotated)
-            self.update()
         elif key == Qt.Key_N:
             self.hideNormal = not self.hideNormal
             self.hideNRect.emit(self.hideNormal)
             self.update()
-        elif key == Qt.Key_O:
-            self.canOutOfBounding = not self.canOutOfBounding
+        elif key == Qt.Key_T:
+            self.hideRotated = not self.hideRotated
+            self.hideRRect.emit(self.hideRotated)
+            self.update()
         elif key == Qt.Key_B:
             self.showCenter = not self.showCenter
             self.update()
@@ -1550,6 +1563,7 @@ class Canvas(QWidget):
         self._clearMarqueeSelection()
         self.pixmap = pixmap
         self.shapes = []
+        self.visible.clear()
         self.selectedShapes = []
         self.selectedShape = None
         self.repaint()
@@ -1560,7 +1574,9 @@ class Canvas(QWidget):
         self.repaint()
 
     def setShapeVisible(self, shape, value):
+        value = bool(value)
         self.visible[shape] = value
+        self.shapeVisibilityChanged.emit(shape, value)
         self.repaint()
 
     def currentCursor(self):

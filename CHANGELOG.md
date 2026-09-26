@@ -3,6 +3,16 @@
 本项目从 `v1.3.0` 开始记录自定义版本。`v1.0`、`v1.1` 和 `v1.2`
 是仓库继承的上游历史标签，不包含当前完整的自定义功能。
 
+## [v2.6.0] - 2026-09-26
+
+- 移动普通框、OBB 和多选框时统一限制在图片边界内；可从图片外开始绘框，完成后自动吸附到图片边缘。
+- `R` 显示/隐藏选中的框；未选中时切换全部框。`T` 和 `N` 保留批量隐藏/显示旋转框与普通框。`Ctrl+Shift+L` 显示/隐藏选中框标签；未选中时切换全部标签。
+- 多框框选允许从图片外的空白画布开始。
+- `Help` 新增使用指南，依次介绍快捷键、基础使用和进阶使用。
+- 新增 `Settings` 菜单，集中管理标签快捷键、标签格式、界面语言、自动保存、框标签显示和角点显示。
+- 新增英文、简体中文、日文、西班牙文、阿拉伯文（RTL）、法文、韩文界面选项，并记住上次选择。
+- `Open Dir` 与 `Open Annotation Dir` 改用不同图标，便于区分。
+
 ## [v2.5.3] - 2026-09-25
 
 - 修复 `Ctrl+Shift+L` 虽能开启“Paint Labels”，却只绘制通常为空的 Extra Info、看不到框类别名的问题；现在显示类别名，并在有 Extra Info 时一并显示。
@@ -274,6 +284,7 @@
 - `v1.1`：上游历史版本。
 - `v1.0`：上游历史版本。
 
+[v2.6.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.6.0
 [v2.5.3]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.3
 [v2.5.2]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.2
 [v2.5.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.1

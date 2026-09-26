@@ -16,7 +16,7 @@
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.5.3（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.3/LabelImg2Custom-2.5.3-Setup.exe)
+[下载 Windows 安装包 v2.6.0（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.0/LabelImg2Custom-2.6.0-Setup.exe)
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或其他运行环境。
 安装包包含 CPU 版模型推理依赖，但不包含 `.pt` 模型权重；自动标注时请选择自己的模型。
@@ -43,11 +43,16 @@
 - 顶部“标注当前图”只推理当前图片；已有标签时可选择覆盖、直接添加或取消。
 - 单张模型标注完成后可按 `Ctrl+Z` 整体撤销，再按 `Ctrl+S` 保存恢复结果。
 - 工具栏选择普通框或 OBB 后，按 `E` 进入或退出对应类型的绘制；原有画框按钮仍可直接使用。
-- 可在右侧 `Box Labels` 配置多个“快捷键 → class.txt 预设类别”；按键后直接绘制一次对应类别的 OBB，并自动记住设置。
+- 移动普通框、OBB 或多选框都不会越出图片；可以从图片外开始绘框，完成后自动吸附到图片边缘。
+- `R` 隐藏/显示选中框，未选中时切换全部框；`Ctrl+Shift+L` 隐藏/显示选中框标签，未选中时切换全部标签。
+- 多框框选可从图片外的空白画布开始。
+- 可在 `Settings > Label Shortcut Settings` 配置多个“快捷键 → class.txt 预设类别”；按键后直接绘制一次对应类别的 OBB，并自动记住设置。
+- `Settings` 集中管理标签格式、标签快捷键、语言、自动保存及显示选项；支持 English、简体中文、日本語、Español、العربية（RTL）、Français、한국어。
+- `Help > User Guide` 按快捷键、基础使用、进阶使用的顺序提供内置指南。
 - 常用类别优先，减少同首字母类别的重复查找。
 - 支持框的复制粘贴、跨图片原位置粘贴、框选多选、整体移动和批量删除。
 - 右侧实时显示项目总标签数、当前图片标签数和本次启动后新增标签净数量；新增、删除及撤销都会同步更新。
-- `View > Auto Saving` 首次启动默认开启，并会记住之后的手动选择。
+- `Settings > Auto Saving` 首次启动默认开启，并会记住之后的手动选择。
 - 未选框时滚轮缩放图片；选中框时滚轮只调整框大小。
 - `Alt + 鼠标左键拖动`平移画布。
 - 未开启自动保存时，切换含未保存修改的图片会先弹出确认提示。
@@ -62,7 +67,7 @@
 
 1. 使用 `File > Open Dir` 选择图片根目录。
 2. 使用 `File > Open Annotation Dir` 选择标签根目录。
-3. 在 `File > Annotation Format` 中选择 `Ultralytics YOLO OBB`；已有标签会显示进度并批量转换。
+3. 在 `Settings > Annotation Format` 中选择 `Ultralytics YOLO OBB`；已有标签会显示进度并批量转换。
 4. 建议在 `View` 菜单开启 `Auto Saving`。
 5. 在工具栏选择“框型：OBB”，按 `E` 绘制旋转框，画完后直接输入类别首字母。
 6. 使用 `Z / X / C / V / F` 调整角度，选中框时滚轮调整大小。
@@ -105,13 +110,15 @@
 | `Ctrl+Z` | 撤销上一步框操作（每张图片最多 50 步） |
 | `Ctrl+D` | 直接复制选中框 |
 | `Delete` | 删除全部选中框 |
+| `R` | 隐藏/显示选中框；未选中时隐藏/显示全部框 |
+| `T` / `N` | 显示/隐藏旋转框 / 普通框 |
 | `Alt + 左键拖动` | 平移画布 |
 | `Ctrl+R` | 打开标签读取与保存目录 |
-| `Ctrl+Shift+L` | 显示或隐藏框上的标签文字 |
+| `Ctrl+Shift+L` | 隐藏/显示选中框标签；未选中时隐藏/显示全部标签 |
 
 开启后会在框上显示类别名；填写了 Extra Info 的框会同时显示附加信息。再次按下即隐藏，当前画布立即更新。
 
-自定义标签键不写死在本表中：点击右侧 `Box Labels` 的“标签快捷键设置...”，例如把
+自定义标签键不写死在本表中：从 `Settings > Label Shortcut Settings` 设置，例如把
 `1` 绑定到 `SafeHat`。程序只允许选择当前 `class.txt` 中的类别，并会拒绝与现有功能或
 其他自定义映射冲突的键位。保存后按 `1` 即可直接进入一次 `SafeHat` 的 OBB 绘制状态，
 设置会在下次启动时自动恢复。

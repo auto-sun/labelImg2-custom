@@ -134,6 +134,80 @@ class PaintLabelsTests(unittest.TestCase):
                 window.close()
             labelImg.Settings = original_settings
 
+    def test_ctrl_shift_l_toggles_only_selected_box_label(self):
+        original_settings = labelImg.Settings
+        MemorySettings.data.clear()
+        labelImg.Settings = MemorySettings
+        window = None
+        try:
+            window = labelImg.MainWindow()
+            first = make_shape()
+            second = make_shape()
+            first.paintLabel = False
+            second.paintLabel = False
+            window.canvas.shapes.extend((first, second))
+            window.addLabel(first)
+            window.addLabel(second)
+            window.canvas.selectShape(first)
+            window.show()
+            window.activateWindow()
+            QApplication.setActiveWindow(window)
+            window.canvas.setFocus()
+            QTest.qWait(10)
+
+            QTest.keyClick(window.canvas, Qt.Key_L,
+                           Qt.ControlModifier | Qt.ShiftModifier)
+            QApplication.processEvents()
+
+            self.assertTrue(first.paintLabel)
+            self.assertFalse(second.paintLabel)
+            self.assertFalse(window.paintLabelsOption.isChecked())
+        finally:
+            if window is not None:
+                window.setClean()
+                window.close()
+            labelImg.Settings = original_settings
+
+    def test_r_hides_selected_box_and_all_boxes_without_selection(self):
+        original_settings = labelImg.Settings
+        MemorySettings.data.clear()
+        labelImg.Settings = MemorySettings
+        window = None
+        try:
+            window = labelImg.MainWindow()
+            first = make_shape()
+            second = make_shape()
+            window.canvas.shapes.extend((first, second))
+            window.addLabel(first)
+            window.addLabel(second)
+            window.canvas.selectShape(first)
+            window.show()
+            window.activateWindow()
+            QApplication.setActiveWindow(window)
+            window.canvas.setFocus()
+            QTest.qWait(10)
+
+            QTest.keyClick(window.canvas, Qt.Key_R)
+            QApplication.processEvents()
+            self.assertFalse(window.canvas.isVisible(first))
+            self.assertTrue(window.canvas.isVisible(second))
+            self.assertFalse(window.labelList.verticalHeader().isChecked[0])
+
+            window.canvas.deSelectShape()
+            QTest.keyClick(window.canvas, Qt.Key_R)
+            QApplication.processEvents()
+            self.assertFalse(window.canvas.isVisible(first))
+            self.assertFalse(window.canvas.isVisible(second))
+            QTest.keyClick(window.canvas, Qt.Key_R)
+            QApplication.processEvents()
+            self.assertTrue(window.canvas.isVisible(first))
+            self.assertTrue(window.canvas.isVisible(second))
+        finally:
+            if window is not None:
+                window.setClean()
+                window.close()
+            labelImg.Settings = original_settings
+
 
 if __name__ == '__main__':
     unittest.main()

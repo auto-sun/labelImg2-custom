@@ -20,7 +20,7 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.5.3（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.3/LabelImg2Custom-2.5.3-Setup.exe)
+[下载 Windows 安装包 v2.6.0（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.0/LabelImg2Custom-2.6.0-Setup.exe)
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或依赖包。
 安装包内含 CPU 版自动标注依赖，但不附带 `.pt` 模型权重。
@@ -48,7 +48,7 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 | 相似目标需要重新画框 | 支持拖动复制、Ctrl+C/Ctrl+X/Ctrl+V 和跨图片粘贴 |
 | 多个框只能逐个调整 | 鼠标框选后可集体移动、缩放、复制和删除 |
 | 难以掌握数据集和本次标注进度 | 右侧实时显示项目、当前图片及本次工作标签数 |
-| 切换图片前容易忘记保存 | `View > Auto Saving` 首次启动默认开启 |
+| 切换图片前容易忘记保存 | `Settings > Auto Saving` 首次启动默认开启 |
 | 图片缩放和框缩放需要不同复杂组合键 | 未选框时滚轮缩放图片，选中框时滚轮缩放框 |
 | 改变标签格式还要另外导出 | 选择新格式后自动批量转换全部已有标签并显示进度 |
 | 背景图片还要手动创建空文件 | 工具栏一键按当前格式生成空 XML/TXT，并标记为 `[BG]` |
@@ -58,7 +58,7 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 ## 推荐的快速标注流程
 
 1. 打开图片文件夹，按 `Ctrl+R` 选择标签目录。
-2. 在 `File > Annotation Format` 选择 XML、YOLO 或 YOLO OBB；如果已有标签，程序会自动批量转换。
+2. 在 `Settings > Annotation Format` 选择 XML、YOLO 或 YOLO OBB；如果已有标签，程序会自动批量转换。
 3. 在工具栏选择“框型：OBB”，按 `E` 进入 OBB 绘制状态。
 4. 在图片上画一个旋转框。
 5. 松开鼠标后程序自动退出连续绘制，并选中新框。
@@ -130,6 +130,9 @@ data/predefined_classes.txt
 | `Ctrl+Z` | 撤销当前图片的上一步框操作（最多 50 步） |
 | `Ctrl+D` | 直接复制全部选中框 |
 | `Delete` | 删除全部选中框 |
+| `R` | 隐藏/显示选中框；未选中时隐藏/显示全部框 |
+| `T` / `N` | 显示/隐藏旋转框 / 普通框 |
+| `Ctrl+Shift+L` | 隐藏/显示选中框标签；未选中时隐藏/显示全部标签 |
 | `A` / 上方向键 | 上一张图片（选中框时上方向键用于微调框） |
 | `D` / 下方向键 | 下一张图片（选中框时下方向键用于微调框） |
 | 四个方向键（已选框） | 将选中框向对应方向移动一个像素 |
@@ -139,6 +142,10 @@ data/predefined_classes.txt
 | `Ctrl+S` | 按当前选择的格式保存标注 |
 | `Ctrl+R` | 打开标签目录，同时作为读取和保存目录 |
 
+普通框和 OBB 移动、多选框集体移动均不可越出图片边界；可从图片外开始绘框，松开鼠标后框会自动吸附到最近的图片边界。多框框选也可从图片外的空白画布开始。
+
+界面语言、标注格式、自定义标签快捷键、自动保存及显示偏好都在上方 `Settings` 中。支持 English、简体中文、日本語、Español、العربية（RTL）、Français 和 한국어，所选语言会在下次打开时保留。`Help > User Guide` 内置使用指南，先列快捷键，再介绍基础和进阶操作。
+
 为了防止误触，`W` 创建普通矩形框的快捷键已取消，但界面中的普通框按钮仍然保留。
 双击已有框的类别后，可输入中文类别的拼音（如 `huolongguo` 对应“火龙果”），
 也可直接按已设置的类别快捷键修改该框类别。右侧 `File List` 右键可将拿不准的图片
@@ -147,7 +154,7 @@ data/predefined_classes.txt
 
 ### 自定义常用类别快捷键
 
-右侧 `Box Labels` 中的“标签快捷键设置...”可以添加多组“按键 → 预设类别”，例如：
+`Settings > Label Shortcut Settings` 中可以添加多组“按键 → 预设类别”，例如：
 
 - `1 → SafeHat`
 - `2 → person`
@@ -225,7 +232,7 @@ data/predefined_classes.txt
 
 ## 保存格式与标签自动识别
 
-在 `File > Annotation Format` 中可以选择：
+在 `Settings > Annotation Format` 中可以选择：
 
 | 选项 | 实际保存内容 |
 | --- | --- |

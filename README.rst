@@ -24,7 +24,7 @@ Interface preview
 Downloads
 ---------
 
-`Download the v2.5.3 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.5.3/LabelImg2Custom-2.5.3-Setup.exe>`__.
+`Download the v2.6.0 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.0/LabelImg2Custom-2.6.0-Setup.exe>`__.
 
 Double-click the installer and launch the app from the Start menu. No Python,
 Conda or separate dependency installation is required. The installer includes
@@ -32,9 +32,12 @@ CPU inference libraries but not your ``.pt`` model weights. Historical changes
 remain in the `changelog
 <CHANGELOG.md>`__.
 
-Version 2.5.3 makes ``Ctrl+Shift+L`` display class names on boxes and repaint
-immediately. It also retains the installer startup fix, high-DPI layouts,
-larger settings dialogs, and native Windows file pickers.
+Version 2.6.0 keeps moved boxes inside the image and snaps boxes drawn from
+outside to the image edge. It adds per-box visibility (``R``), per-box label
+visibility (``Ctrl+Shift+L``), marquee selection from outside the image, a
+built-in user guide, and a Settings menu. The interface offers English,
+Simplified Chinese, Japanese, Spanish, Arabic (right-to-left), French, and
+Korean, and remembers the selected language.
 
 Why this derivative is more convenient
 ---------------------------------------
@@ -73,7 +76,7 @@ Main additions
 * ``Ctrl+C`` / ``Ctrl+X`` / ``Ctrl+V`` box clipboard across images.
 * Automatic label editor after drawing a box.
 * Multiple persistent custom ``key -> class.txt label`` bindings can be set
-  from ``Box Labels``. Conflicting keys are rejected, and a binding starts one
+  from ``Settings > Label Shortcut Settings``. Conflicting keys are rejected, and a binding starts one
   OBB for that class without reopening the label picker.
 * Frequently used labels are prioritised when cycling by initial letter.
 * A panel below ``Box Labels`` shows project, current-image and current-session
@@ -93,6 +96,11 @@ Main additions
 * Natural numeric image ordering (for example, ``2.jpg`` before ``10.jpg``).
 * Bidirectional dataset-wide XML, YOLO and YOLO OBB conversion with visible
   progress and safe retention of failed files.
+* ``R`` hides/shows the selected box, or all boxes when none is selected;
+  ``Ctrl+Shift+L`` does the same for box labels.
+* ``Settings`` groups format, class shortcuts, language, autosave and display
+  preferences. ``Help > User Guide`` explains shortcuts first, then basic and
+  advanced workflows.
 
 Installation
 ------------
@@ -113,7 +121,7 @@ Control                         Behaviour
 Mouse wheel, no box selected    Zoom the image
 Mouse wheel, box selected       Resize the selected box or selected group
 ``Alt + left drag``             Pan the canvas
-Left drag on empty image area   Marquee-select boxes
+Left drag on empty canvas       Marquee-select boxes, even outside the image
 ``Ctrl/Shift + marquee``        Add boxes to the current selection
 ``Ctrl + click``                Toggle a box in the multi-selection
 Drag a selected box             Move the selected box or selected group
@@ -122,6 +130,9 @@ Drag a selected box             Move the selected box or selected group
 ``Ctrl+Z``                      Undo the last box operation (up to 50 steps)
 ``Ctrl+D``                      Duplicate selected boxes
 ``Delete``                      Delete selected boxes
+``R``                           Hide/show selected box, or all with no selection
+``T`` / ``N``                   Show/hide rotated boxes / normal boxes
+``Ctrl+Shift+L``                Hide/show selected labels, or all with no selection
 ``A`` / up arrow                Previous image
 ``D`` / down arrow              Next image
 ``Z`` / ``X``                   Rotate counter-clockwise (large/small step)
@@ -168,7 +179,7 @@ trained or are licensed to use; ``.pt`` files are ignored by Git.
 Annotation formats
 ------------------
 
-Choose the output type from ``File > Annotation Format``:
+Choose the output type from ``Settings > Annotation Format``:
 
 * Pascal VOC XML: ``.xml``
 * YOLO box: ``class_id cx cy width height`` in ``.txt``

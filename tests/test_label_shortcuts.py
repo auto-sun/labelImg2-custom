@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
+import tempfile
 import unittest
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
@@ -8,7 +9,7 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from PyQt5.QtCore import QPointF, Qt
 from PyQt5.QtGui import QColor, QPixmap
 from PyQt5.QtTest import QTest
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QToolButton
 
 import labelImg
 from libs.constants import SETTING_LABEL_SHORTCUTS
@@ -96,9 +97,11 @@ class LabelShortcutWindowTests(unittest.TestCase):
         MemorySettings.data_store.clear()
         self.originalSettings = labelImg.Settings
         labelImg.Settings = MemorySettings
-        self.classesPath = os.path.join(
-            os.path.dirname(labelImg.__file__),
-            'data', 'predefined_classes.txt')
+        with tempfile.NamedTemporaryFile(
+                mode='w', encoding='utf-8', suffix='.txt',
+                delete=False) as classFile:
+            classFile.write('SafeHat\nperson\nexcavator\n')
+            self.classesPath = classFile.name
         self.window = self.createWindow()
 
     def createWindow(self):
@@ -115,15 +118,35 @@ class LabelShortcutWindowTests(unittest.TestCase):
         if self.window is not None:
             self.window.setClean()
             self.window.close()
+        if os.path.isfile(self.classesPath):
+            os.remove(self.classesPath)
         labelImg.Settings = self.originalSettings
 
-    def test_settings_button_is_in_box_labels_panel(self):
-        layout = self.window.dock.widget().layout()
-        self.assertGreaterEqual(
-            layout.indexOf(self.window.labelShortcutSettingsButton), 0)
-        self.assertLess(
-            layout.indexOf(self.window.labelShortcutSettingsButton),
-            layout.indexOf(self.window.labelList))
+    def test_shortcut_settings_moved_to_settings_menu(self):
+        self.assertIn(
+            self.window.labelShortcutSettingsAction,
+            self.window.menus.settings.actions())
+        self.assertFalse(any(
+            button.objectName() == 'labelShortcutSettingsButton'
+            for button in self.window.dock.widget().findChildren(QToolButton)))
+        self.assertIn(
+            self.window.menus.annotationFormat.menuAction(),
+            self.window.menus.settings.actions())
+        self.assertNotIn(
+            self.window.menus.annotationFormat.menuAction(),
+            self.window.menus.file.actions())
+
+    def test_settings_language_choices_are_applied_and_persisted(self):
+        originalClasses = list(self.window.predefinedClasses)
+        self.assertTrue(self.window.setLanguage('ja'))
+        self.assertIn('設定', self.window.menus.settings.menuAction().text())
+        self.assertIn('形式', self.window.menus.annotationFormat.menuAction().text())
+        self.assertEqual('ja', MemorySettings.data_store['language'])
+        self.assertEqual(originalClasses, list(self.window.predefinedClasses))
+
+        self.assertTrue(self.window.setLanguage('ar'))
+        self.assertEqual(Qt.RightToLeft, self.window.layoutDirection())
+        self.window.setLanguage('zh')
 
     def test_shortcut_selects_label_and_enters_obb_drawing(self):
         self.window.setLabelShortcutMappings(

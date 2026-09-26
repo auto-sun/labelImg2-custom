@@ -43,6 +43,8 @@ from libs.classFileDialog import (ClassFileDialog, ClassFileError,
                                   read_class_file)
 from libs.trash_utils import TrashError, move_to_trash
 from libs.ui_geometry import available_screen_geometry
+from libs.i18n import LANGUAGES, LanguageManager
+from libs.userGuide import UserGuideDialog
 
 from libs.labelView import (CLabelView, HashableQStandardItem,
                             label_search_keys)
@@ -188,19 +190,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.classFileButton.setIcon(newIcon('tags.svg'))
         self.classFileButton.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self.classFileButton.clicked.connect(self.openClassFileManager)
-        self.labelShortcutSettingsButton = QToolButton()
-        self.labelShortcutSettingsButton.setObjectName(
-            'labelShortcutSettingsButton')
-        self.labelShortcutSettingsButton.setText(u'标签快捷键设置...')
-        self.labelShortcutSettingsButton.setIcon(newIcon('settings.svg'))
-        self.labelShortcutSettingsButton.setToolButtonStyle(
-            Qt.ToolButtonTextBesideIcon)
-        self.labelShortcutSettingsButton.clicked.connect(
-            self.openLabelShortcutSettings)
-
         labellistLayout.addWidget(self.editButton)
         labellistLayout.addWidget(self.classFileButton)
-        labellistLayout.addWidget(self.labelShortcutSettingsButton)
         labellistLayout.addWidget(self.diffcButton)
 
         # Create and add a widget for showing current label items
@@ -320,6 +311,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas.shapeCopied.connect(self.copyShapeByDragging)
         self.canvas.shapeChangeStarted.connect(self.beginUndoOperation)
         self.canvas.shapeChangeFinished.connect(self.finishUndoOperation)
+        self.canvas.shapeVisibilityChanged.connect(
+            self.updateShapeVisibilityCheckbox)
         self.canvas.selectionChanged.connect(self.shapeSelectionChanged)
         self.canvas.drawingPolygon.connect(self.toggleDrawingSensitive)
         self.canvas.cancelDraw.connect(self.createCancel)
@@ -352,7 +345,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         openAnnotationDir = action(
             '&Open Annotation Dir', self.openAnnotationDirDialog,
-            'Ctrl+r', 'dir.svg',
+            'Ctrl+r', 'tags.svg',
             u'Open the directory used to load and save annotations')
 
         selectClassFile = action(
@@ -628,6 +621,7 @@ class MainWindow(QMainWindow, WindowMixin):
             edit=self.menu('&Edit'),
             view=self.menu('&View'),
             help=self.menu('&Help'),
+            settings=self.menu('&Settings'),
             recentFiles=QMenu('Open &Recent'),
             annotationFormat=QMenu('Annotation Format'),
             labelList=labelMenu)
@@ -647,12 +641,26 @@ class MainWindow(QMainWindow, WindowMixin):
         
         # Add option to enable/disable labels being painted at the top of bounding boxes
         self.paintLabelsOption = QAction("Paint Labels", self)
-        # Ctrl+Shift+P is already used by Play. Keep both actions usable by
-        # assigning Paint Labels its own shortcut.
-        self.paintLabelsOption.setShortcut("Ctrl+Shift+L")
+        # Menu action toggles label text globally; Ctrl+Shift+L uses the
+        # per-selection shortcut below.
         self.paintLabelsOption.setCheckable(True)
         self.paintLabelsOption.setChecked(settings.get(SETTING_PAINT_LABEL, False))
         self.paintLabelsOption.triggered.connect(self.togglePaintLabelsOption)
+        self.paintLabelsShortcuts = []
+        self.toggleVisibilityShortcuts = []
+        for shortcutParent in (self.canvas, self.labelList,
+                               self.fileListView):
+            paintShortcut = QShortcut(
+                QKeySequence("Ctrl+Shift+L"), shortcutParent)
+            paintShortcut.setContext(Qt.WidgetWithChildrenShortcut)
+            paintShortcut.activated.connect(self.toggleSelectedPaintLabels)
+            self.paintLabelsShortcuts.append(paintShortcut)
+            visibilityShortcut = QShortcut(
+                QKeySequence('R'), shortcutParent)
+            visibilityShortcut.setContext(Qt.WidgetWithChildrenShortcut)
+            visibilityShortcut.activated.connect(
+                self.toggleSelectedShapeVisibility)
+            self.toggleVisibilityShortcuts.append(visibilityShortcut)
 
         self.drawCorner = QAction('Always Draw Corner', self)
         self.drawCorner.setCheckable(True)
@@ -666,16 +674,38 @@ class MainWindow(QMainWindow, WindowMixin):
                    (open, opendir, openAnnotationDir, selectClassFile,
                      selectAutoAnnotationModel, singleAutoAnnotate,
                     autoAnnotate, None,
-                    self.menus.annotationFormat,
                     self.menus.recentFiles,
                     save, saveAs, close, resetAll, quit))
 
-        addActions(self.menus.help, (showInfo,))
-        addActions(self.menus.view, (
+        self.userGuideAction = action(
+            'User Guide', self.showUserGuide, None, 'info.svg',
+            'Shortcuts, basic operation, and advanced workflows')
+        addActions(self.menus.help, (self.userGuideAction, showInfo))
+        self.labelShortcutSettingsAction = action(
+            'Label Shortcut Settings...', self.openLabelShortcutSettings,
+            None, 'settings.svg', 'Configure shortcut keys for preset labels')
+        self.languageMenu = QMenu('Language', self.menus.settings)
+        self.languageActions = {}
+        language = settings.get(SETTING_LANGUAGE, 'zh')
+        if language not in LANGUAGES:
+            language = 'zh'
+        for languageCode, (languageName, _direction) in LANGUAGES.items():
+            languageAction = QAction(languageName, self)
+            languageAction.setCheckable(True)
+            languageAction.setChecked(languageCode == language)
+            languageAction.triggered.connect(
+                partial(self.setLanguage, languageCode))
+            self.languageMenu.addAction(languageAction)
+            self.languageActions[languageCode] = languageAction
+        addActions(self.menus.settings, (
+            self.labelShortcutSettingsAction,
+            self.menus.annotationFormat,
+            self.languageMenu,
+            None,
             self.autoSaving,
             self.paintLabelsOption,
-            self.drawCorner,
-            None,
+            self.drawCorner))
+        addActions(self.menus.view, (
             None,
             zoomIn, zoomOut, zoomOrg, None,
             fitWindow, fitWidth))
@@ -703,6 +733,8 @@ class MainWindow(QMainWindow, WindowMixin):
             self.labelShortcutMappings, persist=False,
             discardInvalid=True)
         self.updateClassFileButton()
+        self.languageManager = LanguageManager(self, language)
+        self.languageManager.apply()
 
         self.statusBar().showMessage('%s started.' % __appname__)
         self.statusBar().show()
@@ -1143,6 +1175,8 @@ class MainWindow(QMainWindow, WindowMixin):
             self.labelModel.clear()
             self.labelModel.setHorizontalHeaderLabels(
                 ["Label", "Extra Info"])
+            if hasattr(self, 'languageManager'):
+                self.languageManager.applyWidget(self.labelList)
             self.ShapeItemDict.clear()
             self.ItemShapeDict.clear()
             self.canvas.visible.clear()
@@ -1240,6 +1274,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.resetUndoHistory()
         self.labelModel.clear()
         self.labelModel.setHorizontalHeaderLabels(["Label", "Extra Info"])
+        if hasattr(self, 'languageManager'):
+            self.languageManager.applyWidget(self.labelList)
         self.ShapeItemDict.clear()
         self.ItemShapeDict.clear()
         self.filePath = None
@@ -1294,6 +1330,24 @@ class MainWindow(QMainWindow, WindowMixin):
                u'Upstream © Chinakook 2018. chinakook@msn.com').format(
             __appname__, __version__)
         QMessageBox.information(self, u'About', msg)
+
+    def showUserGuide(self, _checked=False):
+        dialog = UserGuideDialog(
+            self.settings.get(SETTING_LANGUAGE, 'en'), self)
+        self.languageManager.apply()
+        dialog.exec_()
+
+    def setLanguage(self, language, _checked=False):
+        if language not in LANGUAGES:
+            return False
+        self.settings[SETTING_LANGUAGE] = language
+        self.settings.save()
+        for code, action in self.languageActions.items():
+            action.setChecked(code == language)
+        self.languageManager.apply(language)
+        self.statusBar().showMessage(
+            LANGUAGES[language][0], 3000)
+        return True
 
     def createShape(self):
         self.boxTypeComboBox.setCurrentIndex(0)
@@ -1439,6 +1493,9 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def setLabelEditorActive(self, active):
         self._labelEditorActive = bool(active)
+        for shortcut in (self.paintLabelsShortcuts +
+                         self.toggleVisibilityShortcuts):
+            shortcut.setEnabled(not self._labelEditorActive)
         # Plain-letter window shortcuts must yield to the class combo box
         # while it is accepting first-letter searches.
         navigation_actions = (self.actions.openPrevImg,
@@ -1541,6 +1598,7 @@ class MainWindow(QMainWindow, WindowMixin):
     def openClassFileManager(self, _checked=False):
         dialog = ClassFileDialog(
             self.classFilePath, self.classFileHistory, self)
+        self.languageManager.apply()
         if not dialog.exec_():
             return False
         try:
@@ -1573,6 +1631,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 if shortcut:
                     reserved.setdefault(shortcut, description)
 
+        reserved['Ctrl+Shift+L'] = 'Toggle box label visibility'
         canvasKeys = (
             (Qt.Key_Escape, u'取消当前画框/选择'),
             (Qt.Key_Return, u'确认或编辑标签'),
@@ -1584,9 +1643,9 @@ class MainWindow(QMainWindow, WindowMixin):
             (Qt.Key_C, u'旋转框'),
             (Qt.Key_V, u'旋转框'),
             (Qt.Key_F, u'旋转框 90°'),
-            (Qt.Key_R, u'显示/隐藏旋转框'),
+            (Qt.Key_T, u'显示/隐藏旋转框'),
+            (Qt.Key_R, u'显示/隐藏标注框'),
             (Qt.Key_N, u'显示/隐藏普通框'),
-            (Qt.Key_O, u'切换越界模式'),
             (Qt.Key_B, u'显示/隐藏中心点'),
             (Qt.Key_Tab, u'切换界面焦点'),
             (Qt.Key_Backtab, u'切换界面焦点'),
@@ -1653,15 +1712,16 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def updateLabelShortcutSettingsButton(self):
         count = len(self.labelShortcutMappings)
-        self.labelShortcutSettingsButton.setText(
-            u'标签快捷键设置...（%d）' % count)
         if count:
             details = '\n'.join(
                 u'%s → %s' % (mapping['shortcut'], mapping['label'])
                 for mapping in self.labelShortcutMappings)
         else:
             details = u'尚未设置标签快捷键。'
-        self.labelShortcutSettingsButton.setToolTip(details)
+        if hasattr(self, 'labelShortcutSettingsAction'):
+            self.labelShortcutSettingsAction.setText(
+                u'Label Shortcut Settings...')
+            self.labelShortcutSettingsAction.setToolTip(details)
 
     def openLabelShortcutSettings(self, _value=False):
         previousStates = [
@@ -1674,6 +1734,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.predefinedClasses,
             self.labelShortcutReservedKeys(),
             self)
+        self.languageManager.apply()
         if dialog.exec_():
             self.setLabelShortcutMappings(dialog.validatedMappings)
             self.status(u'标签快捷键设置已保存。', 8000)
@@ -2921,6 +2982,7 @@ class MainWindow(QMainWindow, WindowMixin):
         settings[SETTING_AUTO_ANNOTATION_CONFIDENCE] = (
             self.autoAnnotationConfidence)
         settings[SETTING_ANNOTATION_FORMAT] = self.annotationFormat
+        settings[SETTING_LANGUAGE] = self.languageManager.language
         settings.save()
     ## User Dialogs ##
 
@@ -4082,6 +4144,48 @@ class MainWindow(QMainWindow, WindowMixin):
         for shape in self.canvas.shapes:
             shape.paintLabel = paintLabelsOptionChecked
         self.canvas.update()
+
+    def toggleSelectedPaintLabels(self):
+        if self._labelEditorActive or isinstance(
+                QApplication.focusWidget(), (QLineEdit, QTextEdit,
+                                             QPlainTextEdit)):
+            return
+        selected = list(self.canvas.selectedShapes)
+        if not selected and self.canvas.selectedShape is not None:
+            selected = [self.canvas.selectedShape]
+        if not selected:
+            self.paintLabelsOption.trigger()
+            return
+        show = any(not getattr(shape, 'paintLabel', False)
+                   for shape in selected)
+        for shape in selected:
+            shape.paintLabel = show
+        self.canvas.update()
+
+    def toggleSelectedShapeVisibility(self):
+        if self._labelEditorActive or isinstance(
+                QApplication.focusWidget(), (QLineEdit, QTextEdit,
+                                             QPlainTextEdit)):
+            return
+        targets = (list(self.canvas.selectedShapes)
+                   if self.canvas.selectedShapes else
+                   ([self.canvas.selectedShape]
+                    if self.canvas.selectedShape is not None else
+                    list(self.canvas.shapes)))
+        if not targets:
+            return
+        hide = any(self.canvas.isVisible(shape) for shape in targets)
+        for shape in targets:
+            self.canvas.setShapeVisible(shape, not hide)
+
+    def updateShapeVisibilityCheckbox(self, shape, visible):
+        item = self.ShapeItemDict.get(shape)
+        if item is None:
+            return
+        index = self.labelModel.indexFromItem(item)
+        self.labelList.verticalHeader().setSectionChecked(
+            index.row(), visible)
+
 
 
 def find_matching_files(dir_a, dir_b):
