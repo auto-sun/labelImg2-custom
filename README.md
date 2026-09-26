@@ -16,7 +16,7 @@
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.6.0（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.0/LabelImg2Custom-2.6.0-Setup.exe)
+[下载 Windows 安装包 v2.6.1（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.1/LabelImg2Custom-2.6.1-Setup.exe)
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或其他运行环境。
 安装包包含 CPU 版模型推理依赖，但不包含 `.pt` 模型权重；自动标注时请选择自己的模型。

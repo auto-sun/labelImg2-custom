@@ -2,7 +2,7 @@
 """Small, dependency-free UI translation layer for the desktop application."""
 from PyQt5.QtCore import QObject, Qt
 from PyQt5.QtWidgets import (QApplication, QAction, QComboBox, QLineEdit,
-                             QTableView, QWidget)
+                             QDoubleSpinBox, QTableView, QWidget)
 
 
 LANGUAGES = {
@@ -139,6 +139,22 @@ _EXTRA_ZH = {
     '保存': ('Save', '保存', 'Guardar', 'حفظ', 'Enregistrer', '저장'),
     '添加快捷键': ('Add Shortcut', 'ショートカットを追加', 'Añadir atajo', 'إضافة اختصار', 'Ajouter un raccourci', '바로 가기 추가'),
     '删除': ('Delete', '削除', 'Eliminar', 'حذف', 'Supprimer', '삭제'),
+    '使用本地 YOLO / YOLO OBB 模型批量标注未标注图片': ('Batch-label images without annotations using a local YOLO / YOLO OBB model', 'ローカルの YOLO / YOLO OBB モデルで未注釈の画像を一括ラベリング', 'Anotar por lotes las imágenes sin etiquetas con un modelo YOLO / YOLO OBB local', 'وضع تسميات على الصور غير الموسومة دفعة واحدة باستخدام نموذج YOLO / YOLO OBB محلي', 'Annoter par lots les images sans annotations avec un modèle YOLO / YOLO OBB local', '로컬 YOLO / YOLO OBB 모델로 주석이 없는 이미지를 일괄 라벨링'),
+    '使用本地 YOLO / YOLO OBB 模型标注当前图片': ('Annotate the current image using a local YOLO / YOLO OBB model', 'ローカルの YOLO / YOLO OBB モデルで現在の画像にラベルを付ける', 'Anotar la imagen actual con un modelo YOLO / YOLO OBB local', 'وضع تسميات على الصورة الحالية باستخدام نموذج YOLO / YOLO OBB محلي', 'Annoter l’image actuelle avec un modèle YOLO / YOLO OBB local', '로컬 YOLO / YOLO OBB 모델로 현재 이미지 주석 달기'),
+    '将 File List 中选中的图片及同名 XML/TXT 标签移入回收站': ('Move the selected image and matching XML/TXT labels from File List to the Recycle Bin', 'File List で選択した画像と同名の XML/TXT ラベルをごみ箱に移動', 'Mover la imagen seleccionada y sus etiquetas XML/TXT a la Papelera', 'نقل الصورة المحددة وتسميات XML/TXT المطابقة من File List إلى سلة المحذوفات', 'Déplacer l’image sélectionnée et ses annotations XML/TXT dans la corbeille', 'File List에서 선택한 이미지와 같은 이름의 XML/TXT 레이블을 휴지통으로 이동'),
+    '按当前 Annotation Format 为当前图片生成空标签': ('Create an empty annotation for the current image in the selected Annotation Format', '現在の Annotation Format で空のラベルを作成', 'Crear una anotación vacía para la imagen actual en el formato seleccionado', 'إنشاء تسمية فارغة للصورة الحالية بالتنسيق المحدد', 'Créer une annotation vide pour l’image actuelle au format sélectionné', '현재 이미지에 선택한 Annotation Format으로 빈 레이블 만들기'),
+    '选择本地 YOLO / YOLO OBB .pt 模型': ('Choose a local YOLO / YOLO OBB .pt model', 'ローカルの YOLO / YOLO OBB .pt モデルを選択', 'Elegir un modelo YOLO / YOLO OBB .pt local', 'اختيار نموذج YOLO / YOLO OBB .pt محلي', 'Choisir un modèle YOLO / YOLO OBB .pt local', '로컬 YOLO / YOLO OBB .pt 모델 선택'),
+    '模型置信度阈值（0.01–1.00）；数值越高，保留的预测框通常越少。': ('Model confidence threshold (0.01–1.00). Higher values usually keep fewer predicted boxes.', 'モデルの信頼度しきい値（0.01–1.00）。値を上げると、通常、残る予測ボックスは少なくなります。', 'Umbral de confianza del modelo (0.01–1.00). Un valor más alto suele conservar menos cuadros detectados.', 'حدّ ثقة النموذج (0.01–1.00). عادةً ما تؤدي القيمة الأعلى إلى الاحتفاظ بعدد أقل من الصناديق المتوقعة.', 'Seuil de confiance du modèle (0.01–1.00). Une valeur plus élevée conserve généralement moins de boîtes prédites.', '모델 신뢰도 임계값(0.01–1.00). 값이 높을수록 일반적으로 유지되는 예측 상자가 줄어듭니다.'),
+    '置信度 ': ('Confidence ', '信頼度 ', 'Confianza ', 'الثقة ', 'Confiance ', '신뢰도 '),
+    '置信度：': ('Confidence: ', '信頼度：', 'Confianza: ', 'الثقة: ', 'Confiance : ', '신뢰도: '),
+    '自动标注置信度已设为 %.2f。': ('Auto-annotation confidence set to %.2f.', '自動ラベリングの信頼度を %.2f に設定しました。', 'La confianza del etiquetado automático se estableció en %.2f.', 'تم ضبط ثقة الوسم الآلي على %.2f.', 'La confiance du pré-étiquetage automatique est réglée sur %.2f.', '자동 주석 신뢰도를 %.2f로 설정했습니다.'),
+    '加载模型…（当前图片，置信度 %.2f）': ('Loading model… (current image, confidence %.2f)', 'モデルを読み込み中…（現在の画像、信頼度 %.2f）', 'Cargando modelo… (imagen actual, confianza %.2f)', 'جارٍ تحميل النموذج… (الصورة الحالية، الثقة %.2f)', 'Chargement du modèle… (image actuelle, confiance %.2f)', '모델 로드 중… (현재 이미지, 신뢰도 %.2f)'),
+    '加载模型…（待标注 %d 张，置信度 %.2f）': ('Loading model… (%d images to annotate, confidence %.2f)', 'モデルを読み込み中…（注釈対象 %d 枚、信頼度 %.2f）', 'Cargando modelo… (%d imágenes por anotar, confianza %.2f)', 'جارٍ تحميل النموذج… (%d صور متبقية للتوسيم، الثقة %.2f)', 'Chargement du modèle… (%d images à annoter, confiance %.2f)', '모델 로드 중… (주석 대상 이미지 %d장, 신뢰도 %.2f)'),
+    '模型已加载：%s（置信度 %.2f）': ('Model loaded: %s (confidence %.2f)', 'モデルを読み込みました：%s（信頼度 %.2f）', 'Modelo cargado: %s (confianza %.2f)', 'تم تحميل النموذج: %s (الثقة %.2f)', 'Modèle chargé : %s (confiance %.2f)', '모델 로드됨: %s (신뢰도 %.2f)'),
+    '%s\n置信度：%.2f': ('%s\nConfidence: %.2f', '%s\n信頼度：%.2f', '%s\nConfianza: %.2f', '%s\nالثقة: %.2f', '%s\nConfiance : %.2f', '%s\n신뢰도: %.2f'),
+    '置信度：%.2f\n%s': ('Confidence: %.2f\n%s', '信頼度：%.2f\n%s', 'Confianza: %.2f\n%s', 'الثقة: %.2f\n%s', 'Confiance : %.2f\n%s', '신뢰도: %.2f\n%s'),
+    '置信度：%.2f': ('Confidence: %.2f', '信頼度：%.2f', 'Confianza: %.2f', 'الثقة: %.2f', 'Confiance : %.2f', '신뢰도: %.2f'),
+    '选择按 E 绘制的框类型；旁边的画框按钮仍可直接使用。': ('Choose the box type drawn by pressing E. The adjacent draw buttons remain available.', 'E キーで描画する枠の種類を選択します。隣の描画ボタンも引き続き使用できます。', 'Elige el tipo de cuadro que se dibuja al pulsar E. Los botones de dibujo contiguos siguen disponibles.', 'اختر نوع الإطار الذي يرسمه المفتاح E. تظل أزرار الرسم المجاورة متاحة.', 'Choisissez le type de boîte dessiné avec E. Les boutons de dessin voisins restent disponibles.', 'E 키로 그릴 상자 유형을 선택합니다. 옆의 그리기 버튼도 계속 사용할 수 있습니다.'),
 }
 for _source, _items in _EXTRA_ZH.items():
     _LOOKUP[_source] = dict(zip(
@@ -146,6 +162,7 @@ for _source, _items in _EXTRA_ZH.items():
     _LOOKUP[_source]['zh'] = _source
 
 _EXTRA_EN = {
+    'Background': ('背景', '背景', 'Fondo', 'الخلفية', 'Arrière-plan', '배경'),
     'Verify Image': ('校验图片', '画像を確認', 'Verificar imagen', 'التحقق من الصورة', 'Vérifier l’image', '이미지 확인'),
     'Create\nRectBox': ('绘制普通框', '通常枠を描画', 'Dibujar rectángulo', 'رسم مستطيل', 'Dessiner un rectangle', '사각형 그리기'),
     'Create\nSolidRectBox': ('绘制矩形', '矩形を描画', 'Dibujar rectángulo sólido', 'رسم مستطيل', 'Dessiner un rectangle plein', '솔리드 사각형 그리기'),
@@ -161,6 +178,21 @@ _EXTRA_EN = {
     'Original size': ('原始大小', '元のサイズ', 'Tamaño original', 'الحجم الأصلي', 'Taille d’origine', '원래 크기'),
     'Prev Image': ('上一张图片', '前の画像', 'Imagen anterior', 'الصورة السابقة', 'Image précédente', '이전 이미지'),
     'Next Image': ('下一张图片', '次の画像', 'Imagen siguiente', 'الصورة التالية', 'Image suivante', '다음 이미지'),
+    'Configure shortcut keys for preset labels': ('设置预设类别快捷键', 'プリセットラベルのショートカットを設定', 'Configurar atajos para clases predefinidas', 'إعداد اختصارات الفئات المحددة مسبقًا', 'Configurer les raccourcis des classes prédéfinies', '프리셋 클래스 바로 가기 설정'),
+    'Copy selected Box': ('复制选中的框', '選択した枠をコピー', 'Copiar el cuadro seleccionado', 'نسخ الإطار المحدد', 'Copier la boîte sélectionnée', '선택한 상자 복사'),
+    'Cut selected Box': ('剪切选中的框', '選択した枠を切り取り', 'Cortar el cuadro seleccionado', 'قص الإطار المحدد', 'Couper la boîte sélectionnée', '선택한 상자 잘라내기'),
+    'Decrease zoom level': ('缩小图像', '画像を縮小', 'Reducir el zoom', 'تصغير الصورة', 'Diminuer le zoom', '확대율 낮추기'),
+    'Draw a new Box': ('绘制新框', '新しい枠を描画', 'Dibujar un cuadro nuevo', 'رسم إطار جديد', 'Dessiner une nouvelle boîte', '새 상자 그리기'),
+    'Draw a new RotatedRBox': ('绘制新的旋转框（OBB）', '新しい回転枠（OBB）を描画', 'Dibujar un nuevo cuadro girado (OBB)', 'رسم إطار مائل جديد (OBB)', 'Dessiner une nouvelle boîte orientée (OBB)', '새 회전 상자(OBB) 그리기'),
+    'Increase zoom level': ('放大图像', '画像を拡大', 'Aumentar el zoom', 'تكبير الصورة', 'Augmenter le zoom', '확대율 높이기'),
+    'Modify the label of the selected Box': ('修改所选框的类别', '選択した枠のラベルを変更', 'Cambiar la etiqueta del cuadro seleccionado', 'تعديل تسمية الإطار المحدد', 'Modifier l’étiquette de la boîte sélectionnée', '선택한 상자의 레이블 수정'),
+    'Paste copied Box': ('粘贴已复制的框', 'コピーした枠を貼り付け', 'Pegar el cuadro copiado', 'لصق الإطار المنسوخ', 'Coller la boîte copiée', '복사한 상자 붙여넣기'),
+    'Reset all': ('重置所有设置', 'すべてリセット', 'Restablecer todo', 'إعادة تعيين الكل', 'Tout réinitialiser', '모두 초기화'),
+    'Undo the last box operation': ('撤销上一步框操作', '直前の枠操作を元に戻す', 'Deshacer la última operación del cuadro', 'التراجع عن عملية الإطار الأخيرة', 'Annuler la dernière opération sur la boîte', '마지막 상자 작업 실행 취소'),
+    'Zoom follows window size': ('缩放以适应窗口', 'ウィンドウサイズに合わせて拡大縮小', 'Ajustar el zoom al tamaño de la ventana', 'تكييف التكبير مع حجم النافذة', 'Adapter le zoom à la taille de la fenêtre', '창 크기에 맞게 확대/축소'),
+    'Zoom follows window width': ('缩放以适应窗口宽度', 'ウィンドウ幅に合わせて拡大縮小', 'Ajustar el zoom al ancho de la ventana', 'تكييف التكبير مع عرض النافذة', 'Adapter le zoom à la largeur de la fenêtre', '창 너비에 맞게 확대/축소'),
+    'Zoom to original size': ('恢复原始大小', '元のサイズに戻す', 'Restablecer el tamaño original', 'العودة إلى الحجم الأصلي', 'Rétablir la taille d’origine', '원래 크기로 확대/축소'),
+    'auto next': ('自动切换到下一张', '次の画像へ自動で切り替え', 'Avanzar automáticamente a la siguiente imagen', 'الانتقال تلقائيًا إلى الصورة التالية', 'Passer automatiquement à l’image suivante', '자동으로 다음 이미지로 이동'),
     'Play': ('自动播放', '自動再生', 'Reproducir', 'تشغيل', 'Lire', '재생'),
     'Manage Labels': ('管理标签', 'ラベルを管理', 'Administrar etiquetas', 'إدارة الفئات', 'Gérer les étiquettes', '레이블 관리'),
     'set as default': ('设为默认类别', '既定に設定', 'Establecer como predeterminado', 'تعيين كافتراضي', 'Définir par défaut', '기본값으로 설정'),
@@ -254,6 +286,11 @@ class LanguageManager(QObject):
             if isinstance(widget, QLineEdit):
                 self._update(widget, widget.placeholderText,
                              widget.setPlaceholderText, 'placeholder')
+            if isinstance(widget, QDoubleSpinBox):
+                self._update(widget, widget.prefix, widget.setPrefix,
+                             'prefix')
+                if widget.objectName() == 'autoAnnotationConfidenceSpinBox':
+                    widget.setMinimumWidth(widget.sizeHint().width() + 8)
             if isinstance(widget, QComboBox) and widget.objectName() == 'boxTypeComboBox':
                 for index in range(widget.count()):
                     source_property = 'i18nItemSource_%d' % index

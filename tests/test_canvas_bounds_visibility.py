@@ -4,7 +4,8 @@ import unittest
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from PyQt5.QtCore import QPoint, QPointF, Qt
+from PyQt5.QtCore import QEvent, QPoint, QPointF, Qt
+from PyQt5.QtGui import QMouseEvent
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication
@@ -80,6 +81,33 @@ class CanvasBoundsTests(unittest.TestCase):
         self.assertIsNotNone(self.canvas._marqueeStart)
         self.assertLess(self.canvas._marqueeStart.x(), 0)
         self.canvas._clearMarqueeSelection()
+        self.canvas.close()
+
+    def test_marquee_can_drag_across_image_with_both_ends_outside(self):
+        self.canvas.show()
+        QApplication.processEvents()
+        shape = make_shape(((20, 20), (40, 20), (40, 40), (20, 40)))
+        self.canvas.shapes = [shape]
+
+        # With a centered 100x100 image, these canvas points map to (-40,-40)
+        # and (140,140): the selection crosses the whole image and both blank
+        # margins without being clamped to the image rectangle.
+        QTest.mousePress(self.canvas, Qt.LeftButton, pos=QPoint(10, 10))
+        move = QMouseEvent(
+            QEvent.MouseMove, QPointF(190, 190), Qt.NoButton,
+            Qt.LeftButton, Qt.NoModifier)
+        self.canvas.mouseMoveEvent(move)
+
+        self.assertEqual(QPointF(140, 140), self.canvas._marqueeEnd)
+        self.assertLess(self.canvas._marqueeRect().left(), 0)
+        self.assertGreater(self.canvas._marqueeRect().right(), 100)
+
+        release = QMouseEvent(
+            QEvent.MouseButtonRelease, QPointF(190, 190), Qt.LeftButton,
+            Qt.NoButton, Qt.NoModifier)
+        self.canvas.mouseReleaseEvent(release)
+        self.assertIn(shape, self.canvas.selectedShapes)
+        self.assertIsNone(self.canvas._marqueeStart)
         self.canvas.close()
 
 

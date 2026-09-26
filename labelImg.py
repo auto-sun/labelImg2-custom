@@ -43,7 +43,7 @@ from libs.classFileDialog import (ClassFileDialog, ClassFileError,
                                   read_class_file)
 from libs.trash_utils import TrashError, move_to_trash
 from libs.ui_geometry import available_screen_geometry
-from libs.i18n import LANGUAGES, LanguageManager
+from libs.i18n import LANGUAGES, LanguageManager, translate as translateUi
 from libs.userGuide import UserGuideDialog
 
 from libs.labelView import (CLabelView, HashableQStandardItem,
@@ -2500,7 +2500,9 @@ class MainWindow(QMainWindow, WindowMixin):
         self.autoAnnotationConfidence = confidence
         self.settings[SETTING_AUTO_ANNOTATION_CONFIDENCE] = confidence
         self.settings.save()
-        self.status(u'自动标注置信度已设为 %.2f。' % confidence, 5000)
+        self.status(translateUi(
+            u'自动标注置信度已设为 %.2f。',
+            self.languageManager.language) % confidence, 5000)
 
     def selectAutoAnnotationModel(self, _value=False):
         current_model = self.autoAnnotationModelPath
@@ -2703,14 +2705,19 @@ class MainWindow(QMainWindow, WindowMixin):
         self.autoAnnotationProgress.setValue(0)
         if mode == 'single':
             self.autoAnnotationStatus.setText(
-                u'加载模型…（当前图片，置信度 %.2f）' %
+                translateUi(
+                    u'加载模型…（当前图片，置信度 %.2f）',
+                    self.languageManager.language) %
                 self.autoAnnotationConfidence)
         else:
             self.autoAnnotationStatus.setText(
-                u'加载模型…（待标注 %d 张，置信度 %.2f）' %
+                translateUi(
+                    u'加载模型…（待标注 %d 张，置信度 %.2f）',
+                    self.languageManager.language) %
                 (len(jobs), self.autoAnnotationConfidence))
         self.autoAnnotationStatus.setToolTip(
-            u'%s\n置信度：%.2f' %
+            translateUi(
+                u'%s\n置信度：%.2f', self.languageManager.language) %
             (self.autoAnnotationModelPath, self.autoAnnotationConfidence))
         self.autoAnnotationCancelButton.setEnabled(True)
         self.autoAnnotationCancelButton.setText(u'中止')
@@ -2752,11 +2759,14 @@ class MainWindow(QMainWindow, WindowMixin):
             (item['model_name'], item['project_name'], item['score'] * 100.0)
             for item in mapping_details)
         self.autoAnnotationStatus.setText(
-            u'模型已加载：%s（置信度 %.2f）' %
+            translateUi(
+                u'模型已加载：%s（置信度 %.2f）',
+                self.languageManager.language) %
             (self.annotationFormatName(annotation_format),
              self.autoAnnotationConfidence))
         self.autoAnnotationStatus.setToolTip(
-            u'置信度：%.2f\n%s' %
+            translateUi(
+                u'置信度：%.2f\n%s', self.languageManager.language) %
             (self.autoAnnotationConfidence, mapping_text))
 
     def autoAnnotationProgressChanged(self, done, total, image_path,
@@ -2775,7 +2785,8 @@ class MainWindow(QMainWindow, WindowMixin):
             self._pendingAutoSessionCounts[imageKey] = int(object_count)
         self.autoAnnotationStatus.setText(text)
         self.autoAnnotationStatus.setToolTip(
-            u'%s\n置信度：%.2f' %
+            translateUi(
+                u'%s\n置信度：%.2f', self.languageManager.language) %
             (image_path, self.autoAnnotationConfidence))
 
     def cancelAutoAnnotation(self):
@@ -2809,8 +2820,8 @@ class MainWindow(QMainWindow, WindowMixin):
         message_lines = [
             u'保存格式：%s' % self.annotationFormatName(
                 summary.get('format')),
-            u'置信度：%.2f' % summary.get(
-                'confidence', self.autoAnnotationConfidence),
+            translateUi(u'置信度：%.2f', self.languageManager.language) %
+            summary.get('confidence', self.autoAnnotationConfidence),
             u'新生成标签：%d 张，共 %d 个框' %
             (summary.get('saved', 0), summary.get('objects', 0)),
             u'保护并跳过已有标签：%d 张' %
@@ -2884,8 +2895,8 @@ class MainWindow(QMainWindow, WindowMixin):
             u'处理方式：%s' % policy_name,
             u'保存格式：%s' % self.annotationFormatName(
                 summary.get('format')),
-            u'置信度：%.2f' % summary.get(
-                'confidence', self.autoAnnotationConfidence),
+            translateUi(u'置信度：%.2f', self.languageManager.language) %
+            summary.get('confidence', self.autoAnnotationConfidence),
             u'模型新增：%d 个框' % generated_count,
             u'当前图片最终：%d 个框' % final_count,
             u'保存位置：%s' % result.get('annotation_path', ''),

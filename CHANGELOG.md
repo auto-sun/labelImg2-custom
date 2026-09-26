@@ -3,6 +3,12 @@
 本项目从 `v1.3.0` 开始记录自定义版本。`v1.0`、`v1.1` 和 `v1.2`
 是仓库继承的上游历史标签，不包含当前完整的自定义功能。
 
+## [v2.6.1] - 2026-09-26
+
+- 工具栏悬停说明适配七种界面语言；YOLO、OBB、File List、XML/TXT 等专有名词保留英文。
+- 置信度控件前缀、阈值说明，以及模型加载和结果提示中的置信度文字跟随当前语言显示。
+- 多框选择拖动使用未裁剪的画布坐标；从图片外一侧拖到另一侧的图片外时，选区不会吸附到图片边界或被图片尺寸限制。
+
 ## [v2.6.0] - 2026-09-26
 
 - 移动普通框、OBB 和多选框时统一限制在图片边界内；可从图片外开始绘框，完成后自动吸附到图片边缘。
@@ -284,6 +290,7 @@
 - `v1.1`：上游历史版本。
 - `v1.0`：上游历史版本。
 
+[v2.6.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.6.1
 [v2.6.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.6.0
 [v2.5.3]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.3
 [v2.5.2]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.2

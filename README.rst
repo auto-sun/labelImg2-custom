@@ -24,7 +24,7 @@ Interface preview
 Downloads
 ---------
 
-`Download the v2.6.0 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.0/LabelImg2Custom-2.6.0-Setup.exe>`__.
+`Download the v2.6.1 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.1/LabelImg2Custom-2.6.1-Setup.exe>`__.
 
 Double-click the installer and launch the app from the Start menu. No Python,
 Conda or separate dependency installation is required. The installer includes
@@ -32,10 +32,11 @@ CPU inference libraries but not your ``.pt`` model weights. Historical changes
 remain in the `changelog
 <CHANGELOG.md>`__.
 
-Version 2.6.0 keeps moved boxes inside the image and snaps boxes drawn from
+Version 2.6.1 keeps moved boxes inside the image and snaps boxes drawn from
 outside to the image edge. It adds per-box visibility (``R``), per-box label
 visibility (``Ctrl+Shift+L``), marquee selection from outside the image, a
-built-in user guide, and a Settings menu. The interface offers English,
+built-in user guide, and a Settings menu. It also translates button tooltips and
+the confidence control for the selected language. The interface offers English,
 Simplified Chinese, Japanese, Spanish, Arabic (right-to-left), French, and
 Korean, and remembers the selected language.
 

@@ -235,7 +235,10 @@ class Canvas(QWidget):
                     QApplication.startDragDistance()):
                 self._marqueeDragging = True
             pos = self.transformPos(ev.pos())
-            self._marqueeEnd = self._boundedPixmapPoint(pos)
+            # Marquee selection is a canvas operation, not an image edit:
+            # keep the pointer in canvas coordinates so a drag may cross the
+            # image from one outside margin to another without snapping.
+            self._marqueeEnd = pos
             self.overrideCursor(CURSOR_DRAW)
             self.repaint()
             ev.accept()
@@ -470,9 +473,7 @@ class Canvas(QWidget):
 
         if ev.button() == Qt.LeftButton and self._marqueeStart is not None:
             if self._marqueeDragging:
-                self._marqueeEnd = self._boundedPixmapPoint(
-                    self.transformPos(ev.pos())
-                )
+                self._marqueeEnd = self.transformPos(ev.pos())
                 self._finishMarqueeSelection()
             self._clearMarqueeSelection()
             self.overrideCursor(CURSOR_GRAB if self.selectedShape else CURSOR_DEFAULT)
