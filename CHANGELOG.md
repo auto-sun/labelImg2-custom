@@ -9,6 +9,11 @@
 - 置信度控件前缀、阈值说明，以及模型加载和结果提示中的置信度文字跟随当前语言显示。
 - 多框选择拖动使用未裁剪的画布坐标；从图片外一侧拖到另一侧的图片外时，选区不会吸附到图片边界或被图片尺寸限制。
 
+## [v2.6.2] - 2026-09-27
+
+- 修复框角吸附到图片边界后拖动无响应的问题：拖动指针越过图片边界时，会贴边继续调整，而不是直接拒绝此次拖动。
+- 旋转框调整时会限制在图片内可实现的最大范围，避免为保持框形而把其他角拖出图片。
+
 ## [v2.6.0] - 2026-09-26
 
 - 移动普通框、OBB 和多选框时统一限制在图片边界内；可从图片外开始绘框，完成后自动吸附到图片边缘。
@@ -291,6 +296,7 @@
 - `v1.0`：上游历史版本。
 
 [v2.6.1]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.6.1
+[v2.6.2]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.6.2
 [v2.6.0]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.6.0
 [v2.5.3]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.3
 [v2.5.2]: https://github.com/auto-sun/labelImg2-custom/releases/tag/v2.5.2

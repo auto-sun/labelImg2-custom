@@ -762,31 +762,63 @@ class Canvas(QWidget):
     def boundedMoveVertex(self, pos):
         index, shape = self.hVertex, self.hShape
         point = shape[index]
-        if not self.canOutOfBounding and self.outOfPixmap(pos):
+        if self.pixmap is None or self.pixmap.isNull():
             return
-            # pos = self.intersectionPoint(point, pos)
+        # A corner that lies on an image edge is still draggable. Clamp the
+        # pointer to the image instead of rejecting the whole drag when the
+        # pointer moves a little outside the canvas image area.
+        if not self.canOutOfBounding:
+            pos = self._boundedPixmapPoint(pos)
 
         sindex = (index + 2) % 4
-        p2,p3,p4 = self.getAdjointPoints(shape.direction, shape[sindex], pos, index)
+        opposite = shape[sindex]
 
-        pcenter = (pos+p3)/2        
-        if self.canOutOfBounding and self.outOfPixmap(pcenter):
+        if self.canOutOfBounding and self.outOfPixmap((pos + opposite) / 2):
             return
-        # if one pixal out of map , do nothing
-        if not self.canOutOfBounding and (self.outOfPixmap(p2) or
-            self.outOfPixmap(p3) or
-            self.outOfPixmap(p4)):
-                return
-                
-        shiftPos = pos - point
-        shape.moveVertexBy(index, shiftPos)
 
-        lindex = (index + 1) % 4
-        rindex = (index + 3) % 4
-        
-        shape[lindex] = p2
-        # shape[sindex] = p3
-        shape[rindex] = p4
+        def resized_points(corner):
+            p2, p3, p4 = self.getAdjointPoints(
+                shape.direction, opposite, corner, index)
+            points = list(shape.points)
+            points[index] = QPointF(corner)
+            points[(index + 1) % 4] = p2
+            points[(index + 2) % 4] = p3
+            points[(index + 3) % 4] = p4
+            return points
+
+        new_points = resized_points(pos)
+        if not self.canOutOfBounding and any(
+                self.outOfPixmap(candidate) for candidate in new_points):
+            # For a rotated box, clamping the dragged corner alone can still
+            # push an adjacent corner outside the image. Back off along the
+            # drag path to the furthest valid rectangle instead of making the
+            # handle appear unresponsive at an edge.
+            original = QPointF(point)
+            original_points = resized_points(original)
+            if any(self.outOfPixmap(candidate)
+                   for candidate in original_points):
+                return
+
+            delta = pos - original
+            low, high = 0.0, 1.0
+            best_points = original_points
+            for _ in range(24):
+                fraction = (low + high) / 2.0
+                candidate = original + delta * fraction
+                candidate_points = resized_points(candidate)
+                if any(self.outOfPixmap(vertex)
+                       for vertex in candidate_points):
+                    high = fraction
+                else:
+                    low = fraction
+                    best_points = candidate_points
+            if low <= 1e-6:
+                return
+            new_points = best_points
+
+        if new_points == shape.points:
+            return
+        shape.points = new_points
         shape.close()
         # lshift = None
         # rshift = None

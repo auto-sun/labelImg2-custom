@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
+import math
 import unittest
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from PyQt5.QtCore import QPointF
-from PyQt5.QtGui import QPainterPath
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QEvent, QPointF, Qt
+from PyQt5.QtGui import QMouseEvent, QPainterPath, QPixmap
+from PyQt5.QtWidgets import QApplication, QWidget
 
 from libs.canvas import Canvas
 from libs.shape import Shape
@@ -45,6 +46,93 @@ class CornerHandleTests(unittest.TestCase):
         canvas.scale = 1.0
         self.assertEqual(12.0, canvas.vertexHitRadius())
         self.assertGreater(canvas.vertexHitRadius(), canvas.epsilon)
+
+    def test_border_corner_can_resize_when_drag_pointer_goes_outside(self):
+        canvas = Canvas()
+        canvas.loadPixmap(QPixmap(100, 100))
+        cases = (
+            (((0, 20), (80, 20), (80, 90), (0, 90)), 0,
+             (-10, 30), (0, 30)),
+            (((20, 20), (100, 20), (100, 90), (20, 90)), 1,
+             (110, 30), (100, 30)),
+            (((20, 10), (100, 10), (100, 100), (20, 100)), 2,
+             (110, 80), (100, 80)),
+            (((0, 10), (80, 10), (80, 100), (0, 100)), 3,
+             (-10, 80), (0, 80)),
+        )
+
+        for points, index, drag_to, expected in cases:
+            with self.subTest(index=index):
+                shape = Shape(label='edge')
+                for x, y in points:
+                    shape.addPoint(QPointF(x, y))
+                shape.direction = 0.0
+                shape.close()
+                canvas.shapes = [shape]
+                canvas.hShape = shape
+                canvas.hVertex = index
+
+                canvas.boundedMoveVertex(QPointF(*drag_to))
+
+                self.assertEqual(QPointF(*expected), shape.points[index])
+                for point in shape.points:
+                    self.assertGreaterEqual(point.x(), 0)
+                    self.assertLessEqual(point.x(), 100)
+                    self.assertGreaterEqual(point.y(), 0)
+                    self.assertLessEqual(point.y(), 100)
+
+    def test_mouse_drag_on_image_edge_corner_remains_responsive(self):
+        parent = QWidget()
+        parent.filePath = None
+        canvas = Canvas(parent)
+        canvas.resize(200, 200)
+        canvas.loadPixmap(QPixmap(100, 100))
+        shape = Shape(label='edge')
+        for x, y in ((0, 20), (80, 20), (80, 90), (0, 90)):
+            shape.addPoint(QPointF(x, y))
+        shape.direction = 0.0
+        shape.close()
+        canvas.shapes = [shape]
+
+        # The 100x100 image is centered in the 200x200 canvas. Start on its
+        # left-edge corner, then drag outside while changing the box height.
+        canvas.mouseMoveEvent(QMouseEvent(
+            QEvent.MouseMove, QPointF(50, 70), Qt.NoButton, Qt.NoButton,
+            Qt.NoModifier))
+        self.assertEqual(0, canvas.hVertex)
+        self.assertIs(shape, canvas.hShape)
+        canvas.mousePressEvent(QMouseEvent(
+            QEvent.MouseButtonPress, QPointF(50, 70), Qt.LeftButton,
+            Qt.LeftButton, Qt.NoModifier))
+        canvas.mouseMoveEvent(QMouseEvent(
+            QEvent.MouseMove, QPointF(40, 80), Qt.NoButton, Qt.LeftButton,
+            Qt.NoModifier))
+        canvas.mouseReleaseEvent(QMouseEvent(
+            QEvent.MouseButtonRelease, QPointF(40, 80), Qt.LeftButton,
+            Qt.NoButton, Qt.NoModifier))
+
+        self.assertEqual(QPointF(0, 30), shape.points[0])
+
+    def test_rotated_edge_corner_resize_stays_inside_image(self):
+        canvas = Canvas()
+        canvas.loadPixmap(QPixmap(100, 100))
+        shape = Shape(label='rotated-edge')
+        for x, y in ((0, 50), (50, 25), (100, 50), (50, 75)):
+            shape.addPoint(QPointF(x, y))
+        shape.direction = math.atan2(-25, 50)
+        shape.close()
+        canvas.shapes = [shape]
+        canvas.hShape = shape
+        canvas.hVertex = 0
+
+        canvas.boundedMoveVertex(QPointF(-20, 30))
+
+        self.assertNotEqual(QPointF(0, 50), shape.points[0])
+        for point in shape.points:
+            self.assertGreaterEqual(point.x(), 0)
+            self.assertLessEqual(point.x(), 100)
+            self.assertGreaterEqual(point.y(), 0)
+            self.assertLessEqual(point.y(), 100)
 
 
 if __name__ == '__main__':
