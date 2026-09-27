@@ -134,6 +134,36 @@ class CornerHandleTests(unittest.TestCase):
             self.assertGreaterEqual(point.y(), 0)
             self.assertLessEqual(point.y(), 100)
 
+    def test_all_corners_resize_for_edge_box_with_cardinal_directions(self):
+        cases = (
+            (math.pi, ((80, 80), (0, 80), (0, 0), (80, 0))),
+            (math.pi / 2, ((80, 0), (80, 80), (0, 80), (0, 0))),
+        )
+
+        for direction, points in cases:
+            for index, (x, y) in enumerate(points):
+                with self.subTest(direction=direction, index=index):
+                    canvas = Canvas()
+                    canvas.loadPixmap(QPixmap(100, 100))
+                    shape = Shape(label='edge-cardinal')
+                    for px, py in points:
+                        shape.addPoint(QPointF(px, py))
+                    shape.direction = direction
+                    shape.close()
+                    canvas.shapes = [shape]
+                    canvas.hShape = shape
+                    canvas.hVertex = index
+
+                    target = QPointF(x + 10, y + 10)
+                    canvas.boundedMoveVertex(target)
+
+                    self.assertEqual(target, shape.points[index])
+                    for point in shape.points:
+                        self.assertGreaterEqual(point.x(), 0)
+                        self.assertLessEqual(point.x(), 100)
+                        self.assertGreaterEqual(point.y(), 0)
+                        self.assertLessEqual(point.y(), 100)
+
 
 if __name__ == '__main__':
     unittest.main()

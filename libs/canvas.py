@@ -779,6 +779,10 @@ class Canvas(QWidget):
         def resized_points(corner):
             p2, p3, p4 = self.getAdjointPoints(
                 shape.direction, opposite, corner, index)
+            if not self.canOutOfBounding:
+                p2, p3, p4 = [
+                    self._snapPixmapBoundaryRoundoff(point)
+                    for point in (p2, p3, p4)]
             points = list(shape.points)
             points[index] = QPointF(corner)
             points[(index + 1) % 4] = p2
@@ -831,9 +835,45 @@ class Canvas(QWidget):
         # shape.moveVertexBy(rindex, rshift)
         # shape.moveVertexBy(lindex, lshift)
 
+    def _snapPixmapBoundaryRoundoff(self, point):
+        """Remove tiny floating-point overshoots at exact image edges."""
+        width = float(self.pixmap.width())
+        height = float(self.pixmap.height())
+        tolerance = 1e-7
+        x, y = point.x(), point.y()
+        if -tolerance <= x < 0:
+            x = 0.0
+        elif width < x <= width + tolerance:
+            x = width
+        if -tolerance <= y < 0:
+            y = 0.0
+        elif height < y <= height + tolerance:
+            y = 0.0
+        return QPointF(x, y)
+
     def getAdjointPoints(self, theta, p3, p1, index):
         # p3 = center
         # p3 = 2*center-p1
+        # tan(pi) is approximately -1.2e-16 rather than exactly zero, which
+        # can create tiny out-of-image coordinates and reject a corner drag.
+        # Project cardinal-angle boxes directly to avoid that instability.
+        if abs(math.sin(theta)) < 1e-12:
+            if index % 2 == 0:
+                p2 = QPointF(p3.x(), p1.y())
+                p4 = QPointF(p1.x(), p3.y())
+            else:
+                p4 = QPointF(p3.x(), p1.y())
+                p2 = QPointF(p1.x(), p3.y())
+            return p2, p3, p4
+        if abs(math.cos(theta)) < 1e-12:
+            if index % 2 == 0:
+                p2 = QPointF(p1.x(), p3.y())
+                p4 = QPointF(p3.x(), p1.y())
+            else:
+                p4 = QPointF(p1.x(), p3.y())
+                p2 = QPointF(p3.x(), p1.y())
+            return p2, p3, p4
+
         a1 = math.tan(theta)
         if (a1 == 0):
             if index % 2 == 0:
