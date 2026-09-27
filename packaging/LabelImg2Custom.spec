@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller one-folder build for the offline Windows installer."""
 from pathlib import Path
+import subprocess
 
 from PyInstaller.utils.hooks import collect_all
 
@@ -14,9 +15,19 @@ if not icon_path.is_file():
 ultralytics_data, ultralytics_binaries, ultralytics_imports = collect_all(
     'ultralytics')
 
+# Include the public default only, never arbitrary personal class files saved
+# in data/. A locally removed/skip-worktree preset can be recovered for the
+# build without changing the user's working-tree selection.
+default_classes = project_root / 'data' / 'predefined_classes.txt'
+if not default_classes.is_file():
+    default_classes = project_root / 'build' / 'public-data' / 'predefined_classes.txt'
+    default_classes.parent.mkdir(parents=True, exist_ok=True)
+    default_classes.write_bytes(subprocess.check_output(
+        ['git', 'show', 'HEAD:data/predefined_classes.txt'], cwd=str(project_root)))
+
 project_data = [
     (str(project_root / 'img'), 'img'),
-    (str(project_root / 'data'), 'data'),
+    (str(default_classes), 'data'),
 ]
 for name in (
         'LICENSE', 'LICENSE-MIT-UPSTREAM', 'NOTICE.md',

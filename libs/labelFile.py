@@ -147,4 +147,7 @@ class LabelFile(object):
 
         angle = direction % (2*math.pi)
 
-        return (round(cx,4),round(cy,4),round(w,4),round(h,4),round(angle,6))
+        # XML float strings already retain round-trip precision. Quantizing
+        # the angle/size here can reconstruct an edge-touching OBB outside the
+        # image after reopening it (notably pi -> 3.141593).
+        return (cx, cy, w, h, angle)

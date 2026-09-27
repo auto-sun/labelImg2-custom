@@ -16,12 +16,17 @@
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.6.4（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.4/LabelImg2Custom-2.6.4-Setup.exe)
+[下载 Windows 安装包 v2.6.5（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.5/LabelImg2Custom-2.6.5-Setup.exe)
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或其他运行环境。
 安装包包含 CPU 版模型推理依赖，但不包含 `.pt` 模型权重；自动标注时请选择自己的模型。
 安装包未提供代码签名，Windows 可能显示“未知发布者”。
 历史修改记录见 [更新日志](CHANGELOG.md)；以本页链接指向的版本为最新推荐版。
+
+v2.6.5 修复旧 XML 的 4/6 位小数量化及历史越界导致的首次拖角被拒问题。
+禁止越界时，拖角编辑会将框整体贴回图内，必要时等比缩小，保持 OBB 矩形；
+仅打开图片不会批量改写标签。同时修正底边微小误差吸附，并保留后续 XML 保存的
+浮点精度。具体行为见 [v2.6.5 发行说明](docs/releases/v2.6.5.md)。
 
 ## 主要改进
 

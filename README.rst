@@ -24,7 +24,7 @@ Interface preview
 Downloads
 ---------
 
-`Download the v2.6.4 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.4/LabelImg2Custom-2.6.4-Setup.exe>`__.
+`Download the v2.6.5 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.5/LabelImg2Custom-2.6.5-Setup.exe>`__.
 
 Double-click the installer and launch the app from the Start menu. No Python,
 Conda or separate dependency installation is required. The installer includes
@@ -32,9 +32,18 @@ CPU inference libraries but not your ``.pt`` model weights. Historical changes
 remain in the `changelog
 <CHANGELOG.md>`__.
 
-Version 2.6.4 fixes edge-attached corner dragging after switching images,
-allows ``Ctrl+V`` to replace a different selected box with undo support, and
-adds a localized label-shortcut settings entry to the ``Box Labels`` panel.
+Version 2.6.5 fixes first corner drags rejected because legacy XML rounded
+centers/dimensions to four decimal places and angles to six, or because saved
+boxes were already outside the image. With out-of-bounds editing disabled,
+the first corner edit translates an invalid box into the image, uniformly
+scaling oversized boxes while preserving rectangular OBB geometry. Loading
+images does not batch-correct or rewrite annotations. This release also fixes
+bottom-edge roundoff snapping and preserves floating-point precision in new
+XML saves. See the `v2.6.5 release notes (Chinese)
+<docs/releases/v2.6.5.md>`__ for details.
+
+The earlier ``Ctrl+V`` replacement of a different selected box, undo support,
+and localized label-shortcut settings entry in ``Box Labels`` remain available.
 The interface offers English, Simplified Chinese, Japanese, Spanish, Arabic
 (right-to-left), French, and Korean, and remembers the selected language.
 

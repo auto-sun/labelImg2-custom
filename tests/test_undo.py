@@ -5,8 +5,8 @@ import unittest
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from PyQt5.QtCore import QPointF
-from PyQt5.QtGui import QColor, QPixmap
+from PyQt5.QtCore import QEvent, QPointF, Qt
+from PyQt5.QtGui import QColor, QMouseEvent, QPixmap
 from PyQt5.QtWidgets import QApplication
 
 import labelImg
@@ -131,6 +131,31 @@ class UndoOperationTests(unittest.TestCase):
             (point.x(), point.y())
             for point in self.window.canvas.shapes[0].points]
         self.assertEqual(originalPoints, restoredPoints)
+
+    def test_first_resize_repairs_loaded_overflow_in_one_undo_step(self):
+        shape = make_shape('person', 20, -3, 80, 70)
+        self.add_and_select(shape)
+        original = [(point.x(), point.y()) for point in shape.points]
+        canvas = self.window.canvas
+        offset = canvas.offsetToCenter()
+        start = (shape.points[2] + offset) * canvas.scale
+        end = (QPointF(65, 55) + offset) * canvas.scale
+        canvas.mousePressEvent(QMouseEvent(
+            QEvent.MouseButtonPress, start, Qt.LeftButton,
+            Qt.LeftButton, Qt.NoModifier))
+        canvas.mouseMoveEvent(QMouseEvent(
+            QEvent.MouseMove, end, Qt.NoButton,
+            Qt.LeftButton, Qt.NoModifier))
+        canvas.mouseReleaseEvent(QMouseEvent(
+            QEvent.MouseButtonRelease, end, Qt.LeftButton,
+            Qt.NoButton, Qt.NoModifier))
+
+        self.assertEqual(0, min(point.y() for point in shape.points))
+        self.assertEqual(QPointF(65, 55), shape.points[2])
+        self.assertEqual(1, len(self.window._undoStack))
+        self.assertTrue(self.window.undoLastOperation())
+        self.assertEqual(original, [
+            (point.x(), point.y()) for point in canvas.shapes[0].points])
 
     def test_undo_removes_pasted_boxes(self):
         shape = make_shape('person', 20, 20, 60, 80)

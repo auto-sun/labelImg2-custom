@@ -12,12 +12,18 @@
 
 ## 一、下载并安装
 
-1. [下载 v2.6.4 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.4/LabelImg2Custom-2.6.4-Setup.exe)。
+1. [下载 v2.6.5 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.5/LabelImg2Custom-2.6.5-Setup.exe)。
 2. 双击安装包，按向导完成安装。默认安装到当前用户目录，不需要管理员权限。
 3. 从开始菜单打开 `LabelImg2 Custom`。如果 Windows 显示“未知发布者”，请先核对文件确实来自本项目的 GitHub Release；安装包目前没有代码签名。
 
 本安装包包含 CPU 版自动标注环境。程序整体按 GNU AGPL v3.0 免费开源发行，
 上游 LabelImg2 的 MIT 许可证保留在 `LICENSE-MIT-UPSTREAM`。
+
+v2.6.5 修复部分旧标签需要先移动整框才能拖角的问题。旧 XML 保存时的 4/6 位小数
+舍入和历史越界标签都可能导致这个现象。禁止越界时，现在首次拖角会先将越界框
+整体放回图内，超大框会等比缩小，保持旋转矩形。打开图片不会批量修改标签；编辑后的
+结果仍按原有保存设置写回。此版本同时修复底边微小误差吸附，并保留 XML 保存精度。
+更多说明见 [v2.6.5 发行说明](docs/releases/v2.6.5.md)。
 
 ## 二、准备类别文件
 

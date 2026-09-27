@@ -102,11 +102,12 @@ class AnnotationFormatConversionTests(unittest.TestCase):
         image.fill(QColor(255, 255, 255))
         self.assertTrue(image.save(self.imagePath))
 
-        classesPath = os.path.join(
-            os.path.dirname(labelImg.__file__),
-            'data', 'predefined_classes.txt')
+        # Keep conversion tests independent of the user's local class preset.
+        self.classesPath = os.path.join(self.temporary.name, 'classes.txt')
+        with open(self.classesPath, 'w', encoding='utf-8') as stream:
+            stream.write('object_a\nobject_b\n')
         self.window = labelImg.MainWindow(
-            defaultPrefdefClassFile=classesPath)
+            defaultPrefdefClassFile=self.classesPath)
         self.window.dirname = self.imageDir
         self.window.defaultSaveDir = self.annotationDir
         self.label = self.window.labelHist[0]
@@ -288,9 +289,7 @@ class AnnotationFormatConversionTests(unittest.TestCase):
             'annotationformat': FORMAT_YOLO_OBB,
             'savedir': self.annotationDir,
         })
-        classesPath = os.path.join(
-            os.path.dirname(labelImg.__file__),
-            'data', 'predefined_classes.txt')
+        classesPath = self.classesPath
 
         with mock.patch.object(
                 labelImg, 'Settings', return_value=savedSettings):

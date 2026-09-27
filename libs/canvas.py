@@ -789,7 +789,6 @@ class Canvas(QWidget):
 
     def boundedMoveVertex(self, pos):
         index, shape = self.hVertex, self.hShape
-        point = shape[index]
         if self.pixmap is None or self.pixmap.isNull():
             return
         # A corner that lies on an image edge is still draggable. Clamp the
@@ -798,15 +797,21 @@ class Canvas(QWidget):
         if not self.canOutOfBounding:
             pos = self._boundedPixmapPoint(pos)
 
-        sindex = (index + 2) % 4
-        opposite = shape[sindex]
+        # Legacy XML rounded angles to six decimals. Recover exact cardinal
+        # directions within that quantization interval before resizing.
+        direction = shape.direction
+        cardinal = round(direction / (math.pi / 2)) * (math.pi / 2)
+        if abs(direction - cardinal) <= 5e-7:
+            direction = cardinal % (2 * math.pi)
+        point = QPointF(shape[index])
+        opposite = QPointF(shape[(index + 2) % 4])
 
         if self.canOutOfBounding and self.outOfPixmap((pos + opposite) / 2):
             return
 
-        def resized_points(corner):
+        def resized_points(corner, anchor):
             p2, p3, p4 = self.getAdjointPoints(
-                shape.direction, opposite, corner, index)
+                direction, anchor, corner, index)
             if not self.canOutOfBounding:
                 p2, p3, p4 = [
                     self._snapPixmapBoundaryRoundoff(point)
@@ -818,7 +823,17 @@ class Canvas(QWidget):
             points[(index + 3) % 4] = p4
             return points
 
-        new_points = resized_points(pos)
+        # A saved box may already be outside the image: the old fallback
+        # rejected an invalid baseline, so only moving the whole box unlocked
+        # its corners. Fit the rectangle as one unit on this edit, preserving
+        # its angle. Merely loading annotations does not change their geometry.
+        original_points = resized_points(point, opposite)
+        if not self.canOutOfBounding:
+            original_points = self._fitResizeBaseline(original_points)
+        point = original_points[index]
+        opposite = original_points[(index + 2) % 4]
+
+        new_points = resized_points(pos, opposite)
         if not self.canOutOfBounding and any(
                 self.outOfPixmap(candidate) for candidate in new_points):
             # For a rotated box, clamping the dragged corner alone can still
@@ -826,31 +841,25 @@ class Canvas(QWidget):
             # drag path to the furthest valid rectangle instead of making the
             # handle appear unresponsive at an edge.
             original = QPointF(point)
-            original_points = resized_points(original)
-            if any(self.outOfPixmap(candidate)
-                   for candidate in original_points):
-                return
-
             delta = pos - original
             low, high = 0.0, 1.0
             best_points = original_points
             for _ in range(24):
                 fraction = (low + high) / 2.0
                 candidate = original + delta * fraction
-                candidate_points = resized_points(candidate)
+                candidate_points = resized_points(candidate, opposite)
                 if any(self.outOfPixmap(vertex)
                        for vertex in candidate_points):
                     high = fraction
                 else:
                     low = fraction
                     best_points = candidate_points
-            if low <= 1e-6:
-                return
             new_points = best_points
 
         if new_points == shape.points:
             return
         shape.points = new_points
+        shape.direction = direction
         shape.close()
         # lshift = None
         # rshift = None
@@ -862,6 +871,29 @@ class Canvas(QWidget):
         #     rshift = QPointF(0, shiftPos.y())
         # shape.moveVertexBy(rindex, rshift)
         # shape.moveVertexBy(lindex, lshift)
+
+    def _fitResizeBaseline(self, points):
+        """Fit an existing rectangle by translation/uniform scale on edit."""
+        if not any(self.outOfPixmap(point) for point in points):
+            return points
+        width, height = float(self.pixmap.width()), float(self.pixmap.height())
+        left = min(point.x() for point in points)
+        right = max(point.x() for point in points)
+        top = min(point.y() for point in points)
+        bottom = max(point.y() for point in points)
+        factor = min(1.0,
+                     width / (right - left) if right > left else 1.0,
+                     height / (bottom - top) if bottom > top else 1.0)
+        center = QPointF((left + right) / 2, (top + bottom) / 2)
+        fitted = [center + (point - center) * factor for point in points]
+        left = min(point.x() for point in fitted)
+        right = max(point.x() for point in fitted)
+        top = min(point.y() for point in fitted)
+        bottom = max(point.y() for point in fitted)
+        delta = QPointF(min(max(0.0, -left), width - right),
+                        min(max(0.0, -top), height - bottom))
+        return [self._snapPixmapBoundaryRoundoff(point + delta)
+                for point in fitted]
 
     def _snapPixmapBoundaryRoundoff(self, point):
         """Remove tiny floating-point overshoots at exact image edges."""
@@ -876,57 +908,25 @@ class Canvas(QWidget):
         if -tolerance <= y < 0:
             y = 0.0
         elif height < y <= height + tolerance:
-            y = 0.0
+            y = height
         return QPointF(x, y)
 
     def getAdjointPoints(self, theta, p3, p1, index):
-        # p3 = center
-        # p3 = 2*center-p1
-        # tan(pi) is approximately -1.2e-16 rather than exactly zero, which
-        # can create tiny out-of-image coordinates and reject a corner drag.
-        # Project cardinal-angle boxes directly to avoid that instability.
-        if abs(math.sin(theta)) < 1e-12:
-            if index % 2 == 0:
-                p2 = QPointF(p3.x(), p1.y())
-                p4 = QPointF(p1.x(), p3.y())
-            else:
-                p4 = QPointF(p3.x(), p1.y())
-                p2 = QPointF(p1.x(), p3.y())
-            return p2, p3, p4
-        if abs(math.cos(theta)) < 1e-12:
-            if index % 2 == 0:
-                p2 = QPointF(p1.x(), p3.y())
-                p4 = QPointF(p3.x(), p1.y())
-            else:
-                p4 = QPointF(p1.x(), p3.y())
-                p2 = QPointF(p3.x(), p1.y())
-            return p2, p3, p4
-
-        a1 = math.tan(theta)
-        if (a1 == 0):
-            if index % 2 == 0:
-                p2 = QPointF(p3.x(), p1.y())
-                p4 = QPointF(p1.x(), p3.y())
-            else:            
-                p4 = QPointF(p3.x(), p1.y())
-                p2 = QPointF(p1.x(), p3.y())
-        else:    
-            a3 = a1
-            a2 = - 1/a1
-            a4 = - 1/a1
-            b1 = p1.y() - a1 * p1.x()
-            b2 = p1.y() - a2 * p1.x()
-            b3 = p3.y() - a1 * p3.x()
-            b4 = p3.y() - a2 * p3.x()
-
-            if index % 2 == 0:
-                p2 = self.getCrossPoint(a1,b1,a4,b4)
-                p4 = self.getCrossPoint(a2,b2,a3,b3)
-            else:            
-                p4 = self.getCrossPoint(a1,b1,a4,b4)
-                p2 = self.getCrossPoint(a2,b2,a3,b3)
-
-        return p2,p3,p4
+        # Orthogonal projection avoids the near-vertical tan()/intersection
+        # singularity and keeps the opposite corner fixed.
+        cos_theta, sin_theta = math.cos(theta), math.sin(theta)
+        if abs(cos_theta) < 1e-12:
+            cos_theta = 0.0
+        if abs(sin_theta) < 1e-12:
+            sin_theta = 0.0
+        axis = QPointF(cos_theta, sin_theta)
+        diagonal = p3 - p1
+        along = axis * (diagonal.x() * axis.x() + diagonal.y() * axis.y())
+        across = diagonal - along
+        p2, p4 = p1 + along, p1 + across
+        if index % 2:
+            p2, p4 = p4, p2
+        return p2, p3, p4
 
     def getCrossPoint(self,a1,b1,a2,b2):
         x = (b2-b1)/(a1-a2)
