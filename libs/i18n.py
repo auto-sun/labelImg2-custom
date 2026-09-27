@@ -29,6 +29,7 @@ _ROWS = {
     'Open Dir': ('打开图片目录', '画像フォルダーを開く', 'Abrir carpeta de imágenes', 'فتح مجلد الصور', 'Ouvrir le dossier d’images', '이미지 폴더 열기'),
     'Open Annotation Dir': ('打开标签目录', 'アノテーションフォルダーを開く', 'Abrir carpeta de anotaciones', 'فتح مجلد التسميات', 'Ouvrir le dossier d’annotations', '주석 폴더 열기'),
     'Annotation Format': ('标签格式', 'アノテーション形式', 'Formato de anotación', 'تنسيق التوسيم', 'Format d’annotation', '주석 형식'),
+    'Label Shortcut Settings': ('标签快捷键设置', 'ラベルショートカット設定', 'Configuración de atajos de etiquetas', 'إعداد اختصارات الفئات', 'Paramètres des raccourcis d’étiquettes', '레이블 바로 가기 설정'),
     'Label Shortcut Settings...': ('标签快捷键设置...', 'ラベルショートカット設定...', 'Atajos de etiquetas...', 'اختصارات الفئات...', 'Raccourcis des étiquettes...', '레이블 바로 가기 설정...'),
     'Auto Saving': ('自动保存', '自動保存', 'Guardado automático', 'الحفظ التلقائي', 'Enregistrement auto', '자동 저장'),
     'Paint Labels': ('显示框标签', 'ラベル名を表示', 'Mostrar etiquetas', 'إظهار أسماء الفئات', 'Afficher les étiquettes', '레이블 표시'),

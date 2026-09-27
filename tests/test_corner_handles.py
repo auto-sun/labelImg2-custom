@@ -113,6 +113,43 @@ class CornerHandleTests(unittest.TestCase):
 
         self.assertEqual(QPointF(0, 30), shape.points[0])
 
+    def test_first_corner_drag_after_image_switch_needs_no_hover_move(self):
+        parent = QWidget()
+        parent.filePath = None
+        canvas = Canvas(parent)
+        canvas.resize(200, 200)
+        canvas.loadPixmap(QPixmap(100, 100))
+        old_shape = Shape(label='old')
+        for x, y in ((10, 10), (40, 10), (40, 40), (10, 40)):
+            old_shape.addPoint(QPointF(x, y))
+        old_shape.close()
+        canvas.shapes = [old_shape]
+        canvas.mouseMoveEvent(QMouseEvent(
+            QEvent.MouseMove, QPointF(60, 60), Qt.NoButton, Qt.NoButton,
+            Qt.NoModifier))
+        self.assertIs(old_shape, canvas.hShape)
+
+        # The mouse remains still while a new image and its boxes are loaded;
+        # no hover event is sent before clicking the new box's edge corner.
+        canvas.loadPixmap(QPixmap(100, 100))
+        new_shape = Shape(label='new')
+        for x, y in ((0, 20), (80, 20), (80, 90), (0, 90)):
+            new_shape.addPoint(QPointF(x, y))
+        new_shape.close()
+        canvas.shapes = [new_shape]
+        canvas.mousePressEvent(QMouseEvent(
+            QEvent.MouseButtonPress, QPointF(50, 70), Qt.LeftButton,
+            Qt.LeftButton, Qt.NoModifier))
+        canvas.mouseMoveEvent(QMouseEvent(
+            QEvent.MouseMove, QPointF(40, 80), Qt.NoButton, Qt.LeftButton,
+            Qt.NoModifier))
+        canvas.mouseReleaseEvent(QMouseEvent(
+            QEvent.MouseButtonRelease, QPointF(40, 80), Qt.LeftButton,
+            Qt.NoButton, Qt.NoModifier))
+
+        self.assertEqual(QPointF(0, 30), new_shape.points[0])
+        self.assertIsNot(old_shape, canvas.hShape)
+
     def test_rotated_edge_corner_resize_stays_inside_image(self):
         canvas = Canvas()
         canvas.loadPixmap(QPixmap(100, 100))

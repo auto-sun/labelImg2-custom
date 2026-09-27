@@ -143,6 +143,32 @@ class UndoOperationTests(unittest.TestCase):
         self.assertEqual(1, len(self.window.canvas.shapes))
         self.assertEqual('person', self.window.canvas.shapes[0].label)
 
+    def test_paste_replaces_one_selected_box_and_is_undoable(self):
+        source = make_shape('SafeHat', 10, 10, 30, 40)
+        target = make_shape('person', 90, 80, 150, 140)
+        self.add_and_select(source, target)
+        self.window.canvas._setSelectedShapes([source])
+        self.window.copyShapeToClipboard()
+        self.window.canvas.deSelectShape()
+        self.window.canvas._setSelectedShapes([target])
+        self.assertIs(target, self.window.canvas.selectedShape)
+
+        self.window.pasteShapeFromClipboard()
+
+        self.assertEqual(2, len(self.window.canvas.shapes))
+        replacement = self.window.canvas.selectedShape
+        self.assertEqual('SafeHat', replacement.label)
+        self.assertEqual(QPointF(120, 110), replacement.boundingRect().center())
+        self.assertEqual(1, len(self.window.canvas.selectedShapes))
+        self.assertTrue(self.window.undoLastOperation())
+        self.assertEqual(
+            ['SafeHat', 'person'],
+            [shape.label for shape in self.window.canvas.shapes])
+        self.assertEqual(
+            [(90.0, 80.0), (150.0, 80.0), (150.0, 140.0), (90.0, 140.0)],
+            [(point.x(), point.y())
+             for point in self.window.canvas.shapes[1].points])
+
     def test_undo_restores_all_deleted_boxes(self):
         first = make_shape('person', 10, 10, 40, 50)
         second = make_shape('SafeHat', 80, 20, 120, 60)

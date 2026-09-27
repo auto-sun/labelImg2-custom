@@ -139,6 +139,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.ShapeItemDict = {}
         self.ItemShapeDict = {}
         self._shapeClipboard = []
+        self._shapeClipboardToken = None
         self._clipboardPasteCount = 0
         self._shapeClipboardSourceFile = None
         self._shapeClipboardIsCut = False
@@ -682,8 +683,16 @@ class MainWindow(QMainWindow, WindowMixin):
             'Shortcuts, basic operation, and advanced workflows')
         addActions(self.menus.help, (self.userGuideAction, showInfo))
         self.labelShortcutSettingsAction = action(
-            'Label Shortcut Settings...', self.openLabelShortcutSettings,
+            'Label Shortcut Settings', self.openLabelShortcutSettings,
             None, 'settings.svg', 'Configure shortcut keys for preset labels')
+        self.labelShortcutSettingsButton = QToolButton()
+        self.labelShortcutSettingsButton.setObjectName(
+            'labelShortcutSettingsButton')
+        self.labelShortcutSettingsButton.setToolButtonStyle(
+            Qt.ToolButtonTextBesideIcon)
+        self.labelShortcutSettingsButton.setDefaultAction(
+            self.labelShortcutSettingsAction)
+        labellistLayout.addWidget(self.labelShortcutSettingsButton)
         self.languageMenu = QMenu('Language', self.menus.settings)
         self.languageActions = {}
         language = settings.get(SETTING_LANGUAGE, 'zh')
@@ -1719,8 +1728,18 @@ class MainWindow(QMainWindow, WindowMixin):
         else:
             details = u'尚未设置标签快捷键。'
         if hasattr(self, 'labelShortcutSettingsAction'):
-            self.labelShortcutSettingsAction.setText(
-                u'Label Shortcut Settings...')
+            manager = getattr(self, 'languageManager', None)
+            language = getattr(
+                manager, 'language', self.settings.get(
+                    SETTING_LANGUAGE, 'zh'))
+            text = (translateUi('Label Shortcut Settings', language)
+                    if manager is not None else
+                    'Label Shortcut Settings')
+            self.labelShortcutSettingsAction.setText(text)
+            self.labelShortcutSettingsAction.setProperty(
+                'i18nSource_text', 'Label Shortcut Settings')
+            self.labelShortcutSettingsAction.setProperty(
+                'i18nRendered_text', text)
             self.labelShortcutSettingsAction.setToolTip(details)
 
     def openLabelShortcutSettings(self, _value=False):
@@ -2089,6 +2108,9 @@ class MainWindow(QMainWindow, WindowMixin):
         if not shapes:
             return
         self._shapeClipboard = [shape.copy() for shape in shapes]
+        self._shapeClipboardToken = object()
+        for shape in shapes:
+            shape._labelImg2ClipboardToken = self._shapeClipboardToken
         self._clipboardPasteCount = 0
         self._shapeClipboardSourceFile = self.clipboardImageKey()
         self._shapeClipboardIsCut = False
@@ -2117,7 +2139,22 @@ class MainWindow(QMainWindow, WindowMixin):
         sameSourceImage = (
             self.clipboardImageKey() == self._shapeClipboardSourceFile)
         cutPaste = self._shapeClipboardIsCut
-        if cutPaste:
+        selected_shapes = (list(self.canvas.selectedShapes)
+                           if self.canvas.selectedShapes
+                           else ([self.canvas.selectedShape]
+                                 if self.canvas.selectedShape else []))
+        replacement = (
+            not cutPaste and len(selected_shapes) == 1 and
+            len(self._shapeClipboard) == 1 and
+            getattr(selected_shapes[0], '_labelImg2ClipboardToken', None) is
+            not self._shapeClipboardToken)
+        if replacement:
+            # Ctrl+V over one selected box replaces it with the copied box,
+            # keeping the copied box's size/angle/class but centering it on
+            # the selected box.  Multi-box pastes keep their normal behavior.
+            target = selected_shapes[0].boundingRect().center()
+            offset = None
+        elif cutPaste:
             # A cut-paste should restore the original coordinates. If an undo
             # already restored the source boxes, overlap avoidance below will
             # find a nearby free position instead.
@@ -2140,17 +2177,28 @@ class MainWindow(QMainWindow, WindowMixin):
         self.beginUndoOperation()
         newShapes = self.canvas.pasteShapes(
             self._shapeClipboard, target=target, offset=offset,
-            constrainToCanvas=sameSourceImage,
-            avoidExactOverlap=sameSourceImage)
+            constrainToCanvas=(sameSourceImage or replacement),
+            avoidExactOverlap=(sameSourceImage and not replacement))
         if not newShapes:
             self.cancelUndoOperation()
             return
+        if replacement:
+            replaced_shape = selected_shapes[0]
+            if replaced_shape in self.canvas.shapes:
+                self.canvas.shapes.remove(replaced_shape)
+            self.canvas.visible.pop(replaced_shape, None)
+            self.remLabel(replaced_shape)
         for shape in newShapes:
+            shape._labelImg2ClipboardToken = self._shapeClipboardToken
             shape.alwaysShowCorner = self.drawCorner.isChecked()
             self.addLabel(
                 shape,
                 sessionCreated=(not cutPaste or bool(getattr(
                     shape, 'sessionCreated', False))))
+        if replacement:
+            # Removing the replaced label row can move Qt's current row and
+            # briefly select a different box; restore the pasted box selection.
+            self.canvas._setSelectedShapes(newShapes)
         self.shapeSelectionChanged(True)
         self.setDirty()
         if cutPaste:

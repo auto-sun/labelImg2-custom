@@ -167,6 +167,30 @@ class Canvas(QWidget):
             self.hShape.highlightClear()
         self.hVertex = self.hShape = None
 
+    def updateVertexHit(self, pos):
+        """Refresh corner hit state from the actual mouse-press position.
+
+        Qt may not deliver a hover/move event after an image is switched while
+        the pointer stays still.  Recomputing here prevents a stale handle
+        from the previous image from swallowing the first corner drag.
+        """
+        previous_shape = self.hShape
+        for shape in reversed([s for s in self.shapes if self.isVisible(s)]):
+            index = shape.nearestVertex(pos, self.vertexHitRadius())
+            if index is None:
+                continue
+            if previous_shape is not None and previous_shape is not shape:
+                previous_shape.highlightClear()
+            self.hVertex, self.hShape = index, shape
+            shape.highlightCorner = True
+            shape.highlightVertex(index, shape.MOVE_VERTEX)
+            return True
+
+        if previous_shape is not None:
+            previous_shape.highlightClear()
+        self.hVertex = self.hShape = None
+        return False
+
     def selectedVertex(self):
         return self.hVertex is not None
 
@@ -403,6 +427,10 @@ class Canvas(QWidget):
             return
 
         pos = self.transformPos(ev.pos())
+
+        if (self.editing() and ev.button() in
+                (Qt.LeftButton, Qt.RightButton)):
+            self.updateVertexHit(pos)
 
         if (ev.button() == Qt.LeftButton and self.editing() and
                 bool(ev.modifiers() & Qt.ControlModifier)):
@@ -1634,6 +1662,7 @@ class Canvas(QWidget):
 
     def loadPixmap(self, pixmap):
         self._clearMarqueeSelection()
+        self.unHighlight()
         self.pixmap = pixmap
         self.shapes = []
         self.visible.clear()

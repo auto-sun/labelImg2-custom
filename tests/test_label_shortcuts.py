@@ -122,13 +122,18 @@ class LabelShortcutWindowTests(unittest.TestCase):
             os.remove(self.classesPath)
         labelImg.Settings = self.originalSettings
 
-    def test_shortcut_settings_moved_to_settings_menu(self):
+    def test_shortcut_settings_is_in_settings_menu_and_box_labels_panel(self):
         self.assertIn(
             self.window.labelShortcutSettingsAction,
             self.window.menus.settings.actions())
-        self.assertFalse(any(
-            button.objectName() == 'labelShortcutSettingsButton'
-            for button in self.window.dock.widget().findChildren(QToolButton)))
+        buttons = self.window.dock.widget().findChildren(QToolButton)
+        self.assertIn(self.window.labelShortcutSettingsButton, buttons)
+        self.assertEqual(
+            'labelShortcutSettingsButton',
+            self.window.labelShortcutSettingsButton.objectName())
+        self.assertIs(
+            self.window.labelShortcutSettingsAction,
+            self.window.labelShortcutSettingsButton.defaultAction())
         self.assertIn(
             self.window.menus.annotationFormat.menuAction(),
             self.window.menus.settings.actions())
@@ -147,6 +152,19 @@ class LabelShortcutWindowTests(unittest.TestCase):
         self.assertTrue(self.window.setLanguage('ar'))
         self.assertEqual(Qt.RightToLeft, self.window.layoutDirection())
         self.window.setLanguage('zh')
+
+    def test_shortcut_settings_entry_is_translated_in_every_language(self):
+        from libs.i18n import LANGUAGES, translate
+
+        for language in LANGUAGES:
+            with self.subTest(language=language):
+                self.window.setLanguage(language)
+                self.assertEqual(
+                    translate('Label Shortcut Settings', language),
+                    self.window.labelShortcutSettingsAction.text())
+                self.assertEqual(
+                    self.window.labelShortcutSettingsAction.text(),
+                    self.window.labelShortcutSettingsButton.text())
 
     def test_shortcut_selects_label_and_enters_obb_drawing(self):
         self.window.setLabelShortcutMappings(
