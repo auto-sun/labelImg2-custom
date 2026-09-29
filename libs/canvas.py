@@ -66,7 +66,9 @@ class Canvas(QWidget):
         self.offsets = QPointF(), QPointF()
         self._altPressed = False
         self._panning = False
-        self._panLastPos = QPoint()
+        # Keep the drag anchor in screen coordinates. Scrolling the canvas
+        # changes its local coordinate system under the pointer.
+        self._panLastGlobalPos = QPoint()
         self._marqueeStart = None
         self._marqueeEnd = None
         self._marqueeStartWidget = QPoint()
@@ -212,13 +214,16 @@ class Canvas(QWidget):
         #h = self.localScalePixmap.height()
         #self.localScalePixmap = self.localScalePixmap.scaled(w * 5, h * 5, Qt.KeepAspectRatio)
 
+    def _panToGlobal(self, global_pos):
+        delta = self._panLastGlobalPos - global_pos
+        self._panLastGlobalPos = QPoint(global_pos)
+        if not delta.isNull():
+            self.panRequest.emit(delta.x(), delta.y())
+
     def mouseMoveEvent(self, ev):
         """Update line with last point and current coordinates."""
         if self._panning and Qt.LeftButton & ev.buttons():
-            current_pos = ev.pos()
-            delta = self._panLastPos - current_pos
-            self._panLastPos = current_pos
-            self.panRequest.emit(delta.x(), delta.y())
+            self._panToGlobal(ev.globalPos())
             self.overrideCursor(CURSOR_MOVE)
             ev.accept()
             return
@@ -421,7 +426,7 @@ class Canvas(QWidget):
         alt_pressed = self._altPressed or bool(ev.modifiers() & Qt.AltModifier)
         if ev.button() == Qt.LeftButton and alt_pressed:
             self._panning = True
-            self._panLastPos = ev.pos()
+            self._panLastGlobalPos = ev.globalPos()
             self.overrideCursor(CURSOR_MOVE)
             ev.accept()
             return
@@ -477,6 +482,7 @@ class Canvas(QWidget):
 
     def mouseReleaseEvent(self, ev):
         if ev.button() == Qt.LeftButton and self._panning:
+            self._panToGlobal(ev.globalPos())
             self._panning = False
             alt_pressed = self._altPressed or bool(
                 QApplication.keyboardModifiers() & Qt.AltModifier
@@ -1689,7 +1695,10 @@ class Canvas(QWidget):
 
     def overrideCursor(self, cursor):
         self._cursor = cursor
-        if self.currentCursor() is None:
+        current = self.currentCursor()
+        if current == cursor:
+            return
+        if current is None:
             QApplication.setOverrideCursor(cursor)
         else:
             QApplication.changeOverrideCursor(cursor)

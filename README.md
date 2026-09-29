@@ -16,12 +16,12 @@
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.7.0（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.0/LabelImg2Custom-2.7.0-Setup.exe)
+[下载 Windows 安装包 v2.7.1（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.1/LabelImg2Custom-2.7.1-Setup.exe)
 
-v2.7.0 修复连续 Del 删除失效，并记住图片目录与标签目录的对应关系。
+v2.7.1 修复按住 Alt 拖动图片时的明显卡顿和回弹；v2.7.0 修复连续 Del 删除失效，并记住图片目录与标签目录的对应关系。
 例如在 `a/b/img/c` 标注并保存到 `a/b/labels`，以后打开 `a/b/img` 仍能读取原标签。
 “帮助 → 检查更新”可下载并升级安装版；“启动时自动检查更新”默认勾选，可随时关闭。
-更新先询问、可取消下载，安装前验证 SHA256。详见 [v2.7.0 发行说明](docs/releases/v2.7.0.md)。
+更新先询问、可取消下载，安装前验证 SHA256。详见 [v2.7.1 发行说明](docs/releases/v2.7.1.md)。
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或其他运行环境。
 安装包包含 CPU 版模型推理依赖，但不包含 `.pt` 模型权重；自动标注时请选择自己的模型。
