@@ -24,7 +24,14 @@ Interface preview
 Downloads
 ---------
 
-`Download the v2.6.5 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.5/LabelImg2Custom-2.6.5-Setup.exe>`__.
+`Download the v2.7.0 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.0/LabelImg2Custom-2.7.0-Setup.exe>`__.
+
+Version 2.7.0 fixes repeated Delete presses and preserves image/annotation
+directory bindings when opening a parent image directory. Legacy flat labels
+are matched only for unique image names. Help now offers Check for Updates
+and an optional startup check (enabled by default). Installed Windows copies
+download and verify the installer SHA256 before launching it; source runs
+open the release page. Updates require confirmation and downloads can be cancelled.
 
 Double-click the installer and launch the app from the Start menu. No Python,
 Conda or separate dependency installation is required. The installer includes

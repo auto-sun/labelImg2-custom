@@ -49,9 +49,9 @@ class RefreshProjectTests(unittest.TestCase):
         self.firstImage = self.createImage('1.jpg')
         self.thirdImage = self.createImage('3.jpg')
 
-        classesPath = os.path.join(
-            os.path.dirname(labelImg.__file__),
-            'data', 'predefined_classes.txt')
+        classesPath = os.path.join(self.temporary.name, 'classes.txt')
+        with open(classesPath, 'w', encoding='utf-8') as stream:
+            stream.write('person\n')
         self.window = labelImg.MainWindow(
             defaultPrefdefClassFile=classesPath,
             defaultSaveDir=self.annotationDir)

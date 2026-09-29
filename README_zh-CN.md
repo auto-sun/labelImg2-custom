@@ -20,7 +20,14 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.6.5（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.6.5/LabelImg2Custom-2.6.5-Setup.exe)
+[下载 Windows 安装包 v2.7.0（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.0/LabelImg2Custom-2.7.0-Setup.exe)
+
+v2.7.0：连续按 Del 可依次将当前图片及对应标签移入回收站。
+选择标签目录时记录对应的图片根目录，打开上级图片目录后继续按原关系读取和保存。
+旧版扁平标签也会按唯一文件名匹配；有同名图片时不会猜测归属。
+帮助菜单新增“检查更新”和默认勾选的“启动时自动检查更新”。关闭勾选后重启不再自动联网检查。
+安装版同意更新后下载、校验 SHA256，再处理未保存标注并运行安装器；源码版打开发行页。
+网络失败不妨碍标注。详见 [v2.7.0 发行说明](docs/releases/v2.7.0.md)。
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或依赖包。
 安装包内含 CPU 版自动标注依赖，但不附带 `.pt` 模型权重。

@@ -44,7 +44,9 @@ class CFileListModel(QStringListModel):
     
     def parseOne(self, s, openedDir=None, defaultSaveDir=None,
                  annotationFormat=FORMAT_PASCALVOC):
-        if openedDir is not None and defaultSaveDir is not None:
+        if callable(getattr(self, 'annotationPathResolver', None)):
+            annotationBasePath = self.annotationPathResolver(s)
+        elif openedDir is not None and defaultSaveDir is not None:
             relname = os.path.relpath(s, openedDir)
             relname = os.path.splitext(relname)[0]
             annotationBasePath = os.path.join(defaultSaveDir, relname)

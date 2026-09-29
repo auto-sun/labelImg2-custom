@@ -52,9 +52,9 @@ class DeleteImageTests(unittest.TestCase):
         self.firstImage = self.createImage('one.jpg')
         self.secondImage = self.createImage('two.jpg')
 
-        classesPath = os.path.join(
-            os.path.dirname(labelImg.__file__),
-            'data', 'predefined_classes.txt')
+        classesPath = os.path.join(self.temporary.name, 'classes.txt')
+        with open(classesPath, 'w', encoding='utf-8') as stream:
+            stream.write('person\n')
         self.window = labelImg.MainWindow(
             defaultPrefdefClassFile=classesPath)
         self.window.dirname = self.imageDir
@@ -306,7 +306,24 @@ class DeleteImageTests(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.firstImage))
         self.assertTrue(os.path.isfile(xmlPath))
         self.assertTrue(os.path.isfile(txtPath))
-        self.assertEqual(self.firstImage, self.window.filePath)
+
+    def test_repeated_delete_keeps_focus_and_removes_next_image(self):
+        self.window.show()
+        self.window.fileListView.setFocus()
+        self.app.processEvents()
+        with mock.patch.object(labelImg, 'move_to_trash', side_effect=self.fakeTrash), \
+                mock.patch.object(QMessageBox, 'question') as question:
+            QTest.keyClick(QApplication.focusWidget(), Qt.Key_Delete)
+            self.app.processEvents()
+            self.assertEqual(self.secondImage, self.window.filePath)
+            self.assertTrue(self.window.fileListView.hasFocus())
+            QTest.keyClick(QApplication.focusWidget(), Qt.Key_Delete)
+            self.app.processEvents()
+            self.assertEqual(0, self.window.fileModel.rowCount())
+            QTest.keyClick(self.window.fileListView, Qt.Key_Delete)
+            question.assert_not_called()
+        self.assertFalse(os.path.exists(self.firstImage))
+        self.assertFalse(os.path.exists(self.secondImage))
 
     def test_image_delete_failure_leaves_labels_untouched(self):
         xmlPath, txtPath = self.createBothLabels()

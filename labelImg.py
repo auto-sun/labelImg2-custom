@@ -35,6 +35,8 @@ from libs.annotation_converter import (AnnotationConversionError,
                                        convert_annotation_file)
 from libs.auto_annotation import AutoAnnotationThread
 from libs.annotation_scan import AnnotationScanner, iter_annotation_files
+from libs.annotation_paths import annotation_base, relative_inside
+from libs.updater import UpdateController
 from libs.labelShortcutDialog import (LabelShortcutDialog,
                                       LabelShortcutValidationError,
                                       canonical_shortcut,
@@ -682,6 +684,13 @@ class MainWindow(QMainWindow, WindowMixin):
             'User Guide', self.showUserGuide, None, 'info.svg',
             'Shortcuts, basic operation, and advanced workflows')
         addActions(self.menus.help, (self.userGuideAction, showInfo))
+        self.updateController = UpdateController(self, settings)
+        self.checkUpdatesAction = action('Check for Updates', self.updateController.check)
+        self.autoCheckUpdatesAction = QAction('Automatically check for updates', self)
+        self.autoCheckUpdatesAction.setCheckable(True)
+        self.autoCheckUpdatesAction.setChecked(settings.get('autoCheckUpdates', True))
+        self.autoCheckUpdatesAction.toggled.connect(self.updateController.setAutomatic)
+        addActions(self.menus.help, (None, self.checkUpdatesAction, self.autoCheckUpdatesAction))
         self.labelShortcutSettingsAction = action(
             'Label Shortcut Settings', self.openLabelShortcutSettings,
             None, 'settings.svg', 'Configure shortcut keys for preset labels')
@@ -789,6 +798,10 @@ class MainWindow(QMainWindow, WindowMixin):
         self.move(position)
         saveDir = settings.get(SETTING_SAVE_DIR, None)
         self.lastOpenDir = settings.get(SETTING_LAST_OPEN_DIR, None)
+        self.annotationBindings = dict(settings.get('annotationDirectoryBindings', {}))
+        self.uniqueImageStems = set()
+        if self.lastOpenDir and saveDir:
+            self.annotationBindings.setdefault(os.path.abspath(self.lastOpenDir), saveDir)
         self.lastOpenFile = settings.get(SETTING_FILENAME, None)
         if self.defaultSaveDir is None and saveDir is not None and os.path.exists(saveDir):
             self.defaultSaveDir = saveDir
@@ -3010,6 +3023,7 @@ class MainWindow(QMainWindow, WindowMixin):
         if not self.mayContinue():
             event.ignore()
             return
+        self.updateController.stop()
         settings = self.settings
         # Remember the current image so directory-based sessions can resume.
         settings[SETTING_FILENAME] = self.filePath if self.filePath else ''
@@ -3042,6 +3056,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.autoAnnotationConfidence)
         settings[SETTING_ANNOTATION_FORMAT] = self.annotationFormat
         settings[SETTING_LANGUAGE] = self.languageManager.language
+        settings['annotationDirectoryBindings'] = self.annotationBindings
         settings.save()
     ## User Dialogs ##
 
@@ -3062,6 +3077,8 @@ class MainWindow(QMainWindow, WindowMixin):
         def sort_key(path):
             relativePath = os.path.relpath(path, folderPath)
             return natural_path_key(relativePath)
+        counts = Counter(os.path.normcase(os.path.splitext(os.path.basename(p))[0]) for p in images)
+        self.uniqueImageStems = {stem for stem, count in counts.items() if count == 1}
         return sorted(images, key=sort_key)
 
     def annotationCandidatesForImage(self, imagePath):
@@ -3183,7 +3200,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.annotationScanTimer.stop()
         paths = list(imagePaths or [])
         self.annotationScanner = AnnotationScanner(
-            self.dirname, self.defaultSaveDir, self.annotationFormat)
+            self.dirname, self.defaultSaveDir, self.annotationFormat,
+            pathResolver=self.annotationBasePathForImage)
         if paths:
             self.annotationScanMode = 'images'
             self.annotationScanIterator = iter(enumerate(paths))
@@ -3548,6 +3566,13 @@ class MainWindow(QMainWindow, WindowMixin):
             return
 
         self.defaultSaveDir = os.path.abspath(dirpath)
+        if self.dirname:
+            root = os.path.abspath(self.dirname)
+            # An explicit new choice overrides old descendant bindings.
+            self.annotationBindings = {key: value for key, value in self.annotationBindings.items()
+                                       if relative_inside(key, root) is None}
+            self.annotationBindings[root] = self.defaultSaveDir
+            self.settings['annotationDirectoryBindings'] = self.annotationBindings
         self.settings[SETTING_SAVE_DIR] = self.defaultSaveDir
         self.settings.save()
 
@@ -3589,10 +3614,19 @@ class MainWindow(QMainWindow, WindowMixin):
         # Preserve the last explicitly selected annotation directory.  Only
         # fall back to saving beside the images when no valid saved directory
         # is available (for example on the very first launch).
+        known = [(len(root), destination) for root, destination in self.annotationBindings.items()
+                 if relative_inside(dirpath, root) is not None and os.path.isdir(destination)]
+        descendants = {destination for root, destination in self.annotationBindings.items()
+                       if relative_inside(root, dirpath) is not None and os.path.isdir(destination)}
+        if known:
+            self.defaultSaveDir = max(known)[1]
+        elif len(descendants) == 1:
+            self.defaultSaveDir = next(iter(descendants))
         if not self.defaultSaveDir or not os.path.isdir(self.defaultSaveDir):
             self.defaultSaveDir = dirpath
 
         imglist = self.scanAllImages(dirpath)
+        self.fileModel.annotationPathResolver = self.annotationBasePathForImage
         self.fileModel.setStringList(
             imglist, self.dirname, self.defaultSaveDir,
             self.annotationFormat, scanAnnotations=False)
@@ -3706,26 +3740,9 @@ class MainWindow(QMainWindow, WindowMixin):
                 else YOLO_EXT)
 
     def annotationBasePathForImage(self, imageFilePath):
-        if not self.defaultSaveDir:
-            return os.path.splitext(imageFilePath)[0]
-
-        if self.dirname and os.path.isdir(self.dirname):
-            try:
-                relativePath = os.path.relpath(imageFilePath, self.dirname)
-            except ValueError:
-                relativePath = None
-            if relativePath is not None:
-                parentPrefix = os.pardir + os.sep
-                if (relativePath != os.pardir and
-                        not relativePath.startswith(parentPrefix) and
-                        not os.path.isabs(relativePath)):
-                    return os.path.join(
-                        self.defaultSaveDir,
-                        os.path.splitext(relativePath)[0])
-
-        return os.path.join(
-            self.defaultSaveDir,
-            os.path.splitext(os.path.basename(imageFilePath))[0])
+        return annotation_base(imageFilePath, self.dirname, self.defaultSaveDir,
+                               getattr(self, 'annotationBindings', {}),
+                               getattr(self, 'uniqueImageStems', None))
 
     def annotationPathWithExtension(self, annotationFilePath):
         expectedExtension = self.annotationExtension()
@@ -3911,6 +3928,10 @@ class MainWindow(QMainWindow, WindowMixin):
         else:
             self.annotationScanIterator = None
             self.annotationScanner = None
+
+        # loadFile focuses the canvas. Keep Delete routed to File List for
+        # subsequent presses, including after deleting the final row.
+        self.fileListView.setFocus(Qt.ShortcutFocusReason)
 
         if labelTrashErrors:
             details = u'\n'.join(
@@ -4299,6 +4320,9 @@ def get_main_app(argv=[]):
 
 def main():
     '''construct main app and run it'''
+    if sys.argv[1:] == ['--check-update-connection']:
+        from libs.updater import check_connection
+        return check_connection()
     app, _win = get_main_app(sys.argv)
     return app.exec_()
 

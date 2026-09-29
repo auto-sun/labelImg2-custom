@@ -15,7 +15,8 @@ from .yolo_obb_io import YOLO_EXT, YoloError, inspect_yolo_file
 class AnnotationScanner(object):
     """Inspect individual labels; scheduling is handled by MainWindow."""
 
-    def __init__(self, openedDir, annotationDir, preferredFormat):
+    def __init__(self, openedDir, annotationDir, preferredFormat, pathResolver=None):
+        self.pathResolver = pathResolver
         self.openedDir = (os.path.abspath(openedDir)
                           if openedDir else None)
         self.annotationDir = (os.path.abspath(annotationDir)
@@ -31,6 +32,8 @@ class AnnotationScanner(object):
         }
 
     def annotationBasePath(self, imagePath):
+        if self.pathResolver is not None:
+            return self.pathResolver(imagePath)
         if self.annotationDir:
             if self.openedDir:
                 try:

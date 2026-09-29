@@ -18,6 +18,14 @@ LANGUAGES = {
 # These are application chrome strings, not annotation data. Class names,
 # image names, paths, and user-entered text are intentionally never translated.
 _ROWS = {
+    'Check for Updates': ('检查更新', '更新を確認', 'Buscar actualizaciones', 'التحقق من التحديثات', 'Rechercher des mises à jour', '업데이트 확인'),
+    'Automatically check for updates': ('启动时自动检查更新', '起動時に更新を自動確認', 'Buscar actualizaciones al iniciar', 'التحقق تلقائيًا عند بدء التشغيل', 'Vérifier automatiquement au démarrage', '시작할 때 자동으로 업데이트 확인'),
+    'Unable to check for updates. Try again later.': ('无法检查更新，请稍后重试。', '更新を確認できません。後で再試行してください。', 'No se pudo comprobar. Inténtelo más tarde.', 'تعذر التحقق. حاول لاحقًا.', 'Vérification impossible. Réessayez plus tard.', '업데이트를 확인할 수 없습니다. 나중에 다시 시도하세요.'),
+    'You are using the latest version.': ('当前已是最新版本。', '最新バージョンです。', 'Tiene la última versión.', 'لديك أحدث إصدار.', 'Vous utilisez la dernière version.', '최신 버전입니다.'),
+    'A new version is available:': ('发现新版本：', '新しいバージョン：', 'Nueva versión disponible:', 'يتوفر إصدار جديد:', 'Nouvelle version disponible :', '새 버전이 있습니다:'),
+    'Download and install the update now? Your work will be saved before closing.': ('现在下载并安装更新吗？关闭前会按当前保存设置处理未保存的标注。', '今すぐ更新しますか？終了前に保存設定に従って変更を処理します。', '¿Descargar e instalar ahora? Se gestionarán los cambios sin guardar antes de cerrar.', 'هل تريد التنزيل والتثبيت الآن؟ ستتم معالجة التغييرات غير المحفوظة قبل الإغلاق.', 'Télécharger et installer maintenant ? Les modifications seront traitées avant la fermeture.', '지금 다운로드하고 설치할까요? 종료 전에 저장되지 않은 변경 사항을 처리합니다.'),
+    'Downloading update...': ('正在下载更新…', '更新をダウンロード中…', 'Descargando actualización…', 'جارٍ تنزيل التحديث…', 'Téléchargement de la mise à jour…', '업데이트 다운로드 중…'),
+    'Download or verification failed. Please try again.': ('下载或完整性校验失败，请重试。', 'ダウンロードまたは検証に失敗しました。', 'Error de descarga o verificación. Inténtelo de nuevo.', 'فشل التنزيل أو التحقق. حاول مجددًا.', 'Échec du téléchargement ou de la vérification. Réessayez.', '다운로드 또는 검증에 실패했습니다. 다시 시도하세요.'),
     'File': ('文件', 'ファイル', 'Archivo', 'ملف', 'Fichier', '파일'),
     'Edit': ('编辑', '編集', 'Editar', 'تحرير', 'Édition', '편집'),
     'View': ('视图', '表示', 'Ver', 'عرض', 'Affichage', '보기'),
