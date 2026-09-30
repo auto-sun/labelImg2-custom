@@ -24,7 +24,7 @@ Interface preview
 Downloads
 ---------
 
-`Download the v2.7.1 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.1/LabelImg2Custom-2.7.1-Setup.exe>`__.
+`Download the v2.7.2 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.2/LabelImg2Custom-2.7.2-Setup.exe>`__.
 
 Version 2.7.1 fixes stuttering and bounce while panning with Alt. Version 2.7.0 fixes repeated Delete presses and preserves image/annotation
 directory bindings when opening a parent image directory. Legacy flat labels

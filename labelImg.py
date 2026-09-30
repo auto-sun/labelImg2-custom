@@ -306,6 +306,12 @@ class MainWindow(QMainWindow, WindowMixin):
             Qt.Horizontal: scroll.horizontalScrollBar()
         }
         self.scrollArea = scroll
+        self._verticalScrollContentMaximum = scroll.verticalScrollBar().maximum()
+        self._verticalScrollOverscroll = 0
+        self._applyingVerticalScrollOverscroll = False
+        scroll.verticalScrollBar().rangeChanged.connect(
+            self.updateVerticalScrollContentRange)
+        scroll.viewport().installEventFilter(self)
         self.canvas.scrollRequest.connect(self.scrollRequest)
         self.canvas.panRequest.connect(self.panRequest)
 
@@ -701,7 +707,8 @@ class MainWindow(QMainWindow, WindowMixin):
             Qt.ToolButtonTextBesideIcon)
         self.labelShortcutSettingsButton.setDefaultAction(
             self.labelShortcutSettingsAction)
-        labellistLayout.addWidget(self.labelShortcutSettingsButton)
+        labellistLayout.insertWidget(labellistLayout.indexOf(self.diffcButton),
+                                     self.labelShortcutSettingsButton)
         self.languageMenu = QMenu('Language', self.menus.settings)
         self.languageActions = {}
         language = settings.get(SETTING_LANGUAGE, 'zh')
@@ -2299,6 +2306,29 @@ class MainWindow(QMainWindow, WindowMixin):
         v_bar = self.scrollBars[Qt.Vertical]
         h_bar.setValue(h_bar.value() + delta_x)
         v_bar.setValue(v_bar.value() + delta_y)
+
+    def eventFilter(self, watched, event):
+        if watched is self.scrollArea.viewport() and event.type() == QEvent.Resize:
+            self._verticalScrollOverscroll = max(0, event.size().height() // 3)
+            QTimer.singleShot(0, self.applyVerticalScrollOverscroll)
+        return super(MainWindow, self).eventFilter(watched, event)
+
+    def updateVerticalScrollContentRange(self, minimum, maximum):
+        if self._applyingVerticalScrollOverscroll:
+            return
+        self._verticalScrollContentMaximum = maximum
+        QTimer.singleShot(0, self.applyVerticalScrollOverscroll)
+
+    def applyVerticalScrollOverscroll(self):
+        bar = self.scrollBars[Qt.Vertical]
+        targetMaximum = self._verticalScrollContentMaximum + self._verticalScrollOverscroll
+        if bar.maximum() == targetMaximum:
+            return
+        self._applyingVerticalScrollOverscroll = True
+        try:
+            bar.setRange(bar.minimum(), targetMaximum)
+        finally:
+            self._applyingVerticalScrollOverscroll = False
 
     def setZoom(self, value):
         self.actions.fitWidth.setChecked(False)
