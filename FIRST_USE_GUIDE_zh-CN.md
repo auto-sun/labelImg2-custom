@@ -12,7 +12,7 @@
 
 ## 一、下载并安装
 
-1. [下载 v2.7.3 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.3/LabelImg2Custom-2.7.3-Setup.exe)。
+1. [下载 v2.7.4 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.4/LabelImg2Custom-2.7.4-Setup.exe)。
 2. 双击安装包，按向导完成安装。默认安装到当前用户目录，不需要管理员权限。
 3. 从开始菜单打开 `LabelImg2 Custom`。如果 Windows 显示“未知发布者”，请先核对文件确实来自本项目的 GitHub Release；安装包目前没有代码签名。
 
@@ -138,7 +138,7 @@ OBB 模型会自动选择 YOLO OBB 格式。模型自己的类别名会匹配到
 - `Ctrl/Shift + 框选`：追加选择。
 - 拖动任意已选框：整体移动全部选中框。
 - `Delete`：删除全部选中框。
-- `Alt + 鼠标左键拖动`：平移画布；图片上下边缘允许约三分之一可视画布高度的留白。
+- `Alt + 鼠标左键拖动`：平移画布；图片四周均允许约三分之一可视画布的留白（左右按宽度，上下按高度）。
 - 文件菜单“重启软件”可重新启动并恢复已保存项目设置；未保存标注会先询问处理方式。
 - 类别编辑框内连续按 G 等字母，可轮选相同英文/拼音首字母的类别；即使 G 已绑定果腐病，仍可轮选到干枯症。
 

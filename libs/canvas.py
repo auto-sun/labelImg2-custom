@@ -71,7 +71,9 @@ class Canvas(QWidget):
         # changes its local coordinate system under the pointer.
         self._panLastGlobalPos = QPoint()
         self.panViewportHeight = 0
+        self.panViewportWidth = 0
         self.panMargin = 0
+        self.panHorizontalMargin = 0
         self.resetPanView = True
         self._marqueeStart = None
         self._marqueeEnd = None
@@ -1402,16 +1404,22 @@ class Canvas(QWidget):
     def minimumSizeHint(self):
         if self.pixmap:
             size = self.scale * self.pixmap.size()
+            size.setWidth(max(size.width(), self.panViewportWidth) +
+                          2 * self.panHorizontalMargin)
             size.setHeight(max(size.height(), self.panViewportHeight) +
                            2 * self.panMargin)
             return size
         return super(Canvas, self).minimumSizeHint()
 
-    def setPanViewportHeight(self, height):
-        height = max(0, int(height))
-        if height == self.panViewportHeight:
+    def setPanViewportSize(self, size):
+        width = max(0, int(size.width()))
+        height = max(0, int(size.height()))
+        if (width == self.panViewportWidth and
+                height == self.panViewportHeight):
             return False
+        self.panViewportWidth = width
         self.panViewportHeight = height
+        self.panHorizontalMargin = width // 3
         self.panMargin = height // 3
         self.updateGeometry()
         self.adjustSize()

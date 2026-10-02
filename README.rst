@@ -24,9 +24,10 @@ Interface preview
 Downloads
 ---------
 
-`Download the v2.7.3 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.3/LabelImg2Custom-2.7.3-Setup.exe>`__.
+`Download the v2.7.4 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.4/LabelImg2Custom-2.7.4-Setup.exe>`__.
 
-Version 2.7.3 duplicates all selected boxes with Ctrl-drag, nudges by 5 image
+Version 2.7.4 adds real pan margins on all four sides (one third of the visible
+width horizontally and one third of the visible height vertically). It duplicates all selected boxes with Ctrl-drag, nudges by 5 image
 pixels, fixes source/installed canvas overscroll and flickering corner handles,
 adds File > Restart Software, and lets repeated initials cycle Chinese pinyin
 classes even after a custom letter shortcut. R remains the visibility shortcut;
@@ -38,7 +39,7 @@ are matched only for unique image names. Help now offers Check for Updates
 and an optional startup check (enabled by default). Installed Windows copies
 download and verify the installer SHA256 before launching it; source runs
 open the release page. Updates require confirmation and downloads can be cancelled.
-See the `v2.7.3 release notes (Chinese) <docs/releases/v2.7.3.md>`__.
+See the `v2.7.4 release notes (Chinese) <docs/releases/v2.7.4.md>`__.
 
 Double-click the installer and launch the app from the Start menu. No Python,
 Conda or separate dependency installation is required. The installer includes

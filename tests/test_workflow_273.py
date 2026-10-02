@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from PyQt5.QtCore import QEvent, QPointF, Qt
+from PyQt5.QtCore import QEvent, QPoint, QPointF, Qt
 from PyQt5.QtGui import QMouseEvent, QPixmap
 from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication, QMessageBox
@@ -138,17 +138,27 @@ class WorkflowTests(unittest.TestCase):
         self.window.canvas.moveOnePixel('Right')
         self.assertEqual(1150, box.points[0].x())
 
-    def test_vertical_margin_survives_layout_resize_and_zoom(self):
+    def test_all_four_margins_survive_layout_resize_zoom_and_image_switch(self):
         canvas = self.window.canvas
         area = self.window.scrollArea
         bar = area.verticalScrollBar()
-        for zoom, height in ((100, 700), (35, 600), (150, 800)):
-            self.window.resize(1000, height)
+        for zoom, width, height, image_size in (
+                (100, 1000, 700, (1200, 1000)),
+                (35, 1366, 768, (1200, 1000)),
+                (150, 1920, 1080, (1200, 1000)),
+                (60, 2560, 1440, (3000, 200)),
+                (60, 1366, 768, (200, 3000))):
+            self.window.resize(width, height)
+            pixmap = QPixmap(*image_size)
+            pixmap.fill(Qt.white)
+            self.window.image = pixmap.toImage()
+            canvas.loadPixmap(pixmap)
             self.window.zoomWidget.setValue(zoom)
             self.window.paintCanvas()
             for _ in range(4):
                 self.app.processEvents()
             self.assertEqual(area.viewport().height() // 3, canvas.panMargin)
+            self.assertEqual(area.viewport().width() // 3, canvas.panHorizontalMargin)
             margin = canvas.panMargin
             top = canvas.offsetToCenter().y() * canvas.scale
             self.assertGreaterEqual(top, margin - 1)
@@ -162,6 +172,49 @@ class WorkflowTests(unittest.TestCase):
             canvas.adjustSize()
             self.app.processEvents()
             self.assertEqual(maximum, bar.maximum())
+            horizontal_bar = area.horizontalScrollBar()
+            left = canvas.offsetToCenter().x() * canvas.scale
+            horizontal_margin = canvas.panHorizontalMargin
+            self.assertGreaterEqual(left, horizontal_margin - 1)
+            horizontal_bar.setValue(horizontal_bar.minimum())
+            self.assertGreaterEqual(left - horizontal_bar.value(), horizontal_margin - 1)
+            horizontal_bar.setValue(horizontal_bar.maximum())
+            right = left + canvas.pixmap.width() * canvas.scale - horizontal_bar.value()
+            self.assertGreaterEqual(area.viewport().width() - right, horizontal_margin - 1)
+            maximum = horizontal_bar.maximum()
+            canvas.updateGeometry()
+            canvas.adjustSize()
+            self.app.processEvents()
+            self.assertEqual(maximum, horizontal_bar.maximum())
+
+    def test_alt_drag_reaches_left_and_right_blank_margins_without_changing_boxes(self):
+        canvas = self.window.canvas
+        area = self.window.scrollArea
+        bar = area.horizontalScrollBar()
+        self.select_boxes(make_box('person', 30, 30))
+        original = [QPointF(p) for p in canvas.shapes[0].points]
+        bar.setValue(canvas.panHorizontalMargin)
+        start = area.viewport().mapToGlobal(QPoint(100, 100))
+
+        def drag_event(kind, screen):
+            local = QPointF(canvas.mapFromGlobal(screen))
+            button = Qt.NoButton if kind == QEvent.MouseMove else Qt.LeftButton
+            buttons = Qt.NoButton if kind == QEvent.MouseButtonRelease else Qt.LeftButton
+            QApplication.sendEvent(canvas, QMouseEvent(
+                kind, local, QPointF(screen), button, buttons, Qt.AltModifier))
+
+        drag_event(QEvent.MouseButtonPress, start)
+        drag_event(QEvent.MouseMove, start + QPoint(5000, 0))
+        self.assertEqual(bar.minimum(), bar.value())
+        left = canvas.offsetToCenter().x() * canvas.scale - bar.value()
+        self.assertGreaterEqual(left, canvas.panHorizontalMargin - 1)
+        drag_event(QEvent.MouseMove, start + QPoint(-5000, 0))
+        self.assertEqual(bar.maximum(), bar.value())
+        right = (canvas.offsetToCenter().x() * canvas.scale +
+                 canvas.pixmap.width() * canvas.scale - bar.value())
+        self.assertGreaterEqual(area.viewport().width() - right, canvas.panHorizontalMargin - 1)
+        drag_event(QEvent.MouseButtonRelease, start + QPoint(-5000, 0))
+        self.assertEqual(original, canvas.shapes[0].points)
 
     def test_hover_handles_stay_identical_on_repeated_repaints(self):
         box = make_box('person', 30, 30)

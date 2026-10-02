@@ -2308,21 +2308,27 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def eventFilter(self, watched, event):
         if watched is self.scrollArea.viewport() and event.type() == QEvent.Resize:
-            QTimer.singleShot(0, self.applyVerticalScrollOverscroll)
+            QTimer.singleShot(0, self.applyCanvasOverscroll)
         return super(MainWindow, self).eventFilter(watched, event)
 
-    def applyVerticalScrollOverscroll(self):
+    def applyCanvasOverscroll(self):
         # Give QScrollArea actual content to scroll, not a synthetic range
         # that its layout machinery will overwrite on the next resize.
         if self.canvas.pixmap is None or self.canvas.pixmap.isNull():
             return
         bar = self.scrollBars[Qt.Vertical]
+        horizontal_bar = self.scrollBars[Qt.Horizontal]
         old_margin = self.canvas.panMargin
+        old_horizontal_margin = self.canvas.panHorizontalMargin
         reset_view = self.canvas.resetPanView
-        if self.canvas.setPanViewportHeight(self.scrollArea.viewport().height()):
+        if self.canvas.setPanViewportSize(self.scrollArea.viewport().size()):
             bar.setValue(bar.value() + self.canvas.panMargin - old_margin)
+            horizontal_bar.setValue(horizontal_bar.value() +
+                                    self.canvas.panHorizontalMargin -
+                                    old_horizontal_margin)
         if reset_view:
             bar.setValue(self.canvas.panMargin)
+            horizontal_bar.setValue(self.canvas.panHorizontalMargin)
             self.canvas.resetPanView = False
 
     def setZoom(self, value):
@@ -2528,7 +2534,7 @@ class MainWindow(QMainWindow, WindowMixin):
         if self.image.isNull():
             return
         self.canvas.scale = 0.01 * self.zoomWidget.value()
-        self.applyVerticalScrollOverscroll()
+        self.applyCanvasOverscroll()
         self.canvas.adjustSize()
         self.canvas.update()
 
