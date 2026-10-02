@@ -24,7 +24,13 @@ Interface preview
 Downloads
 ---------
 
-`Download the v2.7.2 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.2/LabelImg2Custom-2.7.2-Setup.exe>`__.
+`Download the v2.7.3 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.3/LabelImg2Custom-2.7.3-Setup.exe>`__.
+
+Version 2.7.3 duplicates all selected boxes with Ctrl-drag, nudges by 5 image
+pixels, fixes source/installed canvas overscroll and flickering corner handles,
+adds File > Restart Software, and lets repeated initials cycle Chinese pinyin
+classes even after a custom letter shortcut. R remains the visibility shortcut;
+T is now available for custom label shortcuts.
 
 Version 2.7.1 fixes stuttering and bounce while panning with Alt. Version 2.7.0 fixes repeated Delete presses and preserves image/annotation
 directory bindings when opening a parent image directory. Legacy flat labels
@@ -32,7 +38,7 @@ are matched only for unique image names. Help now offers Check for Updates
 and an optional startup check (enabled by default). Installed Windows copies
 download and verify the installer SHA256 before launching it; source runs
 open the release page. Updates require confirmation and downloads can be cancelled.
-See the `v2.7.1 release notes (Chinese) <docs/releases/v2.7.1.md>`__.
+See the `v2.7.3 release notes (Chinese) <docs/releases/v2.7.3.md>`__.
 
 Double-click the installer and launch the app from the Start menu. No Python,
 Conda or separate dependency installation is required. The installer includes
@@ -141,13 +147,13 @@ Left drag on empty canvas       Marquee-select boxes, even outside the image
 ``Ctrl/Shift + marquee``        Add boxes to the current selection
 ``Ctrl + click``                Toggle a box in the multi-selection
 Drag a selected box             Move the selected box or selected group
-``Ctrl + drag a box``           Copy and move that box
+``Ctrl + drag a box``           Copy and move all selected boxes
 ``Ctrl+C/X/V``                  Copy/cut/paste selected boxes
 ``Ctrl+Z``                      Undo the last box operation (up to 50 steps)
 ``Ctrl+D``                      Duplicate selected boxes
 ``Delete``                      Delete selected boxes
 ``R``                           Hide/show selected box, or all with no selection
-``T`` / ``N``                   Show/hide rotated boxes / normal boxes
+``N``                           Show/hide normal boxes; T is free for custom keys
 ``Ctrl+Shift+L``                Hide/show selected labels, or all with no selection
 ``A`` / up arrow                Previous image
 ``D`` / down arrow              Next image

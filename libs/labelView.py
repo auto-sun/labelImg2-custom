@@ -13,8 +13,9 @@ from .shortcut_input import disable_ime_for_shortcuts
 @lru_cache(maxsize=4096)
 def label_search_keys(label):
     """Match Chinese names by full pinyin and pinyin initials."""
-    syllables = lazy_pinyin(label)
-    return (label.casefold(),
+    search_label = label.strip()
+    syllables = lazy_pinyin(search_label)
+    return (search_label.casefold(),
             ''.join(syllables).casefold(),
             ''.join(syllable[:1] for syllable in syllables).casefold())
 
@@ -57,21 +58,29 @@ class CCommonOrderComboBox(QComboBox):
             int(event.modifiers()) | int(event.key())).toString(
                 QKeySequence.PortableText).casefold()
         mappedLabel = self._shortcutLabels.get(shortcut)
-        if mappedLabel is not None:
+        text = event.text().casefold()
+        now = QDateTime.currentMSecsSinceEpoch()
+        withinTimeout = now - self._lastSearchTime <= self.searchTimeoutMs
+        repeated = (withinTimeout and text == self._lastSearchKey and
+                    self._searchPrefix == text)
+        # An explicit shortcut wins on the first press. Repeating a letter
+        # inside the category editor cycles all matching initials, including
+        # Chinese pinyin, instead of trapping the user on the mapped label.
+        if mappedLabel is not None and not (repeated and text.isalpha()):
             index = self.findText(mappedLabel)
             if index >= 0:
+                self._lastSearchTime = now
+                self._lastSearchKey = text
+                self._searchPrefix = text
+                matches = self.matchesPrefix(text) if text else []
+                self._matchPosition = matches.index(index) if index in matches else -1
                 self.setCurrentIndex(index)
                 event.accept()
                 return
 
-        text = event.text().casefold()
         if (len(text) == 1 and text.isalpha() and
                 not event.modifiers() & (
                     Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)):
-            now = QDateTime.currentMSecsSinceEpoch()
-            withinTimeout = now - self._lastSearchTime <= self.searchTimeoutMs
-            repeated = (withinTimeout and text == self._lastSearchKey and
-                        self._searchPrefix == text)
             prefix = (self._searchPrefix + text
                       if withinTimeout and self._searchPrefix and not repeated
                       else text)

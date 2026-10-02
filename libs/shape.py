@@ -187,8 +187,6 @@ class Shape(object):
                 
                 #painter.fillPath(center_path, self.vertex_fill_color)
                     
-            self.highlightCorner = self.alwaysShowCorner
-
 
     def paintNormalCenter(self, painter):
         if self.center is not None:

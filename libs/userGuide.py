@@ -10,7 +10,7 @@ _GUIDES = {
            '<li><b>Ctrl+Shift+L</b>: hide/show labels for the selected box, or all labels when none is selected.</li>'
            '<li><b>Ctrl+S</b>: save. <b>Up/Down</b>: move between images when no box is selected.</li>'
            '<li><b>Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+Z</b>: copy / cut / paste / undo.</li>'
-           '<li><b>T</b>: show/hide rotated boxes. <b>N</b>: show/hide normal boxes.</li>'
+           '<li><b>N</b>: show/hide normal boxes. T is available for custom shortcuts.</li>'
            '<li><b>Alt + left-drag</b>: pan the canvas. Mouse wheel zooms the image, or resizes selected boxes.</li>',
            'Basic use',
            '<ol><li>Open an image folder, then choose an annotation folder with <i>Open Annotation Dir</i>.</li>'
@@ -28,7 +28,7 @@ _GUIDES = {
            '<li><b>Ctrl+Shift+L</b>：隐藏/显示选中框的标签；未选中时隐藏/显示全部标签。</li>'
            '<li><b>Ctrl+S</b>：保存。未选中框时按<b>上/下方向键</b>切换图片。</li>'
            '<li><b>Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+Z</b>：复制 / 剪切 / 粘贴 / 撤销。</li>'
-           '<li><b>T</b>：显示/隐藏旋转框；<b>N</b>：显示/隐藏普通框。</li>'
+           '<li><b>N</b>：显示/隐藏普通框；T 无默认功能，可自定义。</li>'
            '<li><b>Alt + 鼠标左键拖动</b>：平移画布。滚轮缩放图片；选中框时滚轮调整框大小。</li>',
            '基础使用',
            '<ol><li>打开图片目录，再用“Open Annotation Dir”选择标签目录。</li>'
@@ -46,7 +46,7 @@ _GUIDES = {
            '<li><b>Ctrl+Shift+L</b>：選択枠のラベルを表示/非表示。未選択時はすべてのラベル。</li>'
            '<li><b>Ctrl+S</b>：保存。枠が未選択なら<b>上/下</b>で画像を切り替え。</li>'
            '<li><b>Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+Z</b>：コピー / 切り取り / 貼り付け / 元に戻す。</li>'
-           '<li><b>T</b>：回転枠の表示切替。<b>N</b>：通常枠の表示切替。</li>'
+           '<li><b>N</b>：通常枠の表示切替。T はカスタムキーに利用できます。</li>'
            '<li><b>Alt + 左ドラッグ</b>：キャンバスを移動。ホイールで画像を拡大縮小、枠選択時は枠を拡大縮小。</li>',
            '基本操作',
            '<ol><li>画像フォルダーを開き、「Open Annotation Dir」でラベルフォルダーを選択します。</li>'
@@ -63,7 +63,7 @@ _GUIDES = {
            '<li><b>Ctrl+Shift+L</b>: oculta/muestra las etiquetas seleccionadas o todas si no hay selección.</li>'
            '<li><b>Ctrl+S</b>: guardar. Sin cuadro seleccionado, <b>Arriba/Abajo</b> cambia de imagen.</li>'
            '<li><b>Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+Z</b>: copiar / cortar / pegar / deshacer.</li>'
-           '<li><b>T</b>: mostrar/ocultar OBB. <b>N</b>: mostrar/ocultar rectángulos.</li>'
+           '<li><b>N</b>: mostrar/ocultar rectángulos. T queda libre para atajos personalizados.</li>'
            '<li><b>Alt + arrastrar con botón izquierdo</b>: mover el lienzo. La rueda amplía la imagen o, con cuadros seleccionados, los cuadros.</li>',
            'Uso básico',
            '<ol><li>Abre una carpeta de imágenes y selecciona la carpeta de etiquetas con “Open Annotation Dir”.</li>'
@@ -80,7 +80,7 @@ _GUIDES = {
            '<li><b>Ctrl+Shift+L</b>: إخفاء/إظهار تسميات الإطار المحدد، أو جميع التسميات عند عدم التحديد.</li>'
            '<li><b>Ctrl+S</b>: حفظ. عند عدم تحديد إطار، يبدّل <b>أعلى/أسفل</b> الصورة.</li>'
            '<li><b>Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+Z</b>: نسخ / قص / لصق / تراجع.</li>'
-           '<li><b>T</b>: إظهار/إخفاء OBB. <b>N</b>: إظهار/إخفاء المستطيلات.</li>'
+           '<li><b>N</b>: إظهار/إخفاء المستطيلات. يمكن تخصيص T للفئات.</li>'
            '<li><b>Alt + سحب بالزر الأيسر</b>: تحريك اللوحة. تستخدم العجلة للتكبير، أو لتغيير حجم الإطارات المحددة.</li>',
            'الاستخدام الأساسي',
            '<ol><li>افتح مجلد الصور، ثم اختر مجلد التسميات عبر “Open Annotation Dir”.</li>'
@@ -97,7 +97,7 @@ _GUIDES = {
            '<li><b>Ctrl+Shift+L</b> : masquer/afficher les étiquettes sélectionnées, ou toutes sans sélection.</li>'
            '<li><b>Ctrl+S</b> : enregistrer. Sans boîte sélectionnée, <b>Haut/Bas</b> change d’image.</li>'
            '<li><b>Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+Z</b> : copier / couper / coller / annuler.</li>'
-           '<li><b>T</b> : afficher/masquer les OBB. <b>N</b> : afficher/masquer les rectangles.</li>'
+           '<li><b>N</b> : afficher/masquer les rectangles. T est libre pour les raccourcis personnalisés.</li>'
            '<li><b>Alt + glisser gauche</b> : déplacer le canevas. La molette zoome l’image ou redimensionne les boîtes sélectionnées.</li>',
            'Utilisation de base',
            '<ol><li>Ouvrez un dossier d’images, puis choisissez le dossier d’annotations avec « Open Annotation Dir ».</li>'
@@ -114,7 +114,7 @@ _GUIDES = {
            '<li><b>Ctrl+Shift+L</b>: 선택한 상자의 레이블을 전환합니다. 선택이 없으면 모든 레이블을 전환합니다.</li>'
            '<li><b>Ctrl+S</b>: 저장. 상자 선택이 없으면 <b>위/아래</b>로 이미지를 전환합니다.</li>'
            '<li><b>Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+Z</b>: 복사 / 잘라내기 / 붙여넣기 / 실행 취소.</li>'
-           '<li><b>T</b>: OBB 표시/숨기기. <b>N</b>: 사각형 표시/숨기기.</li>'
+           '<li><b>N</b>: 사각형 표시/숨기기. T는 사용자 지정 키로 사용할 수 있습니다.</li>'
            '<li><b>Alt + 마우스 왼쪽 드래그</b>: 캔버스 이동. 휠은 이미지 확대/축소 또는 선택 상자 크기 조절에 사용됩니다.</li>',
            '기본 사용법',
            '<ol><li>이미지 폴더를 열고 “Open Annotation Dir”에서 레이블 폴더를 선택합니다.</li>'
@@ -128,6 +128,17 @@ _GUIDES = {
 }
 
 
+_WORKFLOW_SHORTCUTS = {
+    'en': '<li><b>Ctrl + left-drag</b>: duplicate all selected boxes. Arrow keys nudge selected boxes by 5 image pixels.</li><li>Alt panning allows blank space above/below the image, about one third of the visible canvas. File → Restart Software reopens with saved settings.</li><li>In the category editor, repeating a letter cycles English/pinyin initials even after a custom label shortcut.</li>',
+    'zh': '<li><b>Ctrl + 左键拖动已选框</b>：复制全部已选框；四方向键每次微调 5 个图片像素。</li><li>Alt 平移可在图片上下边缘留出约三分之一可视画布的空白；文件 → 重启软件会恢复已保存设置。</li><li>编辑类别时第一次按自定义字母优先选绑定类别，连续按相同字母继续轮选英文/中文拼音同首字母类别。</li>',
+    'ja': '<li><b>Ctrl + 左ドラッグ</b>：選択した枠をすべて複製。矢印キーは選択枠を画像の 5 ピクセルずつ移動。</li><li>Alt 移動では画像の上下に表示領域の約 1/3 の余白を作れます。ファイル → 再起動で保存設定を復元。</li><li>クラス編集では同じ文字を繰り返して英語/ピンインの頭文字を巡回できます。</li>',
+    'es': '<li><b>Ctrl + arrastrar</b>: duplicar todos los cuadros seleccionados. Las flechas los mueven 5 píxeles de imagen.</li><li>Alt permite un margen superior/inferior de un tercio del lienzo visible. Archivo → Reiniciar restaura los ajustes guardados.</li><li>En el editor, repetir una letra recorre las iniciales inglesas/pinyin, incluso tras un atajo personalizado.</li>',
+    'ar': '<li><b>Ctrl + سحب</b>: نسخ جميع الإطارات المحددة. الأسهم تحركها 5 بكسلات من الصورة.</li><li>يسمح Alt بهامش أعلى وأسفل الصورة يقارب ثلث اللوحة المرئية. ملف → إعادة التشغيل يستعيد الإعدادات المحفوظة.</li><li>في محرر الفئة، تكرار الحرف يتنقل بين أوائل الكلمات الإنجليزية والبينيين حتى بعد اختصار مخصص.</li>',
+    'fr': '<li><b>Ctrl + glisser gauche</b> : dupliquer toutes les boîtes sélectionnées. Les flèches les déplacent de 5 pixels d’image.</li><li>Alt permet une marge haute/basse d’environ un tiers du canevas visible. Fichier → Redémarrer restaure les paramètres enregistrés.</li><li>Dans l’éditeur, répéter une lettre parcourt les initiales anglaises/pinyin, même après un raccourci personnalisé.</li>',
+    'ko': '<li><b>Ctrl + 왼쪽 드래그</b>: 선택한 모든 상자 복제. 방향키로 이미지 기준 5픽셀씩 이동합니다.</li><li>Alt 이동으로 이미지 위아래에 보이는 캔버스의 약 1/3 여백을 만듭니다. 파일 → 다시 시작은 저장 설정을 복원합니다.</li><li>클래스 편집기에서 같은 글자를 반복하면 사용자 지정 단축키 이후에도 영어/병음 첫 글자를 순환합니다.</li>',
+}
+
+
 class UserGuideDialog(QDialog):
     def __init__(self, language='en', parent=None):
         super(UserGuideDialog, self).__init__(parent)
@@ -135,6 +146,7 @@ class UserGuideDialog(QDialog):
         self.setWindowTitle(_GUIDES.get(language, _GUIDES['en'])[0])
         (title, shortcuts, shortcut_body, basic, basic_body,
          advanced, advanced_body) = _GUIDES.get(language, _GUIDES['en'])
+        shortcut_body += _WORKFLOW_SHORTCUTS.get(language, _WORKFLOW_SHORTCUTS['en'])
         browser = QTextBrowser(self)
         browser.setOpenExternalLinks(False)
         browser.setHtml(

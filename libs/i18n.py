@@ -18,6 +18,11 @@ LANGUAGES = {
 # These are application chrome strings, not annotation data. Class names,
 # image names, paths, and user-entered text are intentionally never translated.
 _ROWS = {
+    'Restart Software': ('重启软件', 'ソフトウェアを再起動', 'Reiniciar software', 'إعادة تشغيل البرنامج', 'Redémarrer le logiciel', '소프트웨어 다시 시작'),
+    'Restart the application': ('重启当前软件，保留已保存的项目设置', '保存した設定でアプリを再起動', 'Reiniciar con los ajustes guardados', 'إعادة التشغيل بالإعدادات المحفوظة', 'Redémarrer avec les paramètres enregistrés', '저장된 설정으로 앱 다시 시작'),
+    'Save changes before restarting?': ('重启前保存当前标注吗？', '再起動前に変更を保存しますか？', '¿Guardar antes de reiniciar?', 'هل تريد حفظ التغييرات قبل إعادة التشغيل؟', 'Enregistrer avant de redémarrer ?', '다시 시작하기 전에 저장할까요?'),
+    'Stop model annotation before restarting.': ('请先中止模型标注，再重启软件。', '再起動前に自動アノテーションを停止してください。', 'Detenga la anotación automática antes de reiniciar.', 'أوقف التعليق التلقائي قبل إعادة التشغيل.', 'Arrêtez l’annotation automatique avant de redémarrer.', '다시 시작하기 전에 자동 주석을 중지하세요.'),
+    'Unable to restart. Please reopen the application.': ('重启失败，请手动重新打开软件。', '再起動できません。手動で開き直してください。', 'No se pudo reiniciar. Abra la aplicación de nuevo.', 'تعذرت إعادة التشغيل. أعد فتح التطبيق يدويًا.', 'Échec du redémarrage. Rouvrez l’application.', '다시 시작하지 못했습니다. 앱을 다시 열어 주세요.'),
     'Check for Updates': ('检查更新', '更新を確認', 'Buscar actualizaciones', 'التحقق من التحديثات', 'Rechercher des mises à jour', '업데이트 확인'),
     'Automatically check for updates': ('启动时自动检查更新', '起動時に更新を自動確認', 'Buscar actualizaciones al iniciar', 'التحقق تلقائيًا عند بدء التشغيل', 'Vérifier automatiquement au démarrage', '시작할 때 자동으로 업데이트 확인'),
     'Unable to check for updates. Try again later.': ('无法检查更新，请稍后重试。', '更新を確認できません。後で再試行してください。', 'No se pudo comprobar. Inténtelo más tarde.', 'تعذر التحقق. حاول لاحقًا.', 'Vérification impossible. Réessayez plus tard.', '업데이트를 확인할 수 없습니다. 나중에 다시 시도하세요.'),

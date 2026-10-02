@@ -123,7 +123,7 @@ class UndoOperationTests(unittest.TestCase):
         originalPoints = [(point.x(), point.y()) for point in shape.points]
 
         self.window.canvas.moveOnePixel('Right')
-        self.assertEqual(11.0, self.window.canvas.shapes[0].points[0].x())
+        self.assertEqual(15.0, self.window.canvas.shapes[0].points[0].x())
         self.assertTrue(self.window.actions.undo.isEnabled())
 
         self.assertTrue(self.window.undoLastOperation())

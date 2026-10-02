@@ -306,11 +306,6 @@ class MainWindow(QMainWindow, WindowMixin):
             Qt.Horizontal: scroll.horizontalScrollBar()
         }
         self.scrollArea = scroll
-        self._verticalScrollContentMaximum = scroll.verticalScrollBar().maximum()
-        self._verticalScrollOverscroll = 0
-        self._applyingVerticalScrollOverscroll = False
-        scroll.verticalScrollBar().rangeChanged.connect(
-            self.updateVerticalScrollContentRange)
         scroll.viewport().installEventFilter(self)
         self.canvas.scrollRequest.connect(self.scrollRequest)
         self.canvas.panRequest.connect(self.panRequest)
@@ -345,6 +340,8 @@ class MainWindow(QMainWindow, WindowMixin):
         action = partial(newAction, self)
         quit = action('&Quit', self.close,
                       'Ctrl+Q', 'power.svg', u'Quit application')
+        restart = action('Restart Software', self.restartSoftware,
+                         None, 'refresh.svg', 'Restart the application')
 
         open = action('&Open', self.openFile,
                       'Ctrl+O', 'open.svg', u'Open image or label file')
@@ -576,6 +573,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # Store actions for further handling.
         self.actions = struct(save=save, saveAs=saveAs, open=open, close=close,
+                              restart=restart,
                               deleteImage=deleteImage, flagImage=flagImage,
                               resetAll = resetAll,
                               create=create, createSo=createSo, createRo=createRo,
@@ -602,7 +600,7 @@ class MainWindow(QMainWindow, WindowMixin):
                                formatYoloObb=formatYoloObb,
                                zoomActions=zoomActions,
                               fileMenuActions=(
-                                  open, opendir, save, saveAs, close, resetAll, quit),
+                                  open, opendir, save, saveAs, close, resetAll, restart, quit),
                               beginner=(),
                               editMenu=(undo, None, edit,
                                         cutToClipboard, copyToClipboard,
@@ -684,7 +682,7 @@ class MainWindow(QMainWindow, WindowMixin):
                      selectAutoAnnotationModel, singleAutoAnnotate,
                     autoAnnotate, None,
                     self.menus.recentFiles,
-                    save, saveAs, close, resetAll, quit))
+                    save, saveAs, close, resetAll, restart, quit))
 
         self.userGuideAction = action(
             'User Guide', self.showUserGuide, None, 'info.svg',
@@ -1672,7 +1670,6 @@ class MainWindow(QMainWindow, WindowMixin):
             (Qt.Key_C, u'旋转框'),
             (Qt.Key_V, u'旋转框'),
             (Qt.Key_F, u'旋转框 90°'),
-            (Qt.Key_T, u'显示/隐藏旋转框'),
             (Qt.Key_R, u'显示/隐藏标注框'),
             (Qt.Key_N, u'显示/隐藏普通框'),
             (Qt.Key_B, u'显示/隐藏中心点'),
@@ -2232,7 +2229,9 @@ class MainWindow(QMainWindow, WindowMixin):
         return os.path.normcase(os.path.abspath(self.filePath))
 
     def copyShapeByDragging(self, shape):
-        self.addLabel(shape, sessionCreated=True)
+        shapes = shape if isinstance(shape, list) else [shape]
+        for copied in shapes:
+            self.addLabel(copied, sessionCreated=True)
         self.shapeSelectionChanged(True)
         self.setCanvasDirty()
 
@@ -2309,26 +2308,22 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def eventFilter(self, watched, event):
         if watched is self.scrollArea.viewport() and event.type() == QEvent.Resize:
-            self._verticalScrollOverscroll = max(0, event.size().height() // 3)
             QTimer.singleShot(0, self.applyVerticalScrollOverscroll)
         return super(MainWindow, self).eventFilter(watched, event)
 
-    def updateVerticalScrollContentRange(self, minimum, maximum):
-        if self._applyingVerticalScrollOverscroll:
-            return
-        self._verticalScrollContentMaximum = maximum
-        QTimer.singleShot(0, self.applyVerticalScrollOverscroll)
-
     def applyVerticalScrollOverscroll(self):
-        bar = self.scrollBars[Qt.Vertical]
-        targetMaximum = self._verticalScrollContentMaximum + self._verticalScrollOverscroll
-        if bar.maximum() == targetMaximum:
+        # Give QScrollArea actual content to scroll, not a synthetic range
+        # that its layout machinery will overwrite on the next resize.
+        if self.canvas.pixmap is None or self.canvas.pixmap.isNull():
             return
-        self._applyingVerticalScrollOverscroll = True
-        try:
-            bar.setRange(bar.minimum(), targetMaximum)
-        finally:
-            self._applyingVerticalScrollOverscroll = False
+        bar = self.scrollBars[Qt.Vertical]
+        old_margin = self.canvas.panMargin
+        reset_view = self.canvas.resetPanView
+        if self.canvas.setPanViewportHeight(self.scrollArea.viewport().height()):
+            bar.setValue(bar.value() + self.canvas.panMargin - old_margin)
+        if reset_view:
+            bar.setValue(self.canvas.panMargin)
+            self.canvas.resetPanView = False
 
     def setZoom(self, value):
         self.actions.fitWidth.setChecked(False)
@@ -2533,6 +2528,7 @@ class MainWindow(QMainWindow, WindowMixin):
         if self.image.isNull():
             return
         self.canvas.scale = 0.01 * self.zoomWidget.value()
+        self.applyVerticalScrollOverscroll()
         self.canvas.adjustSize()
         self.canvas.update()
 
@@ -3037,6 +3033,36 @@ class MainWindow(QMainWindow, WindowMixin):
             self.autoAnnotationMode = None
         thread.deleteLater()
 
+    def restartSoftware(self):
+        discard_approved = False
+        if (self.autoAnnotationThread is not None and
+                self.autoAnnotationThread.isRunning()):
+            QMessageBox.information(
+                self, translateUi('Restart Software', self.languageManager.language),
+                translateUi('Stop model annotation before restarting.',
+                            self.languageManager.language))
+            return
+        if self.dirty:
+            answer = QMessageBox.question(
+                self, translateUi('Restart Software', self.languageManager.language),
+                translateUi('Save changes before restarting?', self.languageManager.language),
+                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
+                QMessageBox.Save)
+            if answer == QMessageBox.Cancel:
+                return
+            if answer == QMessageBox.Save:
+                self.saveFile()
+                if self.dirty:
+                    return
+            discard_approved = answer == QMessageBox.Discard
+        self._restartRequested = True
+        self._restartDiscardApproved = discard_approved
+        try:
+            self.close()
+        finally:
+            self._restartRequested = False
+            self._restartDiscardApproved = False
+
     def closeEvent(self, event):
         self.annotationScanTimer.stop()
         self.annotationScanIterator = None
@@ -3050,7 +3076,8 @@ class MainWindow(QMainWindow, WindowMixin):
                 u'请等待当前图片推理结束后再关闭 LabelImg2。')
             event.ignore()
             return
-        if not self.mayContinue():
+        if (not getattr(self, '_restartDiscardApproved', False) and
+                not self.mayContinue()):
             event.ignore()
             return
         self.updateController.stop()
@@ -3088,6 +3115,19 @@ class MainWindow(QMainWindow, WindowMixin):
         settings[SETTING_LANGUAGE] = self.languageManager.language
         settings['annotationDirectoryBindings'] = self.annotationBindings
         settings.save()
+        if getattr(self, '_restartRequested', False):
+            arguments = ([] if getattr(sys, 'frozen', False) else
+                         [os.path.abspath(__file__)])
+            result = QProcess.startDetached(
+                sys.executable, arguments, os.path.dirname(os.path.abspath(sys.executable))
+                if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__)))
+            started = result[0] if isinstance(result, tuple) else result
+            if not started:
+                event.ignore()
+                QMessageBox.warning(
+                    self, translateUi('Restart Software', self.languageManager.language),
+                    translateUi('Unable to restart. Please reopen the application.',
+                                self.languageManager.language))
     ## User Dialogs ##
 
     def loadRecent(self, filename):

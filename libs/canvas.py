@@ -49,6 +49,7 @@ class Canvas(QWidget):
     VERTEX_HIT_RADIUS = 12.0
     WHEEL_SHAPE_SCALE_STEP = 1.05
     MIN_SHAPE_EDGE = 2.0
+    NUDGE_STEP = 5.0
 
     def __init__(self, *args, **kwargs):
         super(Canvas, self).__init__(*args, **kwargs)
@@ -69,6 +70,9 @@ class Canvas(QWidget):
         # Keep the drag anchor in screen coordinates. Scrolling the canvas
         # changes its local coordinate system under the pointer.
         self._panLastGlobalPos = QPoint()
+        self.panViewportHeight = 0
+        self.panMargin = 0
+        self.resetPanView = True
         self._marqueeStart = None
         self._marqueeEnd = None
         self._marqueeStartWidget = QPoint()
@@ -243,16 +247,22 @@ class Canvas(QWidget):
                     ev.accept()
                     return
 
-                shape = self._ctrlCopySource.copy()
-                self.shapes.append(shape)
-                self.selectShape(shape)
-                self._ctrlCopyShape = shape
+                copies = [shape.copy() for shape in self._ctrlCopySource]
+                self.shapes.extend(copies)
+                self.unHighlight()
+                self._setSelectedShapes(copies)
+                self._ctrlCopyShape = copies
                 self.prevPoint = QPointF(self._ctrlCopyStart)
-                self.calculateOffsets(shape, self._ctrlCopyStart)
-                self.shapeCopied.emit(shape)
+                self.shapeCopied.emit(copies)
 
             self.overrideCursor(CURSOR_MOVE)
-            if self.boundedMoveShape(self._ctrlCopyShape, pos):
+            delta = self._boundedTranslation(
+                self._ctrlCopyShape, pos - self.prevPoint)
+            self.prevPoint = QPointF(pos)
+            if not delta.isNull():
+                for shape in self._ctrlCopyShape:
+                    shape.moveBy(delta)
+                    shape.close()
                 self.shapeMoved.emit()
             self.updateLocalScaleMap(pos.x(), pos.y())
             self.repaint()
@@ -360,13 +370,12 @@ class Canvas(QWidget):
         # - Highlight shapes
         # - Highlight vertex
         # Update shape/vertex fill and tooltip value accordingly.
-        self.setToolTip("Background")
         for shape in reversed([s for s in self.shapes if self.isVisible(s)]):
             # Look for a nearby vertex to highlight. If that fails,
             # check if we happen to be inside a shape.
             index = shape.nearestVertex(pos, self.vertexHitRadius())
             if index is not None:
-                if self.selectedVertex():
+                if self.hShape is not None and self.hShape is not shape:
                     self.hShape.highlightClear()
                 self.hVertex, self.hShape = index, shape
                 shape.highlightCorner = True
@@ -409,6 +418,7 @@ class Canvas(QWidget):
                 self.update()
                 break
         else:  # Nothing found, clear highlights, reset state.
+            self.setToolTip("Background")
             if self.hShape:
                 self.hShape.highlightClear()
                 #self.hShape.highlightCorner=False
@@ -442,7 +452,9 @@ class Canvas(QWidget):
             shape = self._shapeAt(pos)
             if shape is not None:
                 self.shapeChangeStarted.emit()
-                self._ctrlCopySource = shape
+                self._ctrlCopySource = (
+                    list(self.selectedShapes)
+                    if shape in self.selectedShapes else [shape])
                 self._ctrlCopyShape = None
                 self._ctrlCopyStart = QPointF(pos)
                 self._ctrlCopyStartWidget = QPoint(ev.pos())
@@ -1211,6 +1223,9 @@ class Canvas(QWidget):
             if (shape.selected or not self._hideBackround) and self.isVisible(shape):
                 if (shape.isRotated and not self.hideRotated) or (not shape.isRotated and not self.hideNormal):
                     shape.fill = shape.selected or shape == self.hShape
+                    shape.highlightCorner = (
+                        shape.alwaysShowCorner or shape.selected or
+                        shape is self.hShape)
                     shape.paint(p)
                 elif self.showCenter:
                     shape.fill = shape.selected or shape == self.hShape
@@ -1252,16 +1267,6 @@ class Canvas(QWidget):
             # p.drawLine(0, self.prevPoint.y(), self.pixmap.width(), self.prevPoint.y())
             p.drawLine(0, int(self.prevPoint.y()), self.pixmap.width(), int(self.prevPoint.y()))
             p.setCompositionMode(oldmode)
-
-        self.setAutoFillBackground(True)
-        if self.verified:
-            pal = self.palette()
-            pal.setColor(self.backgroundRole(), QColor(184, 239, 38, 128))
-            self.setPalette(pal)
-        else:
-            pal = self.palette()
-            pal.setColor(self.backgroundRole(), QColor(232, 232, 232, 255))
-            self.setPalette(pal)
 
         #p.translate(-self.offsetToCenter())
         #p.scale(1/self.scale, 1/self.scale)
@@ -1396,8 +1401,21 @@ class Canvas(QWidget):
 
     def minimumSizeHint(self):
         if self.pixmap:
-            return self.scale * self.pixmap.size()
+            size = self.scale * self.pixmap.size()
+            size.setHeight(max(size.height(), self.panViewportHeight) +
+                           2 * self.panMargin)
+            return size
         return super(Canvas, self).minimumSizeHint()
+
+    def setPanViewportHeight(self, height):
+        height = max(0, int(height))
+        if height == self.panViewportHeight:
+            return False
+        self.panViewportHeight = height
+        self.panMargin = height // 3
+        self.updateGeometry()
+        self.adjustSize()
+        return True
 
     def _selectedShapesForWheelResize(self):
         shapes = []
@@ -1579,10 +1597,6 @@ class Canvas(QWidget):
             self.hideNormal = not self.hideNormal
             self.hideNRect.emit(self.hideNormal)
             self.update()
-        elif key == Qt.Key_T:
-            self.hideRotated = not self.hideRotated
-            self.hideRRect.emit(self.hideRotated)
-            self.update()
         elif key == Qt.Key_B:
             self.showCenter = not self.showCenter
             self.update()
@@ -1605,22 +1619,22 @@ class Canvas(QWidget):
         return False
 
     def moveOnePixel(self, direction):
-        # Move all selected shapes by one pixel
+        # Keep the legacy method name for callers; nudge by image pixels.
         dirMap = {
-            'Left': QPointF(-1.0, 0),
-            'Right': QPointF(1.0, 0),
-            'Up': QPointF(0, -1.0),
-            'Down': QPointF(0, 1.0),
+            'Left': QPointF(-self.NUDGE_STEP, 0),
+            'Right': QPointF(self.NUDGE_STEP, 0),
+            'Up': QPointF(0, -self.NUDGE_STEP),
+            'Down': QPointF(0, self.NUDGE_STEP),
         }
         step = dirMap.get(direction)
         if step is None:
             return
         shapesToMove = self.selectedShapes if self.selectedShapes else ([self.selectedShape] if self.selectedShape else [])
-        # Check bounds for all shapes
-        for sh in shapesToMove:
-            points = [p + step for p in sh.points]
-            if any(self.outOfPixmap(p) for p in points):
-                return
+        if not shapesToMove:
+            return
+        step = self._boundedTranslation(shapesToMove, step)
+        if step.isNull():
+            return
         self.shapeChangeStarted.emit()
         for sh in shapesToMove:
             for i in range(len(sh.points)):
@@ -1670,6 +1684,7 @@ class Canvas(QWidget):
         self._clearMarqueeSelection()
         self.unHighlight()
         self.pixmap = pixmap
+        self.resetPanView = True
         self.shapes = []
         self.visible.clear()
         self.selectedShapes = []
@@ -1686,6 +1701,21 @@ class Canvas(QWidget):
         self.visible[shape] = value
         self.shapeVisibilityChanged.emit(shape, value)
         self.repaint()
+
+    @property
+    def verified(self):
+        return self._verified
+
+    @verified.setter
+    def verified(self, value):
+        self._verified = bool(value)
+        color = (QColor(184, 239, 38, 128) if value else
+                 QColor(232, 232, 232, 255))
+        palette = self.palette()
+        if palette.color(self.backgroundRole()) != color:
+            palette.setColor(self.backgroundRole(), color)
+            self.setPalette(palette)
+        self.setAutoFillBackground(True)
 
     def currentCursor(self):
         cursor = QApplication.overrideCursor()
