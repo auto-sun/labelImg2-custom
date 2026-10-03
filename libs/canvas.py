@@ -47,7 +47,7 @@ class Canvas(QWidget):
 
     epsilon = 7.0
     VERTEX_HIT_RADIUS = 12.0
-    WHEEL_SHAPE_SCALE_STEP = 1.05
+    WHEEL_SHAPE_SCALE_STEP = 1.02
     MIN_SHAPE_EDGE = 2.0
     NUDGE_STEP = 5.0
 

@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
 from PyQt5.QtCore import QEvent, QPoint, QPointF, Qt
-from PyQt5.QtGui import QMouseEvent, QPixmap
+from PyQt5.QtGui import QMouseEvent, QPixmap, QWheelEvent
 from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication, QMessageBox
 
@@ -137,6 +138,69 @@ class WorkflowTests(unittest.TestCase):
         self.window.canvas.moveOnePixel('Right')
         self.window.canvas.moveOnePixel('Right')
         self.assertEqual(1150, box.points[0].x())
+
+    def wheel(self, delta, modifiers=Qt.NoModifier):
+        canvas = self.window.canvas
+        point = QPoint(100, 100)
+        event = QWheelEvent(
+            QPointF(point), QPointF(canvas.mapToGlobal(point)),
+            QPoint(), QPoint(0, delta), Qt.NoButton, modifiers,
+            Qt.NoScrollPhase, False)
+        QApplication.sendEvent(canvas, event)
+
+    def test_image_wheel_zoom_uses_two_percentage_points_and_ctrl_still_works(self):
+        self.window.setZoom(100)
+        self.wheel(-120)
+        self.assertEqual(98, self.window.zoomWidget.value())
+        self.wheel(120, Qt.ControlModifier)
+        self.assertEqual(100, self.window.zoomWidget.value())
+        self.wheel(-120, Qt.ControlModifier)
+        self.assertEqual(98, self.window.zoomWidget.value())
+
+    def test_selected_box_wheel_resize_is_finer_without_zooming_image(self):
+        box = make_box('person', 30, 30)
+        self.select_boxes(box)
+        original_width = box.boundingRect().width()
+        zoom = self.window.zoomWidget.value()
+        self.wheel(-120)
+        self.assertAlmostEqual(original_width / 1.02, box.boundingRect().width())
+        self.assertEqual(zoom, self.window.zoomWidget.value())
+        self.wheel(120)
+        self.assertAlmostEqual(original_width, box.boundingRect().width())
+        self.assertEqual(zoom, self.window.zoomWidget.value())
+
+    def test_initial_image_load_has_ten_pixels_on_all_sides_after_previous_panning(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for index, (width, height, size) in enumerate((
+                    (1366, 768, (2000, 1000)),
+                    (1366, 768, (1000, 2000)),
+                    (1920, 1080, (2000, 2000)),
+                    (2560, 1440, (3000, 250)),
+                    (1000, 700, (250, 3000)))):
+                self.window.resize(width, height)
+                self.app.processEvents()
+                for bar in self.window.scrollBars.values():
+                    bar.setValue(bar.maximum())
+                pixmap = QPixmap(*size)
+                pixmap.fill(Qt.white)
+                path = os.path.join(directory, 'initial-%d.png' % index)
+                self.assertTrue(pixmap.save(path))
+                self.assertTrue(self.window.loadFile(path))
+                for _ in range(4):
+                    self.app.processEvents()
+                canvas = self.window.canvas
+                area = self.window.scrollArea
+                offset = canvas.offsetToCenter() * canvas.scale
+                left = offset.x() - area.horizontalScrollBar().value()
+                top = offset.y() - area.verticalScrollBar().value()
+                right = area.viewport().width() - left - size[0] * canvas.scale
+                bottom = area.viewport().height() - top - size[1] * canvas.scale
+                for margin in (left, right, top, bottom):
+                    self.assertGreaterEqual(margin, 10, (
+                        width, height, size, canvas.scale,
+                        (left, right, top, bottom),
+                        area.horizontalScrollBar().value(),
+                        area.verticalScrollBar().value()))
 
     def test_all_four_margins_survive_layout_resize_zoom_and_image_switch(self):
         canvas = self.window.canvas

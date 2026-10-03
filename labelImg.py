@@ -83,6 +83,8 @@ class WindowMixin(object):
 class MainWindow(QMainWindow, WindowMixin):
     FIT_WINDOW, FIT_WIDTH, MANUAL_ZOOM = list(range(3))
     UNDO_LIMIT = 50
+    WHEEL_ZOOM_STEP = 2
+    FIT_IMAGE_MARGIN = 10
 
     def __init__(self, defaultFilename=None, defaultPrefdefClassFile=None, defaultSaveDir=None):
         super(MainWindow, self).__init__()
@@ -2308,8 +2310,18 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def eventFilter(self, watched, event):
         if watched is self.scrollArea.viewport() and event.type() == QEvent.Resize:
-            QTimer.singleShot(0, self.applyCanvasOverscroll)
+            QTimer.singleShot(0, self.updateCanvasViewport)
         return super(MainWindow, self).eventFilter(watched, event)
+
+    def updateCanvasViewport(self):
+        # Toolbar wrapping and scrollbar layout can finish after loadFile.
+        # Refit to the final viewport, not the pre-layout window dimensions.
+        if not self.image.isNull() and self.zoomMode != self.MANUAL_ZOOM:
+            self.adjustScale()
+        self.applyCanvasOverscroll()
+        if not self.image.isNull() and self.zoomMode == self.FIT_WINDOW:
+            self.scrollBars[Qt.Horizontal].setValue(self.canvas.panHorizontalMargin)
+            self.scrollBars[Qt.Vertical].setValue(self.canvas.panMargin)
 
     def applyCanvasOverscroll(self):
         # Give QScrollArea actual content to scroll, not a synthetic range
@@ -2379,7 +2391,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # zoom in
         units = delta / (8 * 15)
-        scale = 10
+        scale = self.WHEEL_ZOOM_STEP
         self.addZoom(scale * units)
 
         # get the difference in scrollbar values
@@ -2475,7 +2487,8 @@ class MainWindow(QMainWindow, WindowMixin):
             self.canvas.setEnabled(True)
             self.actions.pasteFromClipboard.setEnabled(
                 bool(self._shapeClipboard))
-            self.adjustScale(initial=True)
+            self.actions.fitWindow.setChecked(True)
+            self.setFitWindow(True)
             self.paintCanvas()
             self.addRecentFile(self.filePath)
             self.toggleActions(True)
@@ -2534,8 +2547,8 @@ class MainWindow(QMainWindow, WindowMixin):
         if self.image.isNull():
             return
         self.canvas.scale = 0.01 * self.zoomWidget.value()
-        self.applyCanvasOverscroll()
         self.canvas.adjustSize()
+        self.applyCanvasOverscroll()
         self.canvas.update()
 
     def adjustScale(self, initial=False):
@@ -2549,9 +2562,17 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def scaleFitWindow(self):
         """Figure out the size of the pixmap in order to fit the main widget."""
-        e = 2.0  # So that no scrollbars are generated.
-        w1 = self.centralWidget().width() - e
-        h1 = self.centralWidget().height() - e
+        # Pan margins make both scrollbars appear. Reserve their space even
+        # before the first image's layout completes, then keep 10 logical
+        # screen pixels on each side of the displayed image.
+        viewport = self.scrollArea.viewport()
+        extent = self.scrollArea.style().pixelMetric(QStyle.PM_ScrollBarExtent)
+        w1 = viewport.width() - 2 * self.FIT_IMAGE_MARGIN
+        h1 = viewport.height() - 2 * self.FIT_IMAGE_MARGIN
+        if not self.scrollBars[Qt.Vertical].isVisible():
+            w1 -= extent
+        if not self.scrollBars[Qt.Horizontal].isVisible():
+            h1 -= extent
         if self.canvas.pixmap is None:
             return 1.0
         # Calculate a new scale value based on the pixmap's aspect ratio.
@@ -2564,8 +2585,9 @@ class MainWindow(QMainWindow, WindowMixin):
         return w1 / w2 if a2 >= a1 else h1 / h2
 
     def scaleFitWidth(self):
-        # The epsilon does not seem to work too well here.
-        w = self.centralWidget().width() - 2.0
+        w = self.scrollArea.viewport().width() - 2 * self.FIT_IMAGE_MARGIN
+        if not self.scrollBars[Qt.Vertical].isVisible():
+            w -= self.scrollArea.style().pixelMetric(QStyle.PM_ScrollBarExtent)
         if self.canvas.pixmap is None:
             return 1.0
         pixmapWidth = self.canvas.pixmap.width()

@@ -14,20 +14,22 @@ Fork 网络，但上游来源、版权和许可证声明仍完整保留。
 [`NOTICE_zh-CN.md`](NOTICE_zh-CN.md) 与
 [`MODIFICATIONS_zh-CN.md`](MODIFICATIONS_zh-CN.md)。
 
+打开/切换图片默认居中适应窗口，四边至少保留 10px 空白；手动缩放不强制保留此初始比例。
+
 ## 界面预览
 
 ![LabelImg2 Custom 标注界面](docs/images/labelimg2-interface-redacted.png)
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.7.4（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.4/LabelImg2Custom-2.7.4-Setup.exe)
+[下载 Windows 安装包 v2.7.5（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.5/LabelImg2Custom-2.7.5-Setup.exe)
 
-v2.7.4：Alt 平移四周均可留出约三分之一可视画布（左右按宽度，上下按高度）；Ctrl 拖动复制全部已选框，方向键微调 5 像素；修复 BAT/安装版 Alt 留白与框角闪烁，新增文件菜单重启，修复中文首字母轮选。R 保留隐藏功能，T 释放给自定义类别。连续按 Del 仍将图片和对应标签移入回收站。
+v2.7.5：滚轮缩放分度调细，初始四周至少 10px 留白；Alt 平移四周均可留出约三分之一可视画布（左右按宽度，上下按高度）；Ctrl 拖动复制全部已选框，方向键微调 5 像素；修复 BAT/安装版 Alt 留白与框角闪烁，新增文件菜单重启，修复中文首字母轮选。R 保留隐藏功能，T 释放给自定义类别。连续按 Del 仍将图片和对应标签移入回收站。
 选择标签目录时记录对应的图片根目录，打开上级图片目录后继续按原关系读取和保存。
 旧版扁平标签也会按唯一文件名匹配；有同名图片时不会猜测归属。
 帮助菜单新增“检查更新”和默认勾选的“启动时自动检查更新”。关闭勾选后重启不再自动联网检查。
 安装版同意更新后下载、校验 SHA256，再处理未保存标注并运行安装器；源码版打开发行页。
-网络失败不妨碍标注。详见 [v2.7.4 发行说明](docs/releases/v2.7.4.md)。
+网络失败不妨碍标注。详见 [v2.7.5 发行说明](docs/releases/v2.7.5.md)。
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或依赖包。
 安装包内含 CPU 版自动标注依赖，但不附带 `.pt` 模型权重。
@@ -129,8 +131,8 @@ data/predefined_classes.txt
 | 操作 | 功能 |
 | --- | --- |
 | `E` | 按工具栏当前选择的普通框或 OBB 类型进入/退出绘制 |
-| 鼠标滚轮（未选框） | 缩放图片 |
-| 鼠标滚轮（已选框） | 以框中心等比例缩放选中框 |
+| 鼠标滚轮 / `Ctrl+滚轮`（未选框） | 缩放图片，每格 2 个百分点 |
+| 鼠标滚轮（已选框） | 以框中心等比例缩放选中框，每格约 2%；Ctrl+滚轮仍优先调整框 |
 | `Alt + 鼠标左键拖动` | 平移画布 |
 | 图片空白处左键拖动 | 框选多个 Box |
 | `Ctrl/Shift + 框选` | 把新框选结果追加到当前选择 |

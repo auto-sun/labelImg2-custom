@@ -139,6 +139,17 @@ _WORKFLOW_SHORTCUTS = {
 }
 
 
+_ZOOM_GUIDE = {
+    'en': '<li>On opening an image, Fit Window leaves at least 10px on each side. Image wheel zoom uses 2 percentage points per notch; selected box resizing is about 2%.</li><li><b>Ctrl + wheel</b> also zooms the image when no box is selected; selected boxes retain priority for wheel resizing.</li>',
+    'zh': '<li>打开图片默认适应窗口，四边至少留出 10px。图片滚轮每格缩放 2 个百分点，选中框每格缩放约 2%。</li><li><b>Ctrl + 滚轮</b>：未选中框时也可缩放图片；已选中框时仍优先调整框大小，保留原有行为。</li>',
+    'ja': '<li>画像を開くとウィンドウに合わせ、各辺に最低 10px の余白を残します。ホイールは画像を 2 ポイント、選択枠を約 2% ずつ拡大縮小します。</li><li><b>Ctrl + ホイール</b>も未選択時に画像を拡大縮小します。枠選択時は枠サイズの変更が優先です。</li>',
+    'es': '<li>Al abrir, la imagen se ajusta con al menos 10px en cada lado. La rueda cambia el zoom 2 puntos porcentuales o el tamaño de los cuadros seleccionados aproximadamente un 2%.</li><li><b>Ctrl + rueda</b> también amplía la imagen sin selección; con cuadros seleccionados se prioriza su tamaño.</li>',
+    'ar': '<li>عند الفتح تلائم الصورة النافذة مع هامش لا يقل عن 10px من كل جانب. تغير العجلة تكبير الصورة بمقدار نقطتين مئويتين أو حجم الإطارات المحددة بنحو 2%.</li><li><b>Ctrl + العجلة</b> يكبر الصورة أيضًا دون تحديد إطار؛ تظل أولوية العجلة لتغيير حجم الإطارات المحددة.</li>',
+    'fr': '<li>À l’ouverture, l’image s’ajuste avec au moins 10px de marge sur chaque côté. La molette change le zoom de 2 points de pourcentage, ou la taille des boîtes sélectionnées d’environ 2%.</li><li><b>Ctrl + molette</b> zoome aussi l’image sans sélection ; les boîtes sélectionnées restent prioritaires pour le redimensionnement.</li>',
+    'ko': '<li>이미지를 열면 각 변에 최소 10px 여백을 두고 창에 맞춥니다. 휠은 이미지 확대율을 2%포인트씩, 선택 상자 크기를 약 2%씩 조절합니다.</li><li><b>Ctrl + 휠</b>도 선택된 상자가 없으면 이미지를 확대/축소합니다. 상자가 선택되면 상자 크기 조절이 우선입니다.</li>',
+}
+
+
 class UserGuideDialog(QDialog):
     def __init__(self, language='en', parent=None):
         super(UserGuideDialog, self).__init__(parent)
@@ -147,6 +158,7 @@ class UserGuideDialog(QDialog):
         (title, shortcuts, shortcut_body, basic, basic_body,
          advanced, advanced_body) = _GUIDES.get(language, _GUIDES['en'])
         shortcut_body += _WORKFLOW_SHORTCUTS.get(language, _WORKFLOW_SHORTCUTS['en'])
+        shortcut_body += _ZOOM_GUIDE.get(language, _ZOOM_GUIDE['en'])
         browser = QTextBrowser(self)
         browser.setOpenExternalLinks(False)
         browser.setHtml(
