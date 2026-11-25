@@ -57,6 +57,7 @@ class WorkflowTests(unittest.TestCase):
         self.settings_patch.start()
         self.window = labelImg.MainWindow(defaultPrefdefClassFile=os.path.join(
             os.path.dirname(labelImg.__file__), 'data', 'predefined_classes.txt'))
+        self.window.workspace.setCurrentWidget(self.window.scrollArea)
         self.window.resize(1000, 700)
         self.window.show()
         pixmap = QPixmap(1200, 1000)

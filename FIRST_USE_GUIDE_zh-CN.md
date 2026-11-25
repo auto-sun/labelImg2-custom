@@ -12,7 +12,7 @@
 
 ## 一、下载并安装
 
-1. [下载 v2.7.5 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.5/LabelImg2Custom-2.7.5-Setup.exe)。
+1. [下载 v2.7.6 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.6/LabelImg2Custom-2.7.6-Setup.exe)。
 2. 双击安装包，按向导完成安装。默认安装到当前用户目录，不需要管理员权限。
 3. 从开始菜单打开 `LabelImg2 Custom`。如果 Windows 显示“未知发布者”，请先核对文件确实来自本项目的 GitHub Release；安装包目前没有代码签名。
 
@@ -67,8 +67,8 @@ my_dataset\
 
 操作顺序：
 
-1. 点击 `File > Open Dir`，选择图片根目录，例如 `my_dataset\images`。
-2. 点击 `File > Open Annotation Dir`，选择标签根目录，例如 `my_dataset\labels`。
+1. 从欢迎页或 `File > Open Dir` 选择图片根目录，例如 `my_dataset\images`。
+2. 点选检测到的同级 `labels` 或 `label`。也可以选择其他文件夹。若找不到候选，系统会自动打开目录选择器。打开后可用 `File > Open Annotation Dir` 更换标签目录。
 3. 点击 `Settings > Annotation Format`，选择需要直接保存的格式：
    - `Pascal VOC XML`
    - `Ultralytics YOLO`

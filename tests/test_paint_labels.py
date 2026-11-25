@@ -102,6 +102,7 @@ class PaintLabelsTests(unittest.TestCase):
             shape = make_shape()
             shape.paintLabel = False
             window.canvas.shapes.append(shape)
+            window.workspace.setCurrentWidget(window.scrollArea)
             window.show()
             window.activateWindow()
             QApplication.setActiveWindow(window)
@@ -149,6 +150,7 @@ class PaintLabelsTests(unittest.TestCase):
             window.addLabel(first)
             window.addLabel(second)
             window.canvas.selectShape(first)
+            window.workspace.setCurrentWidget(window.scrollArea)
             window.show()
             window.activateWindow()
             QApplication.setActiveWindow(window)
@@ -181,6 +183,7 @@ class PaintLabelsTests(unittest.TestCase):
             window.addLabel(first)
             window.addLabel(second)
             window.canvas.selectShape(first)
+            window.workspace.setCurrentWidget(window.scrollArea)
             window.show()
             window.activateWindow()
             QApplication.setActiveWindow(window)

@@ -47,6 +47,7 @@ from libs.trash_utils import TrashError, move_to_trash
 from libs.ui_geometry import available_screen_geometry
 from libs.i18n import LANGUAGES, LanguageManager, translate as translateUi
 from libs.userGuide import UserGuideDialog
+from libs.welcome import WelcomePage
 
 from libs.labelView import (CLabelView, HashableQStandardItem,
                             label_search_keys)
@@ -326,7 +327,11 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas.imageNavigationRequested.connect(
             self.navigateImageByOffset)
 
-        self.setCentralWidget(scroll)
+        self.workspace = QStackedWidget()
+        self.welcomePage = WelcomePage()
+        self.workspace.addWidget(self.welcomePage)
+        self.workspace.addWidget(scroll)
+        self.setCentralWidget(self.workspace)
         self.addDockWidget(Qt.RightDockWidgetArea, self.dock)
         self.addDockWidget(Qt.RightDockWidgetArea, self.filedock)
         self.dock.setFeatures(QDockWidget.DockWidgetFloatable)
@@ -689,6 +694,10 @@ class MainWindow(QMainWindow, WindowMixin):
         self.userGuideAction = action(
             'User Guide', self.showUserGuide, None, 'info.svg',
             'Shortcuts, basic operation, and advanced workflows')
+        self.welcomePage.openFolder.clicked.connect(opendir.trigger)
+        self.welcomePage.openImage.clicked.connect(open.trigger)
+        self.welcomePage.help.clicked.connect(self.userGuideAction.trigger)
+        self.welcomePage.recentOpened.connect(self.loadRecent)
         addActions(self.menus.help, (self.userGuideAction, showInfo))
         self.updateController = UpdateController(self, settings)
         self.checkUpdatesAction = action('Check for Updates', self.updateController.check)
@@ -805,6 +814,9 @@ class MainWindow(QMainWindow, WindowMixin):
         self.move(position)
         saveDir = settings.get(SETTING_SAVE_DIR, None)
         self.lastOpenDir = settings.get(SETTING_LAST_OPEN_DIR, None)
+        self.recentImageDirs = list(settings.get('recentImageDirs', []) or [])
+        if self.lastOpenDir and self.lastOpenDir not in self.recentImageDirs:
+            self.recentImageDirs.insert(0, self.lastOpenDir)
         self.annotationBindings = dict(settings.get('annotationDirectoryBindings', {}))
         self.uniqueImageStems = set()
         if self.lastOpenDir and saveDir:
@@ -825,6 +837,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # Populate the File menu dynamically.
         self.updateFileMenu()
+        self.updateWelcomeRecents()
 
         # Since loading the file may take some time, make sure it runs in the background.
         if (not self.filePath and self.lastOpenDir and
@@ -836,6 +849,8 @@ class MainWindow(QMainWindow, WindowMixin):
             self.queueEvent(partial(self.importDirImages, self.filePath or ""))
         elif self.filePath:
             self.queueEvent(partial(self.loadFile, self.filePath or ""))
+        elif self.lastOpenFile and os.path.isfile(self.lastOpenFile):
+            self.queueEvent(partial(self.loadFile, self.lastOpenFile))
 
         # Callbacks:
         self.zoomWidget.valueChanged.connect(self.paintCanvas)
@@ -1297,7 +1312,7 @@ class MainWindow(QMainWindow, WindowMixin):
     def status(self, message, delay=5000):
         self.statusBar().showMessage(message, delay)
 
-    def resetState(self):
+    def resetState(self, showWelcome=True):
         self._pendingLabelShortcut = None
         self.rememberCurrentSessionShapes()
         self.resetUndoHistory()
@@ -1313,6 +1328,8 @@ class MainWindow(QMainWindow, WindowMixin):
         self.loadedAnnotationPath = None
         self.loadedAnnotationFormat = None
         self.canvas.resetState()
+        if showWelcome:
+            self.showWelcomePage()
         self.actions.pasteFromClipboard.setEnabled(False)
         self.labelCoordinates.clear()
         self.imageDim.clear()
@@ -1353,6 +1370,17 @@ class MainWindow(QMainWindow, WindowMixin):
         elif len(self.recentFiles) >= self.maxRecent:
             self.recentFiles.pop()
         self.recentFiles.insert(0, filePath)
+
+    def updateWelcomeRecents(self):
+        folders = [path for path in self.recentImageDirs if os.path.isdir(path)]
+        images = [path for path in self.recentFiles if os.path.isfile(path)
+                  and not any(relative_inside(path, root) is not None
+                              for root in folders)]
+        self.welcomePage.setRecentPaths((folders + images)[:self.maxRecent])
+
+    def showWelcomePage(self):
+        self.updateWelcomeRecents()
+        self.workspace.setCurrentWidget(self.welcomePage)
 
     def showInfoDialog(self):
         msg = (u'{0} v{1}\nGNU AGPL v3.0\n'
@@ -2420,7 +2448,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def loadFile(self, filePath=None):
         """Load the specified file, or the last opened file if None."""
-        self.resetState()
+        self.resetState(showWelcome=False)
         self.canvas.setEnabled(False)
         if filePath is None:
             filePath = self.settings.get(SETTING_FILENAME)
@@ -2439,6 +2467,7 @@ class MainWindow(QMainWindow, WindowMixin):
                                        u"<p>Make sure <i>%s</i> is a valid label file.")
                                       % (e, unicodeFilePath))
                     self.status("Error reading %s" % unicodeFilePath)
+                    self.showWelcomePage()
                     return False
                 self.imageData = self.labelFile.imageData
                 self.lineColor = QColor(*self.labelFile.lineColor)
@@ -2475,10 +2504,12 @@ class MainWindow(QMainWindow, WindowMixin):
                     u'无法打开图片：<br>%s<br><br>%s<br>'
                     u'可以继续切换到其他图片。' %
                     (unicodeFilePath, error))
+                self.showWelcomePage()
                 return False
 
             self.image = image
             self.filePath = unicodeFilePath
+            self.workspace.setCurrentWidget(self.scrollArea)
             self.canvas.loadPixmap(QPixmap.fromImage(image))
             self.imageDim.setText('%d x %d' % (self.image.width(), self.image.height()))
             if self.labelFile is not None:
@@ -2533,6 +2564,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.updateLabelStatistics()
             self.canvas.setFocus(True)
             return True
+        self.showWelcomePage()
         return False
 
     def resizeEvent(self, event):
@@ -3119,6 +3151,7 @@ class MainWindow(QMainWindow, WindowMixin):
         settings[SETTING_LINE_COLOR] = self.lineColor
         settings[SETTING_FILL_COLOR] = self.fillColor
         settings[SETTING_RECENT_FILES] = self.recentFiles
+        settings['recentImageDirs'] = self.recentImageDirs
         if self.defaultSaveDir and os.path.exists(self.defaultSaveDir):
             settings[SETTING_SAVE_DIR] = self.defaultSaveDir
         else:
@@ -3159,7 +3192,9 @@ class MainWindow(QMainWindow, WindowMixin):
     ## User Dialogs ##
 
     def loadRecent(self, filename):
-        if self.mayContinue():
+        if os.path.isdir(filename):
+            self.openImageProject(filename)
+        elif os.path.isfile(filename) and self.mayContinue():
             self.loadFile(filename)
 
     def scanAllImages(self, folderPath):
@@ -3654,12 +3689,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 if self.defaultSaveDir and os.path.isdir(self.defaultSaveDir)
                 else (self.dirname if self.dirname else '.'))
         if dirpath is None:
-            dirpath = QFileDialog.getExistingDirectory(
-                self,
-                '%s - Open Annotation Dir' % __appname__,
-                path,
-                QFileDialog.ShowDirsOnly |
-                QFileDialog.DontResolveSymlinks)
+            dirpath = self.pickAnnotationDirectory(path)
         if not dirpath:
             return
 
@@ -3681,33 +3711,80 @@ class MainWindow(QMainWindow, WindowMixin):
             self.defaultSaveDir,
             10000)
 
+    def pickAnnotationDirectory(self, initialPath):
+        return QFileDialog.getExistingDirectory(
+            self, translateUi('Open Annotation Dir', self.languageManager.language),
+            initialPath, QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks)
+
     def changeSavedirDialog(self, _value=False):
         """Compatibility alias for older shortcuts and internal calls."""
         return self.openAnnotationDirDialog(_value)
 
     def openDirDialog(self, _value=False, dirpath=None):
-        if not self.mayContinue():
-            return
-
         defaultOpenDirPath = dirpath if dirpath else '.'
         if self.lastOpenDir and os.path.exists(self.lastOpenDir):
             defaultOpenDirPath = self.lastOpenDir
-        else:
-            defaultOpenDirPath = os.path.dirname(self.filePath) if self.filePath else '.'
+        elif self.filePath:
+            defaultOpenDirPath = os.path.dirname(self.filePath)
 
-        targetDirPath = QFileDialog.getExistingDirectory(self,
-                                                     '%s - Open Directory' % __appname__, defaultOpenDirPath,
-                                                     QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks)
-        self.importDirImages(targetDirPath)
+        targetDirPath = QFileDialog.getExistingDirectory(
+            self, translateUi('Open Dir', self.languageManager.language),
+            defaultOpenDirPath, QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks)
+        if targetDirPath:
+            self.openImageProject(targetDirPath)
 
-    def importDirImages(self, dirpath, resumeFilePath=None):
-        if not self.mayContinue() or not dirpath:
+    def openImageProject(self, imageDir):
+        annotationDir = self.selectProjectAnnotationDirectory(imageDir)
+        if annotationDir:
+            self.importDirImages(imageDir, annotationDir=annotationDir)
+
+    def selectProjectAnnotationDirectory(self, imageDir):
+        parent = os.path.dirname(os.path.abspath(imageDir))
+        candidates = [os.path.join(parent, name) for name in ('labels', 'label')
+                      if os.path.isdir(os.path.join(parent, name))]
+        if candidates:
+            language = self.languageManager.language
+            prompt = QMessageBox(QMessageBox.Question,
+                translateUi('Open Annotation Dir', language),
+                translateUi('Choose a detected label folder or browse for another folder.', language),
+                QMessageBox.Cancel, self)
+            prompt.setInformativeText(QDir.toNativeSeparators(parent))
+            prompt.setTextFormat(Qt.PlainText)
+            choices = {
+                prompt.addButton(os.path.basename(path), QMessageBox.AcceptRole): path
+                for path in candidates}
+            browse = prompt.addButton(translateUi('Choose Another Folder…', language),
+                                      QMessageBox.ActionRole)
+            prompt.setDefaultButton(next(iter(choices)))
+            prompt.exec_()
+            selected = prompt.clickedButton()
+            if selected != browse:
+                return choices.get(selected)
+        return self.pickAnnotationDirectory(parent)
+
+    def importDirImages(self, dirpath, resumeFilePath=None, annotationDir=None):
+        if (not dirpath or not os.path.isdir(dirpath) or
+                (annotationDir is not None and not os.path.isdir(annotationDir)) or
+                not self.mayContinue()):
             return
 
+        dirpath = os.path.abspath(dirpath)
+        previousStems = self.uniqueImageStems
+        imglist = self.scanAllImages(dirpath)
+        if not imglist:
+            self.uniqueImageStems = previousStems
+            self.status(translateUi('No supported images were found in this folder.',
+                                    self.languageManager.language))
+            return
+        self.resetState()
+        self.setClean()
         self.lastOpenDir = dirpath
         self.dirname = dirpath
+        if dirpath in self.recentImageDirs:
+            self.recentImageDirs.remove(dirpath)
+        self.recentImageDirs.insert(0, dirpath)
+        self.recentImageDirs = self.recentImageDirs[:self.maxRecent]
         self.actions.refreshProject.setEnabled(True)
-        self.filePath = None
 
         # Preserve the last explicitly selected annotation directory.  Only
         # fall back to saving beside the images when no valid saved directory
@@ -3716,14 +3793,21 @@ class MainWindow(QMainWindow, WindowMixin):
                  if relative_inside(dirpath, root) is not None and os.path.isdir(destination)]
         descendants = {destination for root, destination in self.annotationBindings.items()
                        if relative_inside(root, dirpath) is not None and os.path.isdir(destination)}
-        if known:
+        if annotationDir is not None:
+            self.defaultSaveDir = os.path.abspath(annotationDir)
+            self.annotationBindings[dirpath] = self.defaultSaveDir
+            self.settings['annotationDirectoryBindings'] = self.annotationBindings
+            self.settings[SETTING_SAVE_DIR] = self.defaultSaveDir
+            self.settings[SETTING_LAST_OPEN_DIR] = dirpath
+            self.settings['recentImageDirs'] = self.recentImageDirs
+            self.settings.save()
+        elif known:
             self.defaultSaveDir = max(known)[1]
         elif len(descendants) == 1:
             self.defaultSaveDir = next(iter(descendants))
         if not self.defaultSaveDir or not os.path.isdir(self.defaultSaveDir):
             self.defaultSaveDir = dirpath
 
-        imglist = self.scanAllImages(dirpath)
         self.fileModel.annotationPathResolver = self.annotationBasePathForImage
         self.fileModel.setStringList(
             imglist, self.dirname, self.defaultSaveDir,

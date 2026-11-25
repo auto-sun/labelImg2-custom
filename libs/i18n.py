@@ -18,6 +18,14 @@ LANGUAGES = {
 # These are application chrome strings, not annotation data. Class names,
 # image names, paths, and user-entered text are intentionally never translated.
 _ROWS = {
+    'Start': ('开始', '開始', 'Inicio', 'البدء', 'Démarrer', '시작'),
+    'Open Image': ('打开图片', '画像を開く', 'Abrir imagen', 'فتح صورة', 'Ouvrir une image', '이미지 열기'),
+    'Recent Work': ('最近工作', '最近の作業', 'Trabajo reciente', 'العمل الأخير', 'Travail récent', '최근 작업'),
+    'Open a dataset to start annotating.': ('打开数据集开始标注。', 'データセットを開いてアノテーションを開始します。', 'Abre un conjunto de datos para empezar a anotar.', 'افتح مجموعة بيانات لبدء التعليق التوضيحي.', 'Ouvrez un jeu de données pour commencer à annoter.', '데이터셋을 열어 주석 작업을 시작하세요.'),
+    'Recently opened folders and images will appear here.': ('最近打开的文件夹和图片会显示在这里。', '最近開いたフォルダーと画像がここに表示されます。', 'Aquí aparecerán las carpetas e imágenes abiertas recientemente.', 'ستظهر هنا المجلدات والصور المفتوحة مؤخرًا.', 'Les dossiers et images ouverts récemment apparaîtront ici.', '최근에 연 폴더와 이미지가 여기에 표시됩니다.'),
+    'Choose a detected label folder or browse for another folder.': ('选择检测到的标签文件夹，或打开其他文件夹。', '見つかったラベルフォルダーを選ぶか、別のフォルダーを参照してください。', 'Elige una carpeta de etiquetas detectada o busca otra carpeta.', 'اختر مجلد تسميات تم العثور عليه أو تصفح لاختيار مجلد آخر.', 'Choisissez un dossier d’annotations détecté ou parcourez un autre dossier.', '찾은 라벨 폴더를 선택하거나 다른 폴더를 찾아보세요.'),
+    'Choose Another Folder…': ('选择其他文件夹…', '別のフォルダーを選択…', 'Elegir otra carpeta…', 'اختيار مجلد آخر…', 'Choisir un autre dossier…', '다른 폴더 선택…'),
+    'No supported images were found in this folder.': ('此文件夹内没有受支持的图片。', 'このフォルダーに対応する画像がありません。', 'No se encontraron imágenes compatibles en esta carpeta.', 'لم يتم العثور على صور مدعومة في هذا المجلد.', 'Ce dossier ne contient aucune image prise en charge.', '이 폴더에 지원되는 이미지가 없습니다.'),
     'Restart Software': ('重启软件', 'ソフトウェアを再起動', 'Reiniciar software', 'إعادة تشغيل البرنامج', 'Redémarrer le logiciel', '소프트웨어 다시 시작'),
     'Restart the application': ('重启当前软件，保留已保存的项目设置', '保存した設定でアプリを再起動', 'Reiniciar con los ajustes guardados', 'إعادة التشغيل بالإعدادات المحفوظة', 'Redémarrer avec les paramètres enregistrés', '저장된 설정으로 앱 다시 시작'),
     'Save changes before restarting?': ('重启前保存当前标注吗？', '再起動前に変更を保存しますか？', '¿Guardar antes de reiniciar?', 'هل تريد حفظ التغييرات قبل إعادة التشغيل؟', 'Enregistrer avant de redémarrer ?', '다시 시작하기 전에 저장할까요?'),

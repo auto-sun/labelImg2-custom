@@ -16,12 +16,12 @@
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.7.5（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.5/LabelImg2Custom-2.7.5-Setup.exe)
+[下载 Windows 安装包 v2.7.6（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.6/LabelImg2Custom-2.7.6-Setup.exe)
 
-v2.7.5 调细滚轮分度，图片初始四周至少留 10px；保留左右留白，Alt 平移四周均可留出约三分之一可视画布；支持 Ctrl 拖动复制全部选中框，方向键微调改为 5 像素；修复 BAT/安装版 Alt 留白与角点闪烁，新增文件菜单重启，修复中文同首字母轮选并释放 T 快捷键。右侧标签快捷键按钮在“困难样本”上方。
+v2.7.6 在打开图片目录后自动提示选择同级的 `labels`、`label` 或其他标签目录。没有上次工作可恢复时，欢迎页提供打开图片、打开图片目录和最近工作入口。
 例如在 `a/b/img/c` 标注并保存到 `a/b/labels`，以后打开 `a/b/img` 仍能读取原标签。
 “帮助 → 检查更新”可下载并升级安装版；“启动时自动检查更新”默认勾选，可随时关闭。
-更新先询问、可取消下载，安装前验证 SHA256。详见 [v2.7.5 发行说明](docs/releases/v2.7.5.md)。
+更新先询问、可取消下载，安装前验证 SHA256。详见 [v2.7.6 发行说明](docs/releases/v2.7.6.md)。
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或其他运行环境。
 安装包包含 CPU 版模型推理依赖，但不包含 `.pt` 模型权重；自动标注时请选择自己的模型。
@@ -77,7 +77,7 @@ v2.6.5 修复旧 XML 的 4/6 位小数量化及历史越界导致的首次拖角
 ## 推荐的 YOLO OBB 流程
 
 1. 使用 `File > Open Dir` 选择图片根目录。
-2. 使用 `File > Open Annotation Dir` 选择标签根目录。
+2. 从自动弹出的提示或目录选择器选择标签根目录。之后可以通过 `File > Open Annotation Dir` 更换。
 3. 在 `Settings > Annotation Format` 中选择 `Ultralytics YOLO OBB`；已有标签会显示进度并批量转换。
 4. 建议在 `View` 菜单开启 `Auto Saving`。
 5. 在工具栏选择“框型：OBB”，按 `E` 绘制旋转框，画完后直接输入类别首字母。
