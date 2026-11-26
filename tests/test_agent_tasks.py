@@ -55,6 +55,68 @@ class AgentTests(unittest.TestCase):
     def start(self,**kw):
         return self.call('start_task',instructions='Only pipes',classes=['pipe_row'],**kw)
 
+    def preview(self, info, slot, box):
+        return self.call('preview_box', box_id=slot, box=box,
+                         **{k:info[k] for k in ('task_id','image_token','image_revision')})
+
+    def test_live_overlay_paints_prior_to_submit_and_is_never_an_annotation(self):
+        self.w.show()
+        a=self.start(count=2)
+        canvas=self.w.canvas
+        self.app.processEvents()
+        before=canvas.grab().toImage()
+        self.assertEqual(1,self.preview(a,1,self.box)['preview_count'])
+        self.app.processEvents()
+        self.assertNotEqual(before, canvas.grab().toImage())
+        original_center = canvas._agentPreview[1][1].boundingRect().center()
+        self.assertAlmostEqual(55.0, original_center.x())
+        self.assertEqual(1,self.preview(a,1,dict(self.box,cx=40))['preview_count'])
+        self.assertAlmostEqual(40.0, canvas._agentPreview[1][1].boundingRect().center().x())
+        self.assertEqual(2,self.preview(a,2,dict(self.box,cx=70))['preview_count'])
+        self.assertFalse(canvas.shapes)
+        self.assertFalse(self.w.dirty)
+        self.assertEqual('0.png',Path(self.w.filePath).name)
+        self.assertFalse(list(self.labels.iterdir()))
+        with self.assertRaises(ValueError):
+            self.preview(a,2,dict(self.box,class_id=0))
+        # Only the final supplied list may be written, not the two draft boxes.
+        b=self.submit(a,'annotated',boxes=[self.box])
+        self.assertEqual(1,len((self.labels/'0.txt').read_text().splitlines()))
+        self.assertFalse(canvas._agentPreview)
+        with self.assertRaises(ValueError):
+            self.preview(a,1,self.box)
+        self.preview(b,1,self.box)
+        self.s.stop()
+        self.assertFalse(canvas._agentPreview)
+        self.assertFalse((self.labels/'1.txt').exists())
+
+    def test_review_discards_overlay_and_late_preview_does_not_advance(self):
+        a=self.start(count=2)
+        self.preview(a,1,self.box)
+        b=self.submit(a,'review',reason='ambiguous')
+        self.assertFalse(self.w.canvas._agentPreview)
+        self.assertFalse((self.labels/'0.txt').exists())
+        with self.assertRaises(ValueError):
+            self.preview(a,2,self.box)
+        self.assertEqual('1.png',Path(self.w.filePath).name)
+        self.submit(b,'empty')
+        with self.assertRaises(ValueError):
+            self.preview(b,1,self.box)
+        self.assertEqual(b'',(self.labels/'1.txt').read_bytes())
+
+    def test_manual_switch_and_resume_discard_preview(self):
+        a=self.start(count=2)
+        self.preview(a,1,self.box)
+        self.w.openNextImg()
+        self.assertFalse(self.w.canvas._agentPreview)
+        with self.assertRaises(ValueError):
+            self.preview(a,1,self.box)
+        a=self.call('start_task',resume_task_id=a['task_id'])
+        self.preview(a,1,self.box)
+        self.call('start_task',resume_task_id=a['task_id'])
+        self.assertFalse(self.w.canvas._agentPreview)
+        self.assertFalse(list(self.labels.iterdir()))
+
     def submit(self,info,outcome,**kw):
         return self.call('submit_and_next',outcome=outcome,
                          **{k:info[k] for k in ('task_id','image_token','image_revision')},**kw)
@@ -195,13 +257,17 @@ class AgentTests(unittest.TestCase):
                 try:
                     rpc('initialize',{'protocolVersion':'2025-11-25'})
                     proc.stdin.write(b'{"jsonrpc":"2.0","method":"notifications/initialized"}\n')
-                    self.assertEqual(3,len(rpc('tools/list',{})['tools']))
+                    self.assertEqual({'start_task','task_status','submit_and_next','preview_box'},
+                                     {t['name'] for t in rpc('tools/list',{})['tools']})
                     blocks=tool('start_task',count=2,instructions='QA')
                     for idx in range(2):
                         self.assertEqual('image',blocks[1]['type'])
                         meta=json.loads(blocks[0]['text'])
                         self.assertEqual('%d.png'%idx,meta['image'])
                         ids={k:meta[k] for k in ('task_id','image_revision','image_token')}
+                        ack=json.loads(tool('preview_box',**ids,box_id=1,box=self.box)[0]['text'])
+                        self.assertEqual(1,ack['preview_count'])
+                        self.assertFalse(ack['saved'])
                         blocks=tool('submit_and_next',**ids,outcome='annotated',boxes=[self.box])
                     self.assertTrue(json.loads(blocks[0]['text'])['complete'])
                     self.assertEqual(2,json.loads(tool('task_status')[0]['text'])['annotated'])

@@ -16,14 +16,14 @@
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.8.0（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.8.0/LabelImg2Custom-2.8.0-Setup.exe)
+[下载 Windows 安装包 v2.8.2（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.8.2/LabelImg2Custom-2.8.2-Setup.exe)
 
-2.8.0 支持通过本地 MCP 连续标注。选好项目后在「设置」复制 MCP 配置并授权，智能体即可自动取图、保存和切换下一张。默认跳过已有标签，看不准的图片可标红待复核；停止后可续做。右侧框标签支持按类折叠、整组显隐、全选和改类。
+v2.8.2 的更新提醒会直接显示新版主要改动。通过本地 MCP 连续标注时，智能体可以逐框预览，整张图最终提交时才保存。默认跳过已有标签，看不准的图片可标红待复核。
 
 v2.7.6 在打开图片目录后自动提示选择同级的 `labels`、`label` 或其他标签目录。没有上次工作可恢复时，欢迎页提供打开图片、打开图片目录和最近工作入口。
 例如在 `a/b/img/c` 标注并保存到 `a/b/labels`，以后打开 `a/b/img` 仍能读取原标签。
 “帮助 → 检查更新”可下载并升级安装版；“启动时自动检查更新”默认勾选，可随时关闭。
-更新先询问、可取消下载，安装前验证 SHA256。详见 [v2.8.0 发行说明](docs/releases/v2.8.0.md)。
+更新先询问、可取消下载，安装前验证 SHA256。详见 [v2.8.2 发行说明](docs/releases/v2.8.2.md)。
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或其他运行环境。
 安装包包含 CPU 版模型推理依赖，但不包含 `.pt` 模型权重；自动标注时请选择自己的模型。

@@ -1,14 +1,15 @@
 import hashlib
+import json
 import os
 import tempfile
 import unittest
 from unittest import mock
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
-from PyQt5.QtCore import QByteArray
-from PyQt5.QtWidgets import QApplication, QMessageBox
+from PyQt5.QtCore import QByteArray, Qt
+from PyQt5.QtWidgets import QAction, QApplication, QMessageBox, QWidget
 from libs.annotation_paths import annotation_base
-from libs.updater import newer_release, UpdateController, REPOSITORY
+from libs.updater import newer_release, release_highlights, UpdateController, REPOSITORY
 import test_delete_image as deletion
 MemorySettings = deletion.MemorySettings
 
@@ -91,6 +92,40 @@ class UpdateTests(unittest.TestCase):
         data = self.release()
         data['assets'][0].pop('digest')
         self.assertNotIn('url', newer_release(data, '2.6.0'))
+
+    def test_highlights_support_bullets_and_prose_without_download_noise(self):
+        notes = '# v3\n**[下载安装包](https://example.org)**，SHA-256：123\n- **修复：** 列表刷新\n- 支持 [MCP](https://example.org)\n## 下载与安装\n- 安装步骤'
+        self.assertEqual(release_highlights(notes), '• 修复： 列表刷新\n• 支持 MCP')
+        self.assertEqual(release_highlights('# v3\n支持实时标注。\n\n增加欢迎页。\n[下载](url)'),
+                         '• 支持实时标注。\n• 增加欢迎页。')
+        self.assertEqual(release_highlights('## 下载\n- 安装包'), '')
+        long_notes = '\n'.join('- ' + str(i) + '长' * 200 for i in range(8))
+        preview = release_highlights(long_notes)
+        self.assertEqual(preview.count('•'), 5)
+        self.assertLess(len(preview), 630)
+
+    def test_popup_shows_highlights_before_accepting_in_both_modes(self):
+        for automatic in (False, True):
+            for notes in ('- 修复列表刷新\n- 新增实时预览', None):
+                with self.subTest(automatic=automatic, notes=notes):
+                    window = QWidget()
+                    window.autoCheckUpdatesAction = QAction(window)
+                    controller = UpdateController(window, MemorySettings())
+                    controller.startup.stop()
+                    controller.automatic = automatic
+                    reply = controller.reply = mock.Mock()
+                    reply.error.return_value = 0
+                    reply.readAll.return_value = json.dumps({'tag_name': 'v99.0.0', 'body': notes}).encode()
+                    def inspect(box):
+                        self.assertEqual(box.textFormat(), Qt.PlainText)
+                        self.assertIn('本次更新的主要内容', box.text())
+                        self.assertIn('• 修复列表刷新\n• 新增实时预览' if notes else '此版本未提供更新摘要。', box.text())
+                        self.assertEqual(box.detailedText(), notes or '')
+                        return QMessageBox.No
+                    with mock.patch.object(QMessageBox, 'exec_', new=inspect):
+                        controller.checked()
+                    reply.deleteLater.assert_called_once()
+                    controller.stop()
 
     def test_opt_out_persists_and_prevents_startup_check(self):
         from PyQt5.QtWidgets import QWidget

@@ -36,41 +36,48 @@ def exists_label(base):
     return any(os.path.lexists(base + ext) for ext in ('.xml', '.txt'))
 
 
+def box_geometry(box, width, height, classes, allowed, fmt):
+    """Validate one box for both the live overlay and the output writer."""
+    if not isinstance(box, dict) or set(box) - {'class_id','cx','cy','w','h','angle_deg'}:
+        raise ValueError('Invalid box fields')
+    cid = box.get('class_id')
+    if type(cid) is not int or not 0 <= cid < len(classes) or classes[cid] not in allowed:
+        raise ValueError('class_id outside task class list')
+    values = [box.get(k) for k in ('cx','cy','w','h')] + [box.get('angle_deg', 0)]
+    if any(type(v) not in (int, float) or not math.isfinite(v) for v in values):
+        raise ValueError('Box geometry must contain finite numbers')
+    cx, cy, w, h, degrees = values
+    if min(w, h) <= 0 or (fmt == 'yolo' and degrees != 0):
+        raise ValueError('Invalid size or rotated box in horizontal YOLO format')
+    angle = math.radians(degrees % 360)
+    c, s = math.cos(angle), math.sin(angle)
+    points = [(cx+c*x-s*y, cy+s*x+c*y) for x,y in
+              ((-w/2,-h/2),(w/2,-h/2),(w/2,h/2),(-w/2,h/2))]
+    if any(not (-1e-7 <= x <= width+1e-7 and -1e-7 <= y <= height+1e-7)
+           for x,y in points):
+        raise ValueError('Box exceeds image bounds; correct it before resubmitting')
+    label = classes[cid]
+    if fmt == 'xml' and not angle:
+        x0, y0 = map(round, points[0])
+        x1, y1 = map(round, points[2])
+        if x1 <= x0 or y1 <= y0:
+            raise ValueError('Box is too small for integer XML bounds')
+    return label, points, angle
+
+
 def write_boxes(path, image, width, height, classes, allowed, fmt, boxes):
     """Coordinates are original, display-oriented pixels; clockwise degrees."""
     writer = PascalVocWriter(os.path.basename(os.path.dirname(image)),
                              os.path.basename(image), [height, width, 3], localImgPath=image)
     shapes = []
     for box in boxes:
-        if not isinstance(box, dict) or set(box) - {'class_id','cx','cy','w','h','angle_deg'}:
-            raise ValueError('Invalid box fields')
-        cid = box.get('class_id')
-        if type(cid) is not int or not 0 <= cid < len(classes) or classes[cid] not in allowed:
-            raise ValueError('class_id outside task class list')
-        values = [box.get(k) for k in ('cx','cy','w','h')] + [box.get('angle_deg', 0)]
-        if any(type(v) not in (int, float) or not math.isfinite(v) for v in values):
-            raise ValueError('Box geometry must contain finite numbers')
-        cx, cy, w, h, degrees = values
-        if min(w, h) <= 0 or (fmt == 'yolo' and degrees != 0):
-            raise ValueError('Invalid size or rotated box in horizontal YOLO format')
-        angle = math.radians(degrees % 360)
-        c, s = math.cos(angle), math.sin(angle)
-        points = [(cx+c*x-s*y, cy+s*x+c*y) for x,y in
-                  ((-w/2,-h/2),(w/2,-h/2),(w/2,h/2),(-w/2,h/2))]
-        if any(not (-1e-7 <= x <= width+1e-7 and -1e-7 <= y <= height+1e-7)
-               for x,y in points):
-            raise ValueError('Box exceeds image bounds; correct it before resubmitting')
-        label = classes[cid]
+        label, points, angle = box_geometry(box, width, height, classes, allowed, fmt)
         shapes.append(dict(label=label, points=points))
         if fmt == 'xml':
             if angle:
-                writer.addRotatedBndBox(cx,cy,w,h,angle,label,False,'')
+                writer.addRotatedBndBox(box['cx'], box['cy'], box['w'], box['h'], angle, label, False, '')
             else:
-                x0,y0 = points[0]; x1,y1 = points[2]
-                x0,y0,x1,y1 = map(round,(x0,y0,x1,y1))
-                if x1 <= x0 or y1 <= y0:
-                    raise ValueError('Box is too small for integer XML bounds')
-                writer.addBndBox(x0,y0,x1,y1,label,False,'')
+                writer.addBndBox(*map(round, points[0] + points[2]), label, False, '')
     if fmt == 'xml':
         writer.save(path)
     else:

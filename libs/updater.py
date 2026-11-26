@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 
-from PyQt5.QtCore import QCoreApplication, QObject, QTimer, QUrl
+from PyQt5.QtCore import QCoreApplication, QObject, Qt, QTimer, QUrl
 from PyQt5.QtGui import QDesktopServices
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
 from PyQt5.QtWidgets import QMessageBox, QCheckBox, QProgressDialog
@@ -49,11 +49,39 @@ def version_tuple(value):
     return tuple(map(int, match.groups())) if match else None
 
 
+def release_highlights(notes):
+    """Extract a short plain-text preview from list- or paragraph-style releases."""
+    bullets, paragraphs = [], []
+    skip_section = False
+    for line in notes.splitlines():
+        line = line.strip()
+        if line.startswith('#'):
+            skip_section = bool(re.match(r'#+\s*(下载|安装|校验|download|install|checksum|assets)', line, re.I))
+            continue
+        if not line or skip_section:
+            continue
+        bullet = re.match(r'(?:[-*+]\s+|\d+[.)]\s+)', line)
+        line = line[bullet.end():] if bullet else line
+        line = line.replace('**', '').replace('`', '').strip()
+        if (re.match(r'(?:!?\[[^\]]*\]\([^)]*\)(?:\s*$|[，,。])|https?://|sha-?256|full changelog:)', line, re.I)
+                or not line):
+            continue
+        line = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', line)
+        (bullets if bullet else paragraphs).append(line)
+    items = list(dict.fromkeys(bullets or paragraphs))
+    preview = ['• ' + (s[:119] + '…' if len(s) > 120 else s) for s in items[:5]]
+    if len(items) > 5:
+        preview.append('…')
+    return '\n'.join(preview)
+
+
 def newer_release(data, current=__version__):
     version = version_tuple(data.get('tag_name', ''))
     if data.get('draft') or data.get('prerelease') or not version or version <= version_tuple(current):
         return None
     tag = data['tag_name']
+    body = data.get('body')
+    release = dict(version=tag, notes=body.strip() if isinstance(body, str) else '')
     filename = 'LabelImg2Custom-%s-Setup.exe' % tag.lstrip('v')
     expected_url = REPOSITORY + '/releases/download/' + tag + '/' + filename
     for asset in data.get('assets', []):
@@ -61,9 +89,9 @@ def newer_release(data, current=__version__):
         if (asset.get('name') == filename and asset.get('browser_download_url') == expected_url
                 and re.fullmatch(r'sha256:[0-9a-fA-F]{64}', digest)
                 and isinstance(asset.get('size'), int) and asset['size'] > 0):
-            return dict(version=tag, url=expected_url, name=filename,
-                        size=asset['size'], sha256=digest[7:].lower())
-    return dict(version=tag)
+            release.update(url=expected_url, name=filename, size=asset['size'], sha256=digest[7:].lower())
+            break
+    return release
 
 
 class UpdateController(QObject):
@@ -132,7 +160,13 @@ class UpdateController(QObject):
         self.release = release
         box = QMessageBox(self.window)
         box.setWindowTitle(self.tr('Check for Updates'))
-        box.setText(self.tr('A new version is available:') + ' ' + release['version'])
+        notes = release['notes']
+        highlights = release_highlights(notes) or self.tr('No update highlights were provided.')
+        box.setTextFormat(Qt.PlainText)
+        box.setText(self.tr('A new version is available:') + ' ' + release['version']
+                    + '\n\n' + self.tr('Update highlights') + '\n' + highlights)
+        if notes:
+            box.setDetailedText(notes)
         box.setInformativeText(self.tr('Download and install the update now? Your work will be saved before closing.'))
         box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         box.setDefaultButton(QMessageBox.No)

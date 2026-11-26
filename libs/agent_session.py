@@ -11,7 +11,7 @@ from PyQt5.QtNetwork import QLocalServer
 from PyQt5.QtWidgets import QAction, QApplication, QLabel, QMessageBox, QPushButton
 
 from .agent_mcp import TOOLS, endpoint
-from .agent_tasks import AgentQueue, canonical, inside, stamp
+from .agent_tasks import AgentQueue, box_geometry, canonical, exists_label, inside, stamp
 from .constants import SETTING_FLAGGED_IMAGES
 from .i18n import translate
 
@@ -104,6 +104,7 @@ class AgentSession(QObject):
         self.stop_button.show()
 
     def stop(self):
+        self.w.canvas.clearAgentPreview()
         self.server.close()
         for sock in list(self.clients):
             sock.abort()
@@ -214,9 +215,11 @@ class AgentSession(QObject):
                     destinations.add(key)
                     entries.append((p,base))
                 self.active=q.create(entries,args.get('instructions'),args.get('classes',q.ctx['classes']))
+            self.w.canvas.clearAgentPreview()
             return self.deliver()
         job=args.get('task_id')
-        if job and not self.active and job==q.latest():
+        preview = name == 'preview_box'
+        if not preview and job and not self.active and job==q.latest():
             last=q.summary(job)
             if not last['remaining'] and q.db.execute('SELECT 1 FROM frame WHERE job=? AND token=?',
                     (job,args['image_token'])).fetchone():
@@ -228,14 +231,28 @@ class AgentSession(QObject):
         if not r:
             raise ValueError('Wrong image token')
         if r['state'] not in ('pending','writing'):
+            if preview:
+                raise ValueError('This image has already been processed')
             return self.deliver()  # duplicate after a lost response
         w=self.w
         if (self.issued!=(job,token,args['image_revision']) or r['image']!=w.filePath or
                 r['stamp']!=args['image_revision'] or self.row_for(r['image'])<0 or
                 canonical(w.annotationBasePathForImage(r['image']))!=canonical(r['base'])):
             raise ValueError('Image, label destination or revision changed; resume task to obtain the image again')
+        if preview:
+            slot = args['box_id']
+            if not 1 <= slot <= 2000:
+                raise ValueError('box_id must be 1..2000')
+            if (r['state'] != 'pending' or stamp(inside(r['image'], q.ctx['images'])) != r['stamp']
+                    or exists_label(r['base'])):
+                raise ValueError('Image or label changed; resume the task')
+            label, points, _ = box_geometry(args['box'], r['w'], r['h'], q.ctx['classes'],
+                                            json.loads(q.job(job)['allowed']), q.ctx['format'])
+            count = w.canvas.showAgentPreviewBox(slot, label, points)
+            return self.content(dict(box_id=slot, preview_count=count, saved=False))
         boxes=args.get('boxes',[])
         q.submit(job,token,args['outcome'],boxes,args.get('reason',''))
+        w.canvas.clearAgentPreview()
         self.issued=None
         row=self.row_for(r['image'])
         if args['outcome']=='review':
@@ -252,7 +269,7 @@ class AgentSession(QObject):
         schema=TOOLS[name][1]
         if set(args)-schema['properties'].keys() or set(schema['required'])-args.keys():
             raise ValueError('Unknown or missing arguments')
-        types={'string':str,'array':list,'integer':int,'boolean':bool}
+        types={'string':str,'array':list,'integer':int,'boolean':bool,'object':dict}
         for key,value in args.items():
             definition=schema['properties'][key]
             if 'type' in definition and type(value) is not types[definition['type']]:
@@ -315,6 +332,7 @@ class AgentSession(QObject):
                   image=os.path.relpath(path,q.ctx['images']),width=width,height=height,
                   preview_width=image.width(),preview_height=image.height(),
                   coordinates='original oriented pixels, x right, y down, clockwise degrees',
+                  live_preview='Call preview_box for each detected target immediately, then submit_and_next with all final boxes.',
                   format=q.ctx['format'],classes=q.ctx['classes'],allowed=json.loads(task['allowed']),
                   instructions=task['rules'],remaining=summary['remaining'])
         return self.content(info,base64.b64encode(bytes(buffer.data())).decode('ascii'))

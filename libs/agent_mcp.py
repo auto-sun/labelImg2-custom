@@ -1,4 +1,4 @@
-"""Local stdio MCP adapter. Only these three project-scoped tools exist."""
+"""Local stdio MCP adapter for project-scoped annotation tools."""
 import hashlib
 import json
 import os
@@ -22,6 +22,13 @@ NUM={'type':'number'}
 BOX=obj(dict(class_id={'type':'integer','minimum':0},cx=NUM,cy=NUM,w=NUM,h=NUM,angle_deg=NUM),
         ['class_id','cx','cy','w','h'])
 TOOLS={
+    'preview_box':('Show ONE detected box immediately on the current LabelImg2 canvas. Call as soon as '
+                   'you locate each target, before looking for the next. Use a per-image box_id (1..2000); '
+                   'repeat the same ID to correct it. Live preview only: does not save or advance. '
+                   'Use original oriented image pixels and clockwise degrees. Finally submit all final boxes.',
+                   obj(dict(task_id=STR,image_token=STR,image_revision=STR,
+                            box_id={'type':'integer','minimum':1,'maximum':2000},box=BOX),
+                       ['task_id','image_token','image_revision','box_id','box'])),
     'start_task':('Start at the current image. Supply instructions and count (or all_remaining:true). '
                   'Use resume_task_id alone to resume a saved task. Existing labels are always skipped.',
                   obj(dict(instructions=STR,count={'type':'integer','minimum':1},all_remaining={'type':'boolean'},
@@ -82,7 +89,9 @@ def serve(instream=None,outstream=None,call=request_gui):
                 ver=params.get('protocolVersion')
                 result=dict(protocolVersion=ver if ver in VERSIONS else VERSIONS[0],
                             capabilities={'tools':{}},serverInfo=dict(name='labelimg2',version=__version__),
-                            instructions='Follow user task instructions. Loop submit_and_next until complete. '
+                            instructions='Follow user task instructions. For live annotation, call preview_box '
+                            'immediately for each target as you identify it; do not wait until the image is done. '
+                            'Then submit_and_next with the full final list (previews are not saved); loop until complete. '
                             'If continuation_required, call start_task with resume_task_id. Never invent empty images.')
             elif method=='ping':
                 result={}

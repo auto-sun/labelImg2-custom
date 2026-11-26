@@ -89,6 +89,7 @@ class Canvas(QWidget):
         self.contextMenuActive = False
         self.scale = 1.0
         self.pixmap = QPixmap()
+        self._agentPreview = {}  # paint-only overlay; never an editable/savable Shape
         
         #self.localScalePixmap = QPixmap()
 
@@ -1195,6 +1196,38 @@ class Canvas(QWidget):
         if not self.boundedMoveShape(shape, point - offset):
             self.boundedMoveShape(shape, point + offset)
 
+    def showAgentPreviewBox(self, slot, label, points):
+        self._agentPreview[slot] = (label, QPolygonF([QPointF(x, y) for x, y in points]))
+        self.update()
+        return len(self._agentPreview)
+
+    def clearAgentPreview(self):
+        if self._agentPreview:
+            self._agentPreview.clear()
+            self.update()
+
+    def paintAgentPreview(self, painter):
+        if not self._agentPreview:
+            return
+        painter.save()
+        pen = QPen(QColor('#00f5ee'), 2, Qt.DashLine)
+        pen.setCosmetic(True)
+        painter.setPen(pen)
+        painter.setBrush(QColor(0, 140, 140, 30))
+        for slot, (label, polygon) in self._agentPreview.items():
+            painter.drawPolygon(polygon)
+            painter.save()
+            painter.translate(polygon.boundingRect().topLeft())
+            painter.scale(1 / self.scale, 1 / self.scale)
+            text = 'MCP %s · %s' % (slot, label)
+            rect = painter.fontMetrics().boundingRect(text).adjusted(-3, -1, 3, 1)
+            rect.moveTopLeft(QPoint(1, 1))
+            painter.fillRect(rect, QColor(0, 55, 60, 220))
+            painter.setPen(Qt.white)
+            painter.drawText(rect, Qt.AlignCenter, text)
+            painter.restore()
+        painter.restore()
+
     def paintEvent(self, event):
         if not self.pixmap:
             return super(Canvas, self).paintEvent(event)
@@ -1282,6 +1315,7 @@ class Canvas(QWidget):
             
         #    p.drawPixmap(p0.x(), p0.y(), self.localScalePixmap)
 
+        self.paintAgentPreview(p)
         p.end()
 
         #pp = self._painter
@@ -1689,6 +1723,7 @@ class Canvas(QWidget):
         self.update()
 
     def loadPixmap(self, pixmap):
+        self.clearAgentPreview()
         self._clearMarqueeSelection()
         self.unHighlight()
         self.pixmap = pixmap
@@ -1745,6 +1780,7 @@ class Canvas(QWidget):
         QApplication.restoreOverrideCursor()
 
     def resetState(self):
+        self.clearAgentPreview()
         self._clearMarqueeSelection()
         self.restoreCursor()
         self.pixmap = None

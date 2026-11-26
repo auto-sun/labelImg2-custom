@@ -74,7 +74,7 @@ if (-not $?) {
 
 $broker = Join-Path $projectRoot 'dist\LabelImg2Custom\LabelImg2MCP.exe'
 $reply = '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | & $broker
-if ($LASTEXITCODE -ne 0 -or ($reply | ConvertFrom-Json).result.tools.Count -ne 3) {
+if ($LASTEXITCODE -ne 0 -or 'preview_box' -notin ($reply | ConvertFrom-Json).result.tools.name) {
     throw 'Packaged MCP console executable failed its stdio smoke test.'
 }
 

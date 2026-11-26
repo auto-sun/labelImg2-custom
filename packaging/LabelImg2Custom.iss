@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "2.8.0"
+  #define AppVersion "2.8.2"
 #endif
 
 #define AppName "LabelImg2 Custom"

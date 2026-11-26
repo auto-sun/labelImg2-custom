@@ -39,6 +39,8 @@ _ROWS = {
     'Stop model annotation before restarting.': ('请先中止模型标注，再重启软件。', '再起動前に自動アノテーションを停止してください。', 'Detenga la anotación automática antes de reiniciar.', 'أوقف التعليق التلقائي قبل إعادة التشغيل.', 'Arrêtez l’annotation automatique avant de redémarrer.', '다시 시작하기 전에 자동 주석을 중지하세요.'),
     'Unable to restart. Please reopen the application.': ('重启失败，请手动重新打开软件。', '再起動できません。手動で開き直してください。', 'No se pudo reiniciar. Abra la aplicación de nuevo.', 'تعذرت إعادة التشغيل. أعد فتح التطبيق يدويًا.', 'Échec du redémarrage. Rouvrez l’application.', '다시 시작하지 못했습니다. 앱을 다시 열어 주세요.'),
     'Check for Updates': ('检查更新', '更新を確認', 'Buscar actualizaciones', 'التحقق من التحديثات', 'Rechercher des mises à jour', '업데이트 확인'),
+    'Update highlights': ('本次更新的主要内容', '主な変更点', 'Novedades principales', 'أبرز التغييرات', 'Principales nouveautés', '주요 변경 사항'),
+    'No update highlights were provided.': ('此版本未提供更新摘要。', 'このバージョンの変更概要はありません。', 'No se ha publicado un resumen de los cambios.', 'لم يُنشر ملخص للتغييرات.', 'Aucun résumé des changements n’a été fourni.', '이 버전의 변경 요약이 없습니다.'),
     'Automatically check for updates': ('启动时自动检查更新', '起動時に更新を自動確認', 'Buscar actualizaciones al iniciar', 'التحقق تلقائيًا عند بدء التشغيل', 'Vérifier automatiquement au démarrage', '시작할 때 자동으로 업데이트 확인'),
     'Unable to check for updates. Try again later.': ('无法检查更新，请稍后重试。', '更新を確認できません。後で再試行してください。', 'No se pudo comprobar. Inténtelo más tarde.', 'تعذر التحقق. حاول لاحقًا.', 'Vérification impossible. Réessayez plus tard.', '업데이트를 확인할 수 없습니다. 나중에 다시 시도하세요.'),
     'You are using the latest version.': ('当前已是最新版本。', '最新バージョンです。', 'Tiene la última versión.', 'لديك أحدث إصدار.', 'Vous utilisez la dernière version.', '최신 버전입니다.'),
