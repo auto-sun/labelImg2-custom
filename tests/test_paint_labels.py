@@ -194,7 +194,7 @@ class PaintLabelsTests(unittest.TestCase):
             QApplication.processEvents()
             self.assertFalse(window.canvas.isVisible(first))
             self.assertTrue(window.canvas.isVisible(second))
-            self.assertFalse(window.labelList.verticalHeader().isChecked[0])
+            self.assertEqual(Qt.Unchecked, window.ShapeItemDict[first].checkState())
 
             window.canvas.deSelectShape()
             QTest.keyClick(window.canvas, Qt.Key_R)

@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from PyQt5.QtCore import QEvent, QPoint, QPointF, Qt
+from PyQt5.QtCore import QEvent, QPoint, QPointF, Qt, QTimer
 from PyQt5.QtGui import QMouseEvent, QPixmap, QWheelEvent
 from PyQt5.QtTest import QTest
-from PyQt5.QtWidgets import QApplication, QMessageBox
+from PyQt5.QtWidgets import QApplication, QMenu, QMessageBox
 
 import labelImg
 from libs.labelView import CCommonOrderComboBox
@@ -95,6 +95,66 @@ class WorkflowTests(unittest.TestCase):
         canvas._setSelectedShapes(list(boxes))
         self.window.resetUndoHistory()
 
+    def test_group_fold_visibility_selection_and_undoable_merge(self):
+        w = self.window
+        a, b, c = [make_box(name, x, 25) for name, x in
+                   [('fruit', 20), ('leaf', 90), ('fruit', 160)]]
+        w.predefinedClasses = ['fruit', 'leaf']
+        self.select_boxes(a, b, c)
+        g = w.labelList.groups['fruit']
+        w.labelList.collapse(g.index())
+        self.assertFalse(w.labelList.isExpanded(g.index()))
+        self.assertTrue(all(w.canvas.isVisible(s) for s in (a,b,c)))
+        w.canvas.setShapeVisible(a, False)
+        self.assertEqual(Qt.PartiallyChecked, g.checkState())
+        g.setCheckState(Qt.Unchecked)
+        self.assertEqual([False, True, False], [w.canvas.isVisible(s) for s in (a,b,c)])
+        self.assertFalse(w.dirty)
+        w.selectBoxGroup(g)
+        self.assertEqual([a,c], w.canvas.selectedShapes)
+        self.assertEqual(2, len(w.labelsm.selectedRows()))
+        self.assertFalse(w.changeBoxGroupClass(g, 'not-in-project'))
+        w.canvas.setShapeVisible(c, False)
+        self.assertTrue(w.changeBoxGroupClass(g, 'leaf'))
+        self.assertEqual(['leaf'] * 3, [s.label for s in w.canvas.shapes])
+        self.assertEqual({'leaf'}, set(w.labelList.groups))
+        self.assertEqual(1, len(w._undoStack))
+        self.assertTrue(w.undoLastOperation())
+        self.assertEqual(['fruit','leaf','fruit'], [s.label for s in w.canvas.shapes])
+        self.assertFalse(w.canvas.isVisible(w.canvas.shapes[2]))
+
+    def test_group_rebuild_after_reset_and_individual_relabel(self):
+        w = self.window
+        a, b = make_box('fruit', 20, 30), make_box('fruit', 160, 30)
+        self.select_boxes(a, b)
+        w.ShapeItemDict[a].setText('leaf')
+        self.assertEqual(1, w.labelList.groups['leaf'].rowCount())
+        self.assertEqual(1, w.labelList.groups['fruit'].rowCount())
+        w.remLabel(b)
+        self.assertNotIn('fruit', w.labelList.groups)
+        w.resetState()
+        self.assertFalse(w.labelList.groups)
+        self.assertEqual(0, w.labelModel.rowCount())
+
+    def test_group_dropdown_selects_clicked_category(self):
+        w = self.window
+        a, b, c = [make_box(name, x, 30) for name, x in
+                   [('one', 20), ('two', 80), ('one', 140)]]
+        self.select_boxes(a, b, c)
+        w.canvas.deSelectShape()
+        group = w.labelList.groups['one']
+        idx = group.index().sibling(group.row(), 1)
+        self.app.processEvents()
+        def choose_first_action():
+            menu = self.app.activePopupWidget()
+            if isinstance(menu, QMenu):
+                QTest.mouseClick(menu, Qt.LeftButton, Qt.NoModifier,
+                                 menu.actionGeometry(menu.actions()[0]).center())
+        QTimer.singleShot(50, choose_first_action)
+        QTest.mouseClick(w.labelList.viewport(), Qt.LeftButton, Qt.NoModifier,
+                         w.labelList.visualRect(idx).center())
+        self.assertEqual([a, c], w.canvas.selectedShapes)
+
     def test_ctrl_drag_copies_entire_selection_and_one_undo_restores_it(self):
         boxes = [make_box('person', 30, 30), make_box('SafeHat', 130, 60)]
         self.select_boxes(*boxes)
@@ -106,7 +166,7 @@ class WorkflowTests(unittest.TestCase):
         canvas = self.window.canvas
         self.assertEqual(4, len(canvas.shapes))
         self.assertEqual(2, len(canvas.selectedShapes))
-        self.assertEqual(4, self.window.labelModel.rowCount())
+        self.assertEqual(4, sum(group.rowCount() for group in self.window.labelList.groups.values()))
         for source, copied, original in zip(boxes, canvas.selectedShapes, originals):
             self.assertEqual(original, source.points)
             self.assertEqual(source.label, copied.label)

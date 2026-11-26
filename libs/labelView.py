@@ -183,76 +183,19 @@ class CEditDelegate(QStyledItemDelegate):
             self.destroyEditor(self.editor, index)
 
 
-class CHeaderView(QHeaderView):
-    clicked = pyqtSignal(int, bool)
-    _x_offset = 3
-    _y_offset = 0 # This value is calculated later, based on the height of the paint rect
-    _width = 20
-    _height = 20
-
-    def __init__(self, orientation, parent=None):
-        super(CHeaderView, self).__init__(orientation, parent)
-        self.setFixedWidth(40)
-        self.isChecked = []
-
-    def rowsInserted(self, parent, start, end):
-        self.isChecked.insert(start, 1)
-        return super(CHeaderView, self).rowsInserted(parent, start, end)
-
-    def rowsAboutToBeRemoved(self, parent, start, end):
-        del self.isChecked[start]
-        return super(CHeaderView, self).rowsAboutToBeRemoved(parent, start, end)
-
-    def setSectionChecked(self, logicalIndex, checked):
-        if 0 <= logicalIndex < len(self.isChecked):
-            self.isChecked[logicalIndex] = 1 if checked else 0
-            self.viewport().update()
-
-    def paintSection(self, painter, rect, logicalIndex):
-        self._y_offset = int((rect.height()-self._width)/2.)
-        
-        option = QStyleOptionButton()
-        option.state = QStyle.State_Enabled | QStyle.State_Active
-        option.rect = QRect(rect.x() + self._x_offset, rect.y() + self._y_offset, self._width, self._height)
-        
-        if self.isChecked[logicalIndex]:
-            option.state |= QStyle.State_On
-        else:
-            option.state |= QStyle.State_Off
-
-        self.style().drawPrimitive(QStyle.PE_IndicatorCheckBox, option, painter)
-        #self.style().drawControl(QStyle.CE_CheckBox, option, painter)
-    
-    def mouseReleaseEvent(self, e):
-        index = self.logicalIndexAt(e.pos())
-        
-        if 0 <= index < self.count():
-            # vertical orientation
-            y = self.sectionViewportPosition(index)
-            if self._x_offset < e.pos().x() < self._x_offset + self._width \
-                and y + self._y_offset < e.pos().y() < y + self._y_offset + self._height:
-                if self.isChecked[index] == 1:
-                    self.isChecked[index] = 0
-                else:
-                    self.isChecked[index] = 1
-                self.clicked.emit(index, self.isChecked[index])
-                
-                self.viewport().update()
-            else:
-                super(CHeaderView, self).mousePressEvent(e)
-        else:
-            super(CHeaderView, self).mousePressEvent(e)
 
 
-class CLabelView(QTableView):
+
+class CLabelView(QTreeView):
     extraEditing = pyqtSignal(QModelIndex, str)
     toggleEdit = pyqtSignal(bool)
     def __init__(self, labelHist, parent = None):
         super(CLabelView, self).__init__(parent)
         disable_ime_for_shortcuts(self)
         
-        header = CHeaderView(Qt.Vertical, self)
-        self.setVerticalHeader(header)
+        self.setUniformRowHeights(True)
+        self.setExpandsOnDoubleClick(False)
+        self.setIndentation(16)
 
         self.label_delegate = CComboBoxDelegate(self, labelHist)
         self.setItemDelegateForColumn(0, self.label_delegate)
@@ -267,6 +210,12 @@ class CLabelView(QTableView):
         model.setHorizontalHeaderLabels(["Label", "Extra Info"])
 
         self.setModel(model)
+        self.header().setStretchLastSection(False)
+        self.header().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.header().setSectionResizeMode(1, QHeaderView.Interactive)
+        self.header().resizeSection(1, 78)
+        self.groups = {}
+        model.modelReset.connect(self.groups.clear)
         
         self.sm = self.selectionModel()
 
@@ -279,7 +228,8 @@ class CLabelView(QTableView):
 
     def earlyCommit(self):
         # TODO: verify currentIndex
-        extra_index = self.model().index(self.sm.currentIndex().row(), 1)
+        current = self.sm.currentIndex()
+        extra_index = current.sibling(current.row(), 1)
         self.extra_delegate.earlyCommit(extra_index)
 
     def updateLabelList(self, labelHist):
@@ -293,4 +243,32 @@ class CLabelView(QTableView):
         if key == Qt.Key_Return or key == Qt.Key_Enter:
             if self.extra_delegate.editor is None:
                 self.toggleEdit.emit(True)
-        return super(QTableView, self).keyPressEvent(e)
+        return super(CLabelView, self).keyPressEvent(e)
+
+    def groupFor(self, label):
+        group = self.groups.get(label)
+        if group is None:
+            group = QStandardItem(label)
+            group.setData(label, Qt.UserRole)
+            group.setEditable(False)
+            group.setCheckable(True)
+            group.setCheckState(Qt.Checked)
+            font = group.font()
+            font.setBold(True)
+            group.setFont(font)
+            menu = QStandardItem('⋯  ▾')
+            menu.setEditable(False)
+            menu.setTextAlignment(Qt.AlignCenter)
+            self.groups[label] = group
+            self.model().appendRow([group, menu])
+        return group
+
+    def updateGroup(self, group):
+        count = group.rowCount()
+        if not count:
+            self.groups.pop(group.data(Qt.UserRole), None)
+            self.model().removeRow(group.row())
+            return
+        group.setText('%s (%d)' % (group.data(Qt.UserRole), count))
+        states = {group.child(i).checkState() for i in range(count)}
+        group.setCheckState(states.pop() if len(states) == 1 else Qt.PartiallyChecked)

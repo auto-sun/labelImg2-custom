@@ -72,6 +72,12 @@ if (-not $?) {
     throw 'The packaged executable did not pass the startup smoke test.'
 }
 
+$broker = Join-Path $projectRoot 'dist\LabelImg2Custom\LabelImg2MCP.exe'
+$reply = '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | & $broker
+if ($LASTEXITCODE -ne 0 -or ($reply | ConvertFrom-Json).result.tools.Count -ne 3) {
+    throw 'Packaged MCP console executable failed its stdio smoke test.'
+}
+
 $appVersion = & $PythonExe -c 'from libs.version import __version__; print(__version__)'
 if ($LASTEXITCODE -ne 0 -or -not $appVersion) {
     throw 'Could not read the application version.'

@@ -2,7 +2,21 @@
 
 本文从下载安装包开始，介绍第一次打开数据集、选择类别和保存 YOLO OBB 标签的完整流程。
 
+## 用 Antigravity 等智能体连续标注（本地 MCP）
+
+1. 打开图片目录，选好标签目录、类别文件和输出格式，定位到任务第一张图。先保存手工修改、结束正在绘制的框。
+2. 选 **设置 → 复制 MCP 配置**。把剪贴板里的 `labelimg2` 项加入智能体客户端的 `mcpServers`，保留已有配置，刷新 MCP 服务器列表。安装版使用同目录的 `LabelImg2MCP.exe`；BAT 源码版自动生成对应 Python 和脚本的绝对路径。客户端需要支持 stdio 和图片工具结果。
+3. 在 LabelImg2 选 **设置 → 允许智能体标注当前项目（MCP）**，核对目录后确认一次。只允许一个窗口提供标注服务。没有监听 HTTP 端口，不需要给 LabelImg2 填 API Key；图片交给云端智能体时仍可能发送到其模型服务商。
+4. 对智能体说：**“使用 labelimg2，先读 task_status。从当前图起检查 100 张，只标项目里的 person 和 SafeHat。人和帽子分别画框。已有标签跳过；确实没有目标才写空标签；看不准就标红并写原因。连续调用 submit_and_next 直到 complete，不用逐张问我。最后列出待复核图片。”** 可改为“从当前图到最后”。客户端自身的工具调用审批或额度独立于软件；不要为此全局关闭其他工具的审批。
+5. 状态栏显示进度。点 **停止智能体** 会切断连接，保留已经写好的标签和进度。重新打开同一项目、使用同一类别表和格式，重新授权后，告诉智能体：“查看 task_status，使用返回的 task_id 作为 resume_task_id 继续”。客户端断线但软件没关闭，也可以用同样方法续做。
+
+**范围与保存规则：**“100 张”指文件列表中从当前图起最多 100 个位置，已有标签也占一个位置。本版不覆盖、不追加已有标注，包括空 TXT。每次成功只新建当前格式的一个文件。标红待复核不生成空标签。不重复写已完成图片，也不会因断线而回滚已保存的标签。
+
+**工具约定：**`start_task` 传 `instructions`、`count`（或 `all_remaining: true`），可传预设类别名列表 `classes`；续做只传 `resume_task_id`。`submit_and_next` 回传原样的 `task_id/image_token/image_revision`，以及 `outcome`（`annotated/empty/review`）。框为 `class_id,cx,cy,w,h,angle_deg`，单位是**按 EXIF 方向显示后的原图像素**，角度顺时针为正；按返回的原图与预览尺寸换算，普通 YOLO 不接受非零角度。`review` 需要 `reason`。返回 `continuation_required` 时用相同任务 ID 续取下一张。权限关闭后不会后台继续推理；看图和循环调用由智能体完成。
+
 ## 使用前注意
+
+右侧「框标签」按当前图片的类别分组，括号里是该类的框数。点类别左侧箭头只收起或展开列表；点类别复选框则在画布上隐藏或显示整组，不删除标注。点类别右侧的 **⋯ ▾**（或右键类别行），可「全选本组框」或「批量修改类别」。全选会先显示本组的隐藏框；批量改类包含隐藏框，只能选择项目预设类别，按一次 Ctrl+Z 可撤销整批改类。展开后仍可双击单个框的类别进行编辑。
 
 正式标注前请先了解下面几点：
 
@@ -12,7 +26,7 @@
 
 ## 一、下载并安装
 
-1. [下载 v2.7.6 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.6/LabelImg2Custom-2.7.6-Setup.exe)。
+1. [下载 v2.8.0 Windows 安装包](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.8.0/LabelImg2Custom-2.8.0-Setup.exe)。
 2. 双击安装包，按向导完成安装。默认安装到当前用户目录，不需要管理员权限。
 3. 从开始菜单打开 `LabelImg2 Custom`。如果 Windows 显示“未知发布者”，请先核对文件确实来自本项目的 GitHub Release；安装包目前没有代码签名。
 

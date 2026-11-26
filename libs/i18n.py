@@ -2,7 +2,7 @@
 """Small, dependency-free UI translation layer for the desktop application."""
 from PyQt5.QtCore import QObject, Qt
 from PyQt5.QtWidgets import (QApplication, QAction, QComboBox, QLineEdit,
-                             QDoubleSpinBox, QTableView, QWidget)
+                             QDoubleSpinBox, QTableView, QTreeView, QWidget)
 
 
 LANGUAGES = {
@@ -18,6 +18,13 @@ LANGUAGES = {
 # These are application chrome strings, not annotation data. Class names,
 # image names, paths, and user-entered text are intentionally never translated.
 _ROWS = {
+    'Agent access (MCP)': ('允许智能体标注当前项目（MCP）','現在のプロジェクトへの MCP アクセス','Acceso del agente (MCP)','وصول الوكيل (MCP)','Accès de l’agent (MCP)','현재 프로젝트 에이전트 접근 (MCP)'),
+    'Copy MCP configuration': ('复制 MCP 配置','MCP 設定をコピー','Copiar configuración MCP','نسخ إعدادات MCP','Copier la configuration MCP','MCP 설정 복사'),
+    'MCP configuration copied': ('MCP 配置已复制','MCP 設定をコピーしました','Configuración MCP copiada','تم نسخ إعدادات MCP','Configuration MCP copiée','MCP 설정을 복사했습니다'),
+    'Stop MCP': ('停止智能体','MCP を停止','Detener MCP','إيقاف MCP','Arrêter MCP','MCP 중지'),
+    'Allow the connected agent to read images and save new labels in this project? Images may be sent to its model provider.': ('允许智能体读取此项目图片并自动保存新标签吗？图片可能被发送给智能体的模型服务商。','画像の読み取りと新規ラベルの保存を許可しますか？画像はモデル提供元に送信される場合があります。','¿Permitir leer imágenes y guardar etiquetas nuevas? Las imágenes pueden enviarse al proveedor del modelo.','هل تسمح بقراءة الصور وحفظ تسميات جديدة؟ قد تُرسل الصور إلى مزود النموذج.','Autoriser la lecture des images et la création d’annotations ? Les images peuvent être transmises au fournisseur du modèle.','이미지 읽기 및 새 레이블 저장을 허용할까요? 이미지가 모델 제공업체에 전송될 수 있습니다.'),
+    'Select all boxes in group': ('全选本组框', 'グループの枠をすべて選択', 'Seleccionar todos los cuadros del grupo', 'تحديد كل إطارات المجموعة', 'Sélectionner tous les cadres du groupe', '그룹의 모든 상자 선택'),
+    'Change group class…': ('批量修改类别…', 'グループのクラスを変更…', 'Cambiar la clase del grupo…', 'تغيير فئة المجموعة…', 'Changer la classe du groupe…', '그룹 클래스 변경…'),
     'Start': ('开始', '開始', 'Inicio', 'البدء', 'Démarrer', '시작'),
     'Open Image': ('打开图片', '画像を開く', 'Abrir imagen', 'فتح صورة', 'Ouvrir une image', '이미지 열기'),
     'Recent Work': ('最近工作', '最近の作業', 'Trabajo reciente', 'العمل الأخير', 'Travail récent', '최근 작업'),
@@ -328,7 +335,7 @@ class LanguageManager(QObject):
                     if current != translated:
                         widget.setItemText(index, translated)
                     widget.setProperty(rendered_property, translated)
-            if isinstance(widget, QTableView):
+            if isinstance(widget, QTableView) or (isinstance(widget, QTreeView) and widget.objectName() == 'boxLabelTree'):
                 model = widget.model()
                 for section in range(model.columnCount()):
                     source_property = 'i18nHeaderSource_%d' % section

@@ -10,6 +10,8 @@
 
 ## 开发者说明
 
+2.8.0 的安装目录中另有 `LabelImg2MCP.exe`，只用于 MCP 客户端的 stdio 通信，不是第二个图形界面。它与主程序共用运行库；请不要单独复制该 EXE。任务进度保存在当前 Windows 用户的 `%LOCALAPPDATA%\LabelImg2Custom\agent\tasks.sqlite3`，不放进训练数据集。
+
 Windows 打包脚本是 `build_windows.ps1`，安装向导定义为 `LabelImg2Custom.iss`。
 简体中文 Inno Setup 语言文件的来源及维护者信息保留在
 `ChineseSimplified.isl` 文件头部。普通用户只需下载安装包，不需要运行这些脚本。

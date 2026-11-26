@@ -177,6 +177,8 @@ class CFileListModel(QStringListModel):
         return True
 
     def data(self, index, role):
+        if not index.isValid() or not 0 <= index.row() < len(self.dispList):
+            return None
         item = self.dispList[index.row()]
         pathname, count = item[0], item[1]
         if role == Qt.DisplayRole:
@@ -222,6 +224,8 @@ class CFileListModel(QStringListModel):
                 info[1] = value
                 info[2] = True
                 self.dispList[index.row()] = info
+                self.dataChanged.emit(index, index, [Qt.DisplayRole, Qt.BackgroundRole])
+                return True
 
         return super(CFileListModel, self).setData(index, value, role)
 
@@ -245,6 +249,15 @@ class CFileItemEditDelegate(QStyledItemDelegate):
                 QPalette.HighlightedText,
                 option.palette.color(QPalette.Text))
         super(CFileItemEditDelegate, self).paint(painter, option, index)
+        if option.state & QStyle.State_Selected:
+            # The active image remains identifiable even when the canvas
+            # takes focus or a review flag uses the same red as other rows.
+            painter.save()
+            painter.setPen(QPen(option.palette.color(QPalette.Active, QPalette.Highlight), 2)
+                           if not index.model().isFlagged(index)
+                           else QPen(QColor('#96363d'), 2))
+            painter.drawRect(option.rect.adjusted(1, 1, -1, -1))
+            painter.restore()
 
 
 class CFileView(QListView):
@@ -253,6 +266,9 @@ class CFileView(QListView):
     def __init__(self, parent = None):
         super(CFileView, self).__init__(parent)
         self.rightClickSelectionInProgress = False
+        self._leftPressActive = False
+        self._pendingCenter = False
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         
         model = CFileListModel(self)
         self.setModel(model)
@@ -264,6 +280,25 @@ class CFileView(QListView):
     def focusInEvent(self, event):
         super(CFileView, self).focusInEvent(event)
         disable_ime_for_shortcuts(self)
+
+    def centerCurrentRow(self, index):
+        # QListView finishes its click selection on release. Moving the row
+        # out from under the pointer before then can select a different row.
+        if self._leftPressActive:
+            self._pendingCenter = True
+        else:
+            self.scrollTo(index, QAbstractItemView.PositionAtCenter)
+
+    def mouseReleaseEvent(self, event):
+        super(CFileView, self).mouseReleaseEvent(event)
+        if event.button() == Qt.LeftButton:
+            self._leftPressActive = False
+            if self._pendingCenter:
+                self._pendingCenter = False
+                index = self.currentIndex()
+                if index.isValid():
+                    self.selectionModel().select(index, QItemSelectionModel.ClearAndSelect)
+                    self.centerCurrentRow(index)
 
     def event(self, event):
         # The main window also uses Delete for removing selected boxes.  Claim
@@ -292,6 +327,8 @@ class CFileView(QListView):
         # after the synchronous selection change so a following Delete key is
         # handled by File List, as the user expects.
         self.rightClickSelectionInProgress = event.button() == Qt.RightButton
+        self._leftPressActive = event.button() == Qt.LeftButton
+        self._pendingCenter = False
         try:
             super(CFileView, self).mousePressEvent(event)
         finally:

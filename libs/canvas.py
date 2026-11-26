@@ -1708,7 +1708,7 @@ class Canvas(QWidget):
         value = bool(value)
         self.visible[shape] = value
         self.shapeVisibilityChanged.emit(shape, value)
-        self.repaint()
+        self.update()
 
     @property
     def verified(self):

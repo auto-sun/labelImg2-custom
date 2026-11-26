@@ -10,8 +10,12 @@ import os
 import platform
 import re
 import sys
+if __name__ == '__main__' and getattr(sys, 'frozen', False) and os.path.basename(sys.executable).casefold() == 'labelimg2mcp.exe':
+    from libs.agent_mcp import serve
+    sys.exit(serve())
 import subprocess
 from collections import Counter
+from contextlib import contextmanager
 from functools import partial
 
 from PyQt5.QtGui import *
@@ -48,6 +52,7 @@ from libs.ui_geometry import available_screen_geometry
 from libs.i18n import LANGUAGES, LanguageManager, translate as translateUi
 from libs.userGuide import UserGuideDialog
 from libs.welcome import WelcomePage
+from libs.agent_session import AgentSession
 
 from libs.labelView import (CLabelView, HashableQStandardItem,
                             label_search_keys)
@@ -205,6 +210,8 @@ class MainWindow(QMainWindow, WindowMixin):
         labelListContainer.setLayout(labellistLayout)
 
         self.labelList = CLabelView(self.labelSelectionOrder())
+        self.labelList.setObjectName('boxLabelTree')
+        self._groupUpdate = False
         self.labelModel = self.labelList.model()
         self.labelModel.dataChanged.connect(self.labelDataChanged)
         
@@ -213,8 +220,11 @@ class MainWindow(QMainWindow, WindowMixin):
         self.labelsm = self.labelList.selectionModel()
         self.labelsm.currentChanged.connect(self.labelCurrentChanged)
 
-        myHeader = self.labelList.verticalHeader()
-        myHeader.clicked.connect(self.labelHeaderClicked)
+        self.labelList.clicked.connect(self.labelGroupClicked)
+        self.labelList.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.labelList.customContextMenuRequested.connect(
+            lambda pos: self.showLabelGroupMenu(self.labelList.indexAt(pos),
+                                                 self.labelList.viewport().mapToGlobal(pos)))
 
         labellistLayout.addWidget(self.labelList, 1)
 
@@ -264,6 +274,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.fileModel.setFlaggedPaths(
             savedFlags if isinstance(savedFlags, (list, tuple, set)) else [])
         self._suppressFileListCenter = False
+        self._restoringFileRow = False
         self.filesm = self.fileListView.selectionModel()
         self.filesm.currentChanged.connect(self.fileCurrentChanged)
 
@@ -880,6 +891,9 @@ class MainWindow(QMainWindow, WindowMixin):
             self.autoAnnotationCancelButton)
         self.setAutoAnnotationWidgetsVisible(False)
 
+        self.agentSession = AgentSession(self)
+        self.languageManager.apply()
+
         # If only a saved labels directory is available, inspect its format in
         # the background. When an image directory is restored, its own scan
         # starts shortly and provides counts plus the same format detection.
@@ -917,11 +931,21 @@ class MainWindow(QMainWindow, WindowMixin):
                 return index
         return QModelIndex()
 
+    @contextmanager
+    def restoringFileRow(self):
+        # Suppress image loading only. The view still needs currentChanged
+        # and selectionChanged to repaint and scroll after a model reset.
+        previous = self._restoringFileRow
+        self._restoringFileRow = True
+        try:
+            yield
+        finally:
+            self._restoringFileRow = previous
+
     def centerFileListIndex(self, index):
         """Keep the active image vertically centered in File List."""
         if index is not None and index.isValid():
-            self.fileListView.scrollTo(
-                index, QAbstractItemView.PositionAtCenter)
+            self.fileListView.centerCurrentRow(index)
 
     def updateLabelStatistics(self):
         """Refresh project, current-image and current-session box counts."""
@@ -1112,6 +1136,7 @@ class MainWindow(QMainWindow, WindowMixin):
             'shapes': [self.copyShapeForUndo(shape)
                        for shape in self.canvas.shapes],
             'selected': selected,
+            'visible': [self.canvas.isVisible(s) for s in self.canvas.shapes],
             'back_sample': bool(self.back_sample),
             'session_label_count': self.sessionLabelCount,
         }
@@ -1233,6 +1258,9 @@ class MainWindow(QMainWindow, WindowMixin):
                 shape.selected = False
                 self.addLabel(shape)
             self.canvas.loadShapes(shapes)
+            for shape, visible in zip(shapes, snapshot.get('visible', ())):
+                if not visible:
+                    self.canvas.setShapeVisible(shape, False)
 
             selected = [shapes[index] for index in snapshot['selected']
                         if 0 <= index < len(shapes)]
@@ -1335,34 +1363,144 @@ class MainWindow(QMainWindow, WindowMixin):
         self.imageDim.clear()
         self.updateLabelStatistics()
 
-    def labelDataChanged(self, topLeft, bottomRight):
-        item0 = self.labelModel.item(topLeft.row(), 0)
-        shape = self.ItemShapeDict[item0]
-        self.beginUndoOperation()
-        if topLeft.column() == 0:
-            shape.label = self.labelModel.data(topLeft)
-            if sys.version_info < (3, 0, 0):
-                shape.label = shape.label.toPyObject()
-            color = generateColorByText(shape.label)
-            item1 = self.labelModel.item(topLeft.row(), 1)
-            item0.setBackground(color)
-            item1.setBackground(color)
-            shape.line_color = color
-            shape.fill_color = color
+    def labelDataChanged(self, topLeft, bottomRight, roles=()):
+        if self._groupUpdate or not topLeft.isValid():
+            return
+        first = self.labelModel.itemFromIndex(topLeft.sibling(topLeft.row(), 0))
+        if Qt.CheckStateRole in roles:
+            if topLeft.column() == 0:
+                if first.parent() is None:
+                    self.setGroupVisibility(first, first.checkState() != Qt.Unchecked)
+                elif first in self.ItemShapeDict:
+                    self.canvas.setShapeVisible(self.ItemShapeDict[first],
+                                                first.checkState() == Qt.Checked)
+            return
+        if roles and not {Qt.DisplayRole, Qt.EditRole}.intersection(roles):
+            return
+        shape = self.ItemShapeDict.get(first)
+        if shape is None:
+            return
+        text = topLeft.data(Qt.EditRole)
+        if topLeft.column() == 0 and text and shape.label != text:
+            self.beginUndoOperation()
+            shape.label = text
+            self.colorLabelRow(first, shape)
+            if not self._labelEditorActive:
+                self.regroupEditedBoxes()
+        elif topLeft.column() == 1 and shape.extra_label != text:
+            self.beginUndoOperation()
+            shape.extra_label = text
         else:
-            shape.extra_label = self.labelModel.data(topLeft)
-            if sys.version_info < (3, 0, 0):
-                shape.extra_label = shape.extra_label.toPyObject()
+            return
         self.setDirty()
         self.canvas.update()
-        
-        return
 
-    def updateLabelShowing(self, index, str):
-        item0 = self.labelModel.item(index.row(), 0)
-        shape = self.ItemShapeDict[item0]
-        shape.extra_label = str
+    def colorLabelRow(self, item, shape):
+        color = generateColorByText(shape.label)
+        shape.line_color = shape.fill_color = color
+        item.setBackground(color)
+        item.parent().child(item.row(), 1).setBackground(color)
+
+    def updateLabelShowing(self, index, text):
+        first = self.labelModel.itemFromIndex(index.sibling(index.row(), 0))
+        shape = self.ItemShapeDict.get(first)
+        if shape is not None and shape.extra_label != text:
+            self.beginUndoOperation()
+            shape.extra_label = text
+            self.setDirty()
+            self.canvas.update()
+
+    def regroupEditedBoxes(self):
+        if self._labelEditorActive:
+            return
+        affected = {}
+        with self.changingGroups():
+            for shape, item in list(self.ShapeItemDict.items()):
+                old = item.parent()
+                if old is None or old.data(Qt.UserRole) == shape.label:
+                    continue
+                target = self.labelList.groupFor(shape.label)
+                fresh = not target.rowCount()
+                target.appendRow(old.takeRow(item.row()))
+                affected[old.data(Qt.UserRole)] = old
+                affected[shape.label] = target
+                if fresh:
+                    self.labelList.expand(target.index())
+            for group in affected.values():
+                self.labelList.updateGroup(group)
+        if affected:
+            self.shapeSelectionChanged(bool(self.canvas.selectedShapes))
+
+    @contextmanager
+    def changingGroups(self):
+        previous = self._groupUpdate
+        self._groupUpdate = True
+        try:
+            yield
+        finally:
+            self._groupUpdate = previous
+
+    def groupShapes(self, group):
+        return [self.ItemShapeDict[group.child(i)] for i in range(group.rowCount())]
+
+    def setGroupVisibility(self, group, visible):
+        with self.changingGroups():
+            for shape in self.groupShapes(group):
+                if self.canvas.isVisible(shape) != visible:
+                    self.canvas.setShapeVisible(shape, visible)
+            self.labelList.updateGroup(group)
+        if not visible and any(not self.canvas.isVisible(s) for s in self.canvas.selectedShapes):
+            self.canvas._setSelectedShapes(self.canvas.selectedShapes)
+
+    def selectBoxGroup(self, group):
+        # Hidden shapes cannot be selected on the canvas; selecting the
+        # entire group explicitly makes them visible first.
+        self.setGroupVisibility(group, True)
+        self.canvas._setSelectedShapes(self.groupShapes(group))
+
+    def changeBoxGroupClass(self, group, target):
+        if target not in self.predefinedClasses or target == group.data(Qt.UserRole):
+            return False
+        self.beginUndoOperation()
+        with self.changingGroups():
+            for shape in self.groupShapes(group):
+                shape.label = target
+                item = self.ShapeItemDict[shape]
+                item.setText(target)
+                self.colorLabelRow(item, shape)
+        self.regroupEditedBoxes()
+        self.setDirty()
         self.canvas.update()
+        return True
+
+    def labelGroupClicked(self, index):
+        if not index.parent().isValid() and index.column() == 1:
+            self.showLabelGroupMenu(index, self.labelList.viewport().mapToGlobal(
+                self.labelList.visualRect(index).bottomLeft()))
+
+    def showLabelGroupMenu(self, index, pos):
+        if not index.isValid() or index.parent().isValid():
+            return
+        group = self.labelModel.itemFromIndex(index.sibling(index.row(), 0))
+        anchor = QPersistentModelIndex(group.index())
+        language = self.languageManager.language
+        menu = QMenu(self.labelList)
+        select = menu.addAction(translateUi('Select all boxes in group', language))
+        change = menu.addAction(translateUi('Change group class…', language))
+        change.setEnabled(bool(self.predefinedClasses))
+        choice = menu.exec_(pos)
+        menu.deleteLater()
+        if not anchor.isValid():
+            return
+        if choice == select:
+            self.selectBoxGroup(group)
+        elif choice == change:
+            current = group.data(Qt.UserRole)
+            classes = self.predefinedClasses
+            target, ok = QInputDialog.getItem(self, change.text(), current, classes,
+                classes.index(current) if current in classes else 0, False)
+            if ok and anchor.isValid():
+                self.changeBoxGroupClass(group, target)
 
     def addRecentFile(self, filePath):
         if filePath in self.recentFiles:
@@ -1475,8 +1613,8 @@ class MainWindow(QMainWindow, WindowMixin):
     def toggleExtraEditing(self, state):
         index = self.labelsm.currentIndex()
         #print("ExtraEditing", self.sender())
-        editindex = self.labelModel.index(index.row(), 1)
-        self.labelList.edit(editindex)
+        if index.parent().isValid():
+            self.labelList.edit(index.sibling(index.row(), 1))
 
     def updateFileMenu(self):
         currFilePath = self.filePath
@@ -1505,7 +1643,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self._suppressFileListCenter = True
             try:
                 self.filesm.setCurrentIndex(
-                    index, QItemSelectionModel.SelectCurrent)
+                    index, QItemSelectionModel.ClearAndSelect)
             finally:
                 self._suppressFileListCenter = False
         if self.filesm.currentIndex() != index:
@@ -1550,6 +1688,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def setLabelEditorActive(self, active):
         self._labelEditorActive = bool(active)
+        if not active:
+            QTimer.singleShot(0, self.regroupEditedBoxes)
         for shortcut in (self.paintLabelsShortcuts +
                          self.toggleVisibilityShortcuts):
             shortcut.setEnabled(not self._labelEditorActive)
@@ -1623,6 +1763,8 @@ class MainWindow(QMainWindow, WindowMixin):
             if label and label not in classNames and label not in existingLabels:
                 existingLabels.append(label)
 
+        if hasattr(self, 'agentSession') and self.agentSession.queue:
+            self.agentSession.stop()
         self.classFilePath = absolute
         self.classFileHistory = ClassFileDialog.normalizeHistory(
             [absolute] + list(historyPaths or self.classFileHistory))
@@ -1893,18 +2035,17 @@ class MainWindow(QMainWindow, WindowMixin):
 
 
     def fileCurrentChanged(self, current, previous):
+        if self._restoringFileRow or not current.isValid():
+            return
         # File-list clicks and navigation shortcuts change the selection
         # before this slot runs. When auto-save is disabled, give the user a
         # chance to keep editing instead of silently discarding new boxes.
         if self.dirty and not self.autoSaving.isChecked():
             self.labelList.earlyCommit()
             if not self.discardChangesDialog():
-                self.filesm.blockSignals(True)
-                try:
+                with self.restoringFileRow():
                     self.filesm.setCurrentIndex(
-                        previous, QItemSelectionModel.SelectCurrent)
-                finally:
-                    self.filesm.blockSignals(False)
+                        previous, QItemSelectionModel.ClearAndSelect)
                 if previous.isValid():
                     self.statFile.setText('{0}/{1}'.format(
                         previous.row() + 1, previous.model().rowCount()))
@@ -1948,9 +2089,8 @@ class MainWindow(QMainWindow, WindowMixin):
         if not self.canvas.editing():
             return
         
-        item0 = self.labelModel.itemFromIndex(self.labelModel.index(self.labelsm.currentIndex().row(), 0))
-        if item0 is None:
-            item0 = self.labelModel.item(self.labelModel.rowCount() - 1,0)
+        index = self.labelsm.currentIndex()
+        item0 = self.labelModel.itemFromIndex(index.sibling(index.row(), 0))
 
         difficult = self.diffcButton.isChecked()
 
@@ -1972,23 +2112,24 @@ class MainWindow(QMainWindow, WindowMixin):
 
     # React to canvas signals.
     def shapeSelectionChanged(self, selected=False):
-        if self._noSelectionSlot:
-            self._noSelectionSlot = False
-        else:
-            shape = self.canvas.selectedShape
-            if shape and shape in self.ShapeItemDict:
-                # When multi-selecting, prevent labelCurrentChanged from
-                # calling selectShape (which would clear multi-selection)
-                if len(self.canvas.selectedShapes) > 1:
-                    self._noSelectionSlot = True
-                item0 = self.ShapeItemDict[shape]
-                index = self.labelModel.indexFromItem(item0)
-                self.labelList.selectRow(index.row())
-                #self.labelsm.setCurrentIndex(index, QItemSelectionModel.SelectCurrent)
-
-            else:
-                
-                self.labelList.clearSelection()
+        if not self._groupUpdate:
+            with self.changingGroups():
+                items = [self.ShapeItemDict[s] for s in self.canvas.selectedShapes
+                         if s in self.ShapeItemDict]
+                if not items and self.canvas.selectedShape in self.ShapeItemDict:
+                    items = [self.ShapeItemDict[self.canvas.selectedShape]]
+                selection = QItemSelection()
+                for item in items:
+                    idx = item.index()
+                    selection.select(idx, idx.sibling(idx.row(), 1))
+                self.labelsm.select(selection, QItemSelectionModel.ClearAndSelect)
+                if items:
+                    self.labelsm.setCurrentIndex(items[-1].index(), QItemSelectionModel.NoUpdate)
+                    self.diffcButton.blockSignals(True)
+                    try:
+                        self.diffcButton.setChecked(self.ItemShapeDict[items[-1]].difficult)
+                    finally:
+                        self.diffcButton.blockSignals(False)
         self.actions.delete.setEnabled(selected)
         self.actions.copy.setEnabled(selected)
         self.actions.copyToClipboard.setEnabled(selected)
@@ -2002,10 +2143,19 @@ class MainWindow(QMainWindow, WindowMixin):
         color = generateColorByText(shape.label)
         item0.setBackground(color)
         item1.setBackground(color)
-        self.labelModel.appendRow([item0, item1])
-
-        self.ShapeItemDict[shape] = item0
-        self.ItemShapeDict[item0] = shape
+        item0.setCheckable(True)
+        item0.setCheckState(Qt.Checked)
+        with self.changingGroups():
+            group = self.labelList.groupFor(shape.label)
+            fresh = not group.rowCount()
+            group.appendRow([item0, item1])
+            self.ShapeItemDict[shape] = item0
+            self.ItemShapeDict[item0] = shape
+            group.setText('%s (%d)' % (shape.label, group.rowCount()))
+            if group.checkState() == Qt.Unchecked:
+                group.setCheckState(Qt.PartiallyChecked)
+            if fresh:
+                self.labelList.expand(group.index())
         
         for action in self.actions.onShapesPresent:
             action.setEnabled(True)
@@ -2023,9 +2173,12 @@ class MainWindow(QMainWindow, WindowMixin):
         item0 = self.ShapeItemDict[shape]
         index = self.labelModel.indexFromItem(item0)
         
-        self.labelModel.removeRows(index.row(), 1)
-        del self.ShapeItemDict[shape]
-        del self.ItemShapeDict[item0]
+        group = item0.parent()
+        with self.changingGroups():
+            del self.ShapeItemDict[shape]
+            del self.ItemShapeDict[item0]
+            group.removeRow(index.row())
+            self.labelList.updateGroup(group)
         if getattr(shape, 'sessionCreated', False):
             shape.sessionCreated = False
             self.recordSessionLabels(-1)
@@ -2267,22 +2420,12 @@ class MainWindow(QMainWindow, WindowMixin):
 
 
     def labelCurrentChanged(self, current, previous):
-        if current.row() < 0:
+        if self._groupUpdate or not current.parent().isValid():
             return
-        # Don't override multi-selection from canvas when label row changes
-        if len(self.canvas.selectedShapes) > 1:
-            return
-        item0 = self.labelModel.itemFromIndex(self.labelModel.index(current.row(), 0))
-        if self.canvas.editing():
-            self._noSelectionSlot =True
-            shape = self.ItemShapeDict[item0]
+        item = self.labelModel.itemFromIndex(current.sibling(current.row(), 0))
+        shape = self.ItemShapeDict.get(item)
+        if shape is not None and self.canvas.editing():
             self.canvas.selectShape(shape)
-            self.diffcButton.setChecked(shape.difficult)
-
-    def labelHeaderClicked(self, index, checked):
-        item0 = self.labelModel.item(index, 0)
-        shape = self.ItemShapeDict[item0]
-        self.canvas.setShapeVisible(shape, checked)
 
     # Callback functions:
     def newShape(self, continous):
@@ -2309,6 +2452,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 item = self.ShapeItemDict.get(shape)
                 if item is not None:
                     index = self.labelModel.indexFromItem(item)
+                    self.labelList.expand(index.parent())
                     self.labelList.setCurrentIndex(index)
                     if shortcutLabel == text:
                         self.canvas.setFocus(Qt.OtherFocusReason)
@@ -3141,6 +3285,7 @@ class MainWindow(QMainWindow, WindowMixin):
             event.ignore()
             return
         self.updateController.stop()
+        self.agentSession.stop()
         settings = self.settings
         # Remember the current image so directory-based sessions can resume.
         settings[SETTING_FILENAME] = self.filePath if self.filePath else ''
@@ -3282,6 +3427,9 @@ class MainWindow(QMainWindow, WindowMixin):
         """Select a detected project format without rewriting its labels."""
         if annotationFormat not in SUPPORTED_ANNOTATION_FORMATS:
             return False
+        if (annotationFormat != self.annotationFormat and hasattr(self, 'agentSession')
+                and self.agentSession.queue):
+            self.agentSession.stop()
         self.annotationFormat = annotationFormat
         if hasattr(self, 'annotationFormatActions'):
             self.annotationFormatActions[annotationFormat].setChecked(True)
@@ -3433,8 +3581,7 @@ class MainWindow(QMainWindow, WindowMixin):
         imglist = list(self.fileModel.stringList())
         if not imglist:
             imglist = self.scanAllImages(self.dirname)
-        self.filesm.blockSignals(True)
-        try:
+        with self.restoringFileRow():
             if imglist == list(self.fileModel.stringList()):
                 self.fileModel.resetAnnotationCounts()
             else:
@@ -3444,10 +3591,8 @@ class MainWindow(QMainWindow, WindowMixin):
             if currentFile in imglist:
                 currentIndex = self.fileModel.index(imglist.index(currentFile))
                 self.filesm.setCurrentIndex(
-                    currentIndex, QItemSelectionModel.SelectCurrent)
+                    currentIndex, QItemSelectionModel.ClearAndSelect)
                 self.centerFileListIndex(currentIndex)
-        finally:
-            self.filesm.blockSignals(False)
 
         self.updateLabelStatistics()
 
@@ -3495,8 +3640,7 @@ class MainWindow(QMainWindow, WindowMixin):
             QApplication.restoreOverrideCursor()
 
         self.annotationScanTimer.stop()
-        self.filesm.blockSignals(True)
-        try:
+        with self.restoringFileRow():
             self.fileModel.setStringList(
                 imagePaths, self.dirname, self.defaultSaveDir,
                 self.annotationFormat, scanAnnotations=False)
@@ -3508,9 +3652,7 @@ class MainWindow(QMainWindow, WindowMixin):
                     targetRow = min(previousRow, len(imagePaths) - 1)
                 targetIndex = self.fileModel.index(targetRow)
                 self.filesm.setCurrentIndex(
-                    targetIndex, QItemSelectionModel.SelectCurrent)
-        finally:
-            self.filesm.blockSignals(False)
+                    targetIndex, QItemSelectionModel.ClearAndSelect)
 
         if targetIndex.isValid():
             targetPath = self.fileModel.data(targetIndex, Qt.EditRole)
@@ -3693,6 +3835,8 @@ class MainWindow(QMainWindow, WindowMixin):
         if not dirpath:
             return
 
+        if self.agentSession.queue:
+            self.agentSession.stop()
         self.defaultSaveDir = os.path.abspath(dirpath)
         if self.dirname:
             root = os.path.abspath(self.dirname)
@@ -3778,6 +3922,8 @@ class MainWindow(QMainWindow, WindowMixin):
             return
         self.resetState()
         self.setClean()
+        if self.agentSession.queue:
+            self.agentSession.stop()
         self.lastOpenDir = dirpath
         self.dirname = dirpath
         if dirpath in self.recentImageDirs:
@@ -3818,7 +3964,7 @@ class MainWindow(QMainWindow, WindowMixin):
         resumeFilePath = os.path.abspath(resumeFilePath) if resumeFilePath else None
         if resumeFilePath in imglist:
             resumeIndex = self.fileModel.index(imglist.index(resumeFilePath))
-            self.filesm.setCurrentIndex(resumeIndex, QItemSelectionModel.SelectCurrent)
+            self.filesm.setCurrentIndex(resumeIndex, QItemSelectionModel.ClearAndSelect)
             self.centerFileListIndex(resumeIndex)
         else:
             self.openNextImg()
@@ -3859,7 +4005,7 @@ class MainWindow(QMainWindow, WindowMixin):
         
         prevIndex = self.fileModel.index(currIndex.row() - 1)
       
-        self.filesm.setCurrentIndex(prevIndex, QItemSelectionModel.SelectCurrent)
+        self.filesm.setCurrentIndex(prevIndex, QItemSelectionModel.ClearAndSelect)
         changed = self.filesm.currentIndex() == prevIndex
         if changed:
             # loadFile() focuses the canvas. Keyboard image navigation should
@@ -3882,7 +4028,7 @@ class MainWindow(QMainWindow, WindowMixin):
             return False
 
         nextIndex = self.fileModel.index(currIndex.row() + 1)      
-        self.filesm.setCurrentIndex(nextIndex, QItemSelectionModel.SelectCurrent)
+        self.filesm.setCurrentIndex(nextIndex, QItemSelectionModel.ClearAndSelect)
         changed = self.filesm.currentIndex() == nextIndex
         if changed:
             self.fileListView.setFocus(Qt.ShortcutFocusReason)
@@ -3898,6 +4044,8 @@ class MainWindow(QMainWindow, WindowMixin):
         if filename:
             if isinstance(filename, (tuple, list)):
                 filename = filename[0]
+            if self.agentSession.queue:
+                self.agentSession.stop()
             self.loadFile(filename)
 
             if self.filePath is not None:
@@ -3905,9 +4053,8 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.fileModel.setStringList(imglist)
                 if self.fileModel.rowCount() > 0:
                     curIndex = self.fileModel.index(0)
-                    self.filesm.blockSignals(True)
-                    self.filesm.setCurrentIndex(curIndex, QItemSelectionModel.SelectCurrent)
-                    self.filesm.blockSignals(False)
+                    with self.restoringFileRow():
+                        self.filesm.setCurrentIndex(curIndex, QItemSelectionModel.ClearAndSelect)
                 self.updateLabelStatistics()
 
     def saveLocal(self, file_path):
@@ -4056,8 +4203,7 @@ class MainWindow(QMainWindow, WindowMixin):
         remainingDisplay = [
             list(info) for row, info in enumerate(self.fileModel.dispList)
             if row != selectedRow]
-        self.filesm.blockSignals(True)
-        try:
+        with self.restoringFileRow():
             self.fileModel.dispList = remainingDisplay
             self.fileModel._totalAnnotationCount = sum(
                 info[1] for info in remainingDisplay
@@ -4069,9 +4215,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 nextIndex = self.fileModel.index(
                     min(selectedRow, len(remainingImages) - 1))
                 self.filesm.setCurrentIndex(
-                    nextIndex, QItemSelectionModel.SelectCurrent)
-        finally:
-            self.filesm.blockSignals(False)
+                    nextIndex, QItemSelectionModel.ClearAndSelect)
 
         if deletingCurrent or not self.filePath:
             # Avoid recording deleted current-image shapes during resetState.
@@ -4089,10 +4233,10 @@ class MainWindow(QMainWindow, WindowMixin):
         elif self.filePath in remainingImages:
             currentRow = remainingImages.index(self.filePath)
             currentIndex = self.fileModel.index(currentRow)
-            self.filesm.blockSignals(True)
-            self.filesm.setCurrentIndex(
-                currentIndex, QItemSelectionModel.SelectCurrent)
-            self.filesm.blockSignals(False)
+            with self.restoringFileRow():
+                self.filesm.setCurrentIndex(
+                    currentIndex, QItemSelectionModel.ClearAndSelect)
+            self.centerFileListIndex(currentIndex)
 
         if self.fileModel.rowCount():
             current = self.filesm.currentIndex()
@@ -4444,9 +4588,11 @@ class MainWindow(QMainWindow, WindowMixin):
         item = self.ShapeItemDict.get(shape)
         if item is None:
             return
-        index = self.labelModel.indexFromItem(item)
-        self.labelList.verticalHeader().setSectionChecked(
-            index.row(), visible)
+        batching = self._groupUpdate
+        with self.changingGroups():
+            item.setCheckState(Qt.Checked if visible else Qt.Unchecked)
+            if not batching:
+                self.labelList.updateGroup(item.parent())
 
 
 

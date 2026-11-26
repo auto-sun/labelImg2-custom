@@ -64,8 +64,11 @@ exe = EXE(
     console=False,
     icon=str(icon_path),
 )
+broker = EXE(pyz, a.scripts, [], exclude_binaries=True, name='LabelImg2MCP',
+             console=True, strip=False, upx=False, icon=str(icon_path))
 coll = COLLECT(
     exe,
+    broker,
     a.binaries,
     a.datas,
     strip=False,

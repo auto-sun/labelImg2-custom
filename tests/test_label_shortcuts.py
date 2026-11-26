@@ -357,7 +357,7 @@ class LabelShortcutWindowTests(unittest.TestCase):
         shape.label = 'person'
         self.window.canvas.shapes.append(shape)
         self.window.addLabel(shape)
-        index = self.window.labelModel.index(0, 0)
+        index = self.window.ShapeItemDict[shape].index()
 
         self.window.show()
         self.window.labelList.setCurrentIndex(index)

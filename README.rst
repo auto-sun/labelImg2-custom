@@ -24,7 +24,9 @@ Interface preview
 Downloads
 ---------
 
-`Download the v2.7.6 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.7.6/LabelImg2Custom-2.7.6-Setup.exe>`__.
+`Download the v2.8.0 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.8.0/LabelImg2Custom-2.8.0-Setup.exe>`__.
+
+Version 2.8.0 adds a local stdio MCP adapter for continuous annotation. Authorize one project in Settings, then let your agent label a bounded range. Existing labels are skipped; uncertain images can be flagged without creating empty labels. Box Labels now supports per-class folding, visibility, selection and reclassification.
 
 Version 2.7.6 adds a welcome screen for an empty workspace. Opening an image
 folder now offers sibling ``labels`` or ``label`` folders. When no candidates
@@ -46,7 +48,7 @@ are matched only for unique image names. Help now offers Check for Updates
 and an optional startup check (enabled by default). Installed Windows copies
 download and verify the installer SHA256 before launching it; source runs
 open the release page. Updates require confirmation and downloads can be cancelled.
-See the `v2.7.6 release notes (Chinese) <docs/releases/v2.7.6.md>`__.
+See the `v2.8.0 release notes (Chinese) <docs/releases/v2.8.0.md>`__.
 
 Double-click the installer and launch the app from the Start menu. No Python,
 Conda or separate dependency installation is required. The installer includes

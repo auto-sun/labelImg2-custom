@@ -171,6 +171,28 @@ class AnnotationFormatConversionTests(unittest.TestCase):
                 target_format, convertExisting=convert_existing)
         return result, information, warning
 
+    def test_hidden_group_reclass_saves_only_new_ids_in_yolo_obb(self):
+        w = self.window
+        w.annotationFormat = FORMAT_YOLO_OBB
+        path = self.create_txt(FORMAT_YOLO_OBB)
+        with open(path, encoding='utf-8') as stream:
+            old = stream.read().strip()
+        with open(path, 'a', encoding='utf-8') as stream:
+            stream.write(old + '\n')
+        self.assertTrue(w.loadFile(self.imagePath))
+        group = w.labelList.groups[self.label]
+        w.setGroupVisibility(group, False)
+        self.assertTrue(w.changeBoxGroupClass(group, 'object_b'))
+        self.assertTrue(w.saveFile())
+        with open(path, encoding='utf-8') as stream:
+            rows = [line.split() for line in stream if line.strip()]
+        self.assertEqual(2, len(rows))
+        for row in rows:
+            self.assertEqual('1', row[0])
+            self.assertEqual(old.split()[1:], row[1:])
+        self.assertTrue(w.loadFile(self.imagePath))
+        self.assertEqual(['object_b', 'object_b'], [s.label for s in w.canvas.shapes])
+
     def test_xml_to_yolo_obb_converts_all_and_shows_progress(self):
         xmlPath = self.create_xml()
 

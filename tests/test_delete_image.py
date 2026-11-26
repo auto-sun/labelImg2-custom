@@ -237,6 +237,39 @@ class DeleteImageTests(unittest.TestCase):
                         for call in centerIndex.call_args_list]
         self.assertIn(1, centeredRows)
 
+    def test_clicked_then_keyboard_navigated_row_is_only_selection_and_centered(self):
+        images = [self.createImage('frame%03d.jpg' % i) for i in range(80)]
+        view = self.window.fileListView
+        self.window.fileModel.setStringList(images, scanAnnotations=False)
+        self.window.show()
+        self.app.processEvents()
+        clicked = self.window.fileModel.index(35)
+        view.scrollTo(clicked, QAbstractItemView.PositionAtBottom)
+        self.app.processEvents()
+        QTest.mouseClick(view.viewport(), Qt.LeftButton, Qt.NoModifier,
+                         view.visualRect(clicked).center())
+        for row in range(35, 63):
+            if row > 35:
+                QTest.keyClick(view, Qt.Key_Down)
+            self.app.processEvents()
+            index = self.window.fileModel.index(row)
+            self.assertEqual(images[row], self.window.filePath)
+            self.assertEqual([index], view.selectedIndexes())
+            self.assertLessEqual(abs(view.visualRect(index).center().y() -
+                                     view.viewport().rect().center().y()),
+                                 view.visualRect(index).height())
+
+    def test_refresh_notifies_view_of_restored_selection_without_reloading_twice(self):
+        self.window.show()
+        self.app.processEvents()
+        selection = QSignalSpy(self.window.filesm.selectionChanged)
+        with mock.patch.object(self.window, 'loadFile', wraps=self.window.loadFile) as load:
+            self.window.refreshProjectDirectories()
+        self.assertEqual(1, load.call_count)
+        self.assertGreater(len(selection), 0)
+        self.assertEqual([self.window.filesm.currentIndex()],
+                         self.window.fileListView.selectedIndexes())
+
     def test_left_right_no_longer_switch_images(self):
         self.window.show()
         self.window.canvas.setFocus()
