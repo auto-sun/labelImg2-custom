@@ -2,6 +2,7 @@
 from PyQt5.QtCore import QEasingCurve, QObject, QRect, Qt, QVariantAnimation, pyqtSignal
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import QApplication, QDialog, QWidget
+from .ui_geometry import screen_work_areas
 
 
 def widget_rect(widget):
@@ -81,14 +82,19 @@ class WindowMotion(QObject):
         if not self.available() or not window.isVisible() or window.isMinimized():
             return False
         full=widget_rect(window)
-        if not full.isValid():
+        # Interpolating between rectangles on different DPI-scaled screens
+        # can cross a gap in Qt's virtual coordinates. Never hide the live
+        # window behind an animation that cannot stay on a single monitor.
+        area=next((area for area in screen_work_areas() if area.contains(full)),None)
+        if not full.isValid() or area is None:
             return False
         target=anchor() if callable(anchor) else widget_rect(anchor)
-        if opening and not target.isValid():
+        same_screen=target.isValid() and area.contains(target)
+        if opening and not same_screen:
             return False
         # A hidden or unavailable entry still gets a short fade, not a jump
         # toward an arbitrary point on the desktop.
-        target=target if target.isValid() else full
+        target=target if same_screen else full
         ghost=WindowSnapshot(self.owner,window.grab())
         animation=QVariantAnimation(self)
         animation.setStartValue(0.0)

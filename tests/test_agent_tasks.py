@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import QApplication
 import labelImg
 from libs.agent_tasks import AgentQueue, digest, project_image_name
 from libs.pascal_voc_io import PascalVocReader
+from libs.ui_geometry import screen_work_areas
 from test_delete_image import MemorySettings
 
 
@@ -228,6 +229,29 @@ class AgentTests(unittest.TestCase):
             self.assertEqual('0.png',Path(self.w.filePath).name)
         finally:
             self.w.dirty=False
+
+    def test_task_window_recovers_after_minimize_without_resetting_the_task(self):
+        self.w.show()
+        current=self.start(images=['2.png','3.png'])
+        monitor=self.s.monitor
+        self.preview(current,1,self.box)
+        self.app.processEvents()
+        monitor.resize(4484,519)
+        monitor.move(3360,1413)
+        monitor.showMinimized()
+        self.app.processEvents()
+        self.s.show_monitor()
+        self.app.processEvents()
+        self.assertTrue(monitor.isVisible())
+        self.assertFalse(monitor.isMinimized())
+        self.assertTrue(any(area.contains(monitor.frameGeometry()) for area in screen_work_areas()),
+                        monitor.frameGeometry())
+        self.assertEqual(1,len(monitor.preview.boxes))
+        self.assertEqual(current['task_id'],self.s.active)
+        self.assertTrue(self.w.fileModel.isAgentLocked(self.w.fileModel.index(2)))
+        nxt=self.submit(current,'annotated',boxes=[self.box])
+        self.assertEqual('3.png',nxt['image'])
+        self.assertEqual('0.png',Path(self.w.filePath).name)
 
     def test_batch_skip_existing_mark_review_empty_and_retry(self):
         old=self.labels/'0.xml'

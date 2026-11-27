@@ -1,8 +1,9 @@
 """Non-modal, read-only task monitor; never edits the manual annotation canvas."""
-from PyQt5.QtCore import QPointF, QRectF, Qt
+from PyQt5.QtCore import QEvent, QPointF, QRectF, QSize, Qt, QTimer
 from PyQt5.QtGui import QColor, QPainter, QPen, QPolygonF
-from PyQt5.QtWidgets import (QHBoxLayout, QLabel, QListWidget,
-                             QPushButton, QSplitter, QVBoxLayout, QWidget)
+from PyQt5.QtWidgets import (QAbstractScrollArea, QHBoxLayout, QLabel, QListWidget,
+                             QPushButton, QSizePolicy, QSplitter, QVBoxLayout, QWidget)
+from .ui_geometry import available_screen_geometry, recover_window_frame, screen_work_areas
 from .window_motion import MotionDialog
 
 
@@ -53,12 +54,20 @@ class AgentTaskWindow(MotionDialog):
         super().__init__(window, Qt.Window)
         self.setModal(False)
         self.resize(860, 530)
+        self._placement_timer = QTimer(self, singleShot=True)
+        self._placement_timer.timeout.connect(self.ensureOnScreen)
         self.title = QLabel()
         self.title.setTextFormat(Qt.PlainText)
         self.title.setWordWrap(True)
+        self.title.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self.files = QListWidget()
         self.files.setUniformItemSizes(True)
         self.files.setSelectionMode(QListWidget.NoSelection)
+        self.files.setSizeAdjustPolicy(QAbstractScrollArea.AdjustIgnored)
+        self.files.setTextElideMode(Qt.ElideMiddle)
+        self.files.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.files.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        self.files.setMinimumWidth(120)
         self.preview = AgentPreview()
         splitter = QSplitter()
         splitter.addWidget(self.files)
@@ -78,6 +87,58 @@ class AgentTaskWindow(MotionDialog):
         main.addWidget(splitter, 1)
         main.addLayout(controls)
         self._paths = []
+
+    def ensureOnScreen(self):
+        if not self.isVisible() or self.isMinimized():
+            return False
+        frame = self.frameGeometry()
+        areas = screen_work_areas()
+        # Windows can extend the invisible resize border of a genuine
+        # maximized window a few logical pixels beyond the work area.
+        if self.isMaximized() and any(area.adjusted(-16, -16, 16, 16).contains(frame)
+                                     for area in areas):
+            return False
+        destination = recover_window_frame(frame, areas, available_screen_geometry(self))
+        if destination == frame:
+            return False
+
+        animator = self.animator()
+        if animator is not None:
+            animator.finish(self)
+        self.setWindowOpacity(1)
+        if self.isMaximized():
+            self.showNormal()
+        decorations = self.frameSize() - self.size()
+        content = destination.size() - decorations
+        self.resize(content.expandedTo(QSize(1, 1)))
+        self.move(destination.topLeft())
+        return True
+
+    def present(self, interactive=False):
+        was_visible = self.isVisible() and not self.isMinimized()
+        animator = self.animator()
+        if animator is not None:
+            animator.finish(self)
+        self.setAttribute(Qt.WA_ShowWithoutActivating, not interactive)
+        if self.isMinimized():
+            self.setWindowState(self.windowState() & ~Qt.WindowMinimized)
+        self.show()
+        moved = self.ensureOnScreen()
+        # Recheck once after native maximize/restore and DPI events settle.
+        self._placement_timer.start(0)
+        if interactive:
+            self.raise_()
+            self.activateWindow()
+            if animator is not None and not was_visible and not moved:
+                animator.play(self, self.motionAnchor, opening=True)
+
+    def showAnimated(self):
+        self.present(interactive=True)
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QEvent.WindowStateChange and hasattr(self, '_placement_timer'):
+            self._placement_timer.start(0)
 
     def setFiles(self, relative_paths):
         self._paths = list(relative_paths)

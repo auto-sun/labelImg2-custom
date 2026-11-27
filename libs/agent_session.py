@@ -418,7 +418,7 @@ class AgentSession(QObject):
         self.update_monitor('Agent annotation in progress')
         if not resume and not self.monitor.isVisible():
             self.monitor.motionAnchor=self.monitor_button
-            self.monitor.show()
+            self.monitor.present()
         return self.deliver()
 
     def dispatch(self,name,args):

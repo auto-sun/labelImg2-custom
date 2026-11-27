@@ -9,6 +9,8 @@ $env:YOLO_AUTOINSTALL = 'false'
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 Set-Location -LiteralPath $projectRoot
 
+& (Join-Path $PSScriptRoot 'smoke_test_upgrade_preflight.ps1')
+
 if (-not $InnoCompiler) {
     $compilerCandidates = @(
         (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),

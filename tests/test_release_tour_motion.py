@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import QApplication, QPushButton, QWidget
 
 import labelImg
 from libs.release_tour import should_offer_tour
+from libs.ui_geometry import recover_window_frame
 from libs.window_motion import MotionDialog, WindowMotion, widget_rect
 from test_delete_image import MemorySettings
 
@@ -65,6 +66,57 @@ class MotionTests(unittest.TestCase):
         dialog.close()
         self.assertFalse(animator.running)
 
+    def test_different_monitor_entry_never_hides_the_live_dialog(self):
+        owner=QWidget()
+        owner.show()
+        self.addCleanup(owner.close)
+        owner.windowMotion=animator=WindowMotion(owner,MemorySettings())
+        dialog=MotionDialog(owner)
+        dialog.resize(250,130)
+        dialog.move(80,80)
+        dialog.show()
+        self.app.processEvents()
+        left=QRect(-1400,-200,1000,900)
+        right=QRect(0,0,800,600)
+        anchor=lambda:QRect(-900,640,120,22)
+        with patch.object(animator,'available',return_value=True), \
+                patch('libs.window_motion.screen_work_areas',return_value=[left,right]):
+            self.assertFalse(animator.play(dialog,anchor,opening=True))
+            self.assertEqual(1,dialog.windowOpacity())
+            self.assertTrue(animator.play(dialog,anchor))
+        timeline,ghost,_=animator.running[dialog]
+        timeline.setCurrentTime(timeline.duration()//2)
+        self.assertEqual(widget_rect(dialog),ghost.geometry())
+        animator.finishAll()
+
+
+class MonitorPlacementTests(unittest.TestCase):
+    main=QRect(0,0,1920,1040)
+    # A smaller logical screen with negative origins and a gap at its right.
+    secondary=QRect(-2560,-374,1707,1026)
+
+    def fit(self,frame):
+        return recover_window_frame(frame,[self.secondary,self.main],self.main)
+
+    def test_reported_frame_returns_to_owner_screen_at_normal_size(self):
+        recovered=self.fit(QRect(3360,1413,4484,519))
+        self.assertTrue(self.main.contains(recovered))
+        self.assertEqual((860,530),(recovered.width(),recovered.height()))
+        self.assertEqual(self.main.center(),recovered.center())
+
+    def test_gap_is_not_a_screen_and_oversize_never_spans_them(self):
+        for frame in (QRect(-750,50,420,390),QRect(-2470,-100,4340,530)):
+            with self.subTest(frame=frame):
+                self.assertTrue(self.main.contains(self.fit(frame)))
+
+    def test_visible_secondary_window_stays_where_the_user_put_it(self):
+        placed=QRect(-2300,-200,690,470)
+        self.assertEqual(placed,self.fit(placed))
+        clipped=QRect(-1800,190,730,530)
+        result=self.fit(clipped)
+        self.assertTrue(self.secondary.contains(result))
+        self.assertEqual(clipped.size(),result.size())
+
 
 class ReleaseTourTests(unittest.TestCase):
     @classmethod
@@ -78,6 +130,9 @@ class ReleaseTourTests(unittest.TestCase):
         preset.write_text('person\n',encoding='utf8')
         with patch.object(labelImg,'Settings',MemorySettings):
             self.window=labelImg.MainWindow(defaultPrefdefClassFile=str(preset))
+        # Exercise the existing feature tour, even on a bugfix release
+        # that does not introduce a new tour page.
+        self.window.releaseTour.version='2.8.4'
         self.addCleanup(self.window.close)
         self.window.show()
         self.app.processEvents()
