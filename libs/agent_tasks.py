@@ -130,6 +130,10 @@ class AgentQueue:
         return self.db.execute("SELECT * FROM frame WHERE job=? AND state IN ('pending','writing') ORDER BY seq LIMIT 1",
                                (job,)).fetchone()
 
+    def frames(self, job, start=0, end=2147483647):
+        return self.db.execute('SELECT * FROM frame WHERE job=? AND seq>=? AND seq<? ORDER BY seq',
+                               (job, start, end))
+
     def finish(self, r, state, reason=''):
         with self.db:
             self.db.execute('UPDATE frame SET state=?,reason=? WHERE job=? AND seq=?',

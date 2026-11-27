@@ -6,12 +6,13 @@ from __future__ import absolute_import
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence
-from PyQt5.QtWidgets import (QAbstractItemView, QComboBox, QDialog,
+from PyQt5.QtWidgets import (QAbstractItemView, QComboBox,
                              QDialogButtonBox, QHBoxLayout, QHeaderView,
                              QLabel, QMessageBox, QPushButton,
                              QKeySequenceEdit, QTableWidget, QVBoxLayout)
 
 from .ui_geometry import available_screen_geometry, responsive_dialog_size
+from .window_motion import MotionDialog
 
 
 class LabelShortcutValidationError(ValueError):
@@ -62,7 +63,7 @@ def validate_label_shortcuts(mappings, class_names, reserved=None):
     return normalized
 
 
-class LabelShortcutDialog(QDialog):
+class LabelShortcutDialog(MotionDialog):
     def __init__(self, mappings, class_names, reserved=None, parent=None):
         super(LabelShortcutDialog, self).__init__(parent)
         self.classNames = list(class_names or [])

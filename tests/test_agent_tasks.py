@@ -10,8 +10,9 @@ import unittest
 from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QPoint, Qt
 from PyQt5.QtGui import QImage
+from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication
 import labelImg
 from libs.agent_tasks import AgentQueue, digest
@@ -62,64 +63,133 @@ class AgentTests(unittest.TestCase):
     def test_live_overlay_paints_prior_to_submit_and_is_never_an_annotation(self):
         self.w.show()
         a=self.start(count=2)
-        canvas=self.w.canvas
+        canvas=self.s.monitor.preview
         self.app.processEvents()
         before=canvas.grab().toImage()
         self.assertEqual(1,self.preview(a,1,self.box)['preview_count'])
         self.app.processEvents()
         self.assertNotEqual(before, canvas.grab().toImage())
-        original_center = canvas._agentPreview[1][1].boundingRect().center()
-        self.assertAlmostEqual(55.0, original_center.x())
+        self.assertAlmostEqual(55.0,sum(x for x,y in canvas.boxes[1][1])/4)
         self.assertEqual(1,self.preview(a,1,dict(self.box,cx=40))['preview_count'])
-        self.assertAlmostEqual(40.0, canvas._agentPreview[1][1].boundingRect().center().x())
+        self.assertAlmostEqual(40.0,sum(x for x,y in canvas.boxes[1][1])/4)
         self.assertEqual(2,self.preview(a,2,dict(self.box,cx=70))['preview_count'])
-        self.assertFalse(canvas.shapes)
+        self.assertFalse(self.w.canvas.shapes)
         self.assertFalse(self.w.dirty)
-        self.assertEqual('0.png',Path(self.w.filePath).name)
+        self.assertEqual('2.png',Path(self.w.filePath).name)
         self.assertFalse(list(self.labels.iterdir()))
         with self.assertRaises(ValueError):
             self.preview(a,2,dict(self.box,class_id=0))
         # Only the final supplied list may be written, not the two draft boxes.
         b=self.submit(a,'annotated',boxes=[self.box])
         self.assertEqual(1,len((self.labels/'0.txt').read_text().splitlines()))
-        self.assertFalse(canvas._agentPreview)
+        self.assertFalse(canvas.boxes)
         with self.assertRaises(ValueError):
             self.preview(a,1,self.box)
         self.preview(b,1,self.box)
         self.s.stop()
-        self.assertFalse(canvas._agentPreview)
+        self.assertFalse(canvas.boxes)
         self.assertFalse((self.labels/'1.txt').exists())
 
     def test_review_discards_overlay_and_late_preview_does_not_advance(self):
         a=self.start(count=2)
         self.preview(a,1,self.box)
         b=self.submit(a,'review',reason='ambiguous')
-        self.assertFalse(self.w.canvas._agentPreview)
+        self.assertFalse(self.s.monitor.preview.boxes)
         self.assertFalse((self.labels/'0.txt').exists())
         with self.assertRaises(ValueError):
             self.preview(a,2,self.box)
-        self.assertEqual('1.png',Path(self.w.filePath).name)
+        self.assertEqual('2.png',Path(self.w.filePath).name)
         self.submit(b,'empty')
         with self.assertRaises(ValueError):
             self.preview(b,1,self.box)
         self.assertEqual(b'',(self.labels/'1.txt').read_bytes())
 
-    def test_manual_switch_and_resume_discard_preview(self):
+    def test_manual_switch_and_dirty_edit_do_not_interrupt_preview(self):
         a=self.start(count=2)
         self.preview(a,1,self.box)
-        self.w.openNextImg()
-        self.assertFalse(self.w.canvas._agentPreview)
-        with self.assertRaises(ValueError):
-            self.preview(a,1,self.box)
+        self.assertTrue(self.w.openNextImg())
+        self.w.dirty=True
+        self.assertEqual('3.png',Path(self.w.filePath).name)
+        self.assertEqual(1,self.preview(a,1,self.box)['preview_count'])
+        self.assertEqual('3.png',Path(self.w.filePath).name)
+        self.w.dirty=False
         a=self.call('start_task',resume_task_id=a['task_id'])
         self.preview(a,1,self.box)
         self.call('start_task',resume_task_id=a['task_id'])
-        self.assertFalse(self.w.canvas._agentPreview)
+        self.assertFalse(self.s.monitor.preview.boxes)
         self.assertFalse(list(self.labels.iterdir()))
 
     def submit(self,info,outcome,**kw):
         return self.call('submit_and_next',outcome=outcome,
                          **{k:info[k] for k in ('task_id','image_token','image_revision')},**kw)
+
+    def test_mouse_frame_selection_and_right_click_stages_all_rows(self):
+        self.w.resize(1000,800)
+        self.w.show()
+        self.app.processEvents()
+        view=self.w.fileListView
+        first=view.visualRect(self.w.fileModel.index(1)).center()
+        last=view.visualRect(self.w.fileModel.index(3)).center()
+        QTest.mousePress(view.viewport(),Qt.LeftButton,Qt.NoModifier,first)
+        QTest.mouseMove(view.viewport(),last)
+        QTest.mouseRelease(view.viewport(),Qt.LeftButton,Qt.NoModifier,last)
+        self.assertEqual([1,2,3],sorted(i.row() for i in self.w.filesm.selectedIndexes()))
+        QTest.mousePress(view.viewport(),Qt.RightButton,Qt.NoModifier,last)
+        self.assertEqual([1,2,3],sorted(i.row() for i in self.w.filesm.selectedIndexes()))
+        def choose(*_):
+            self.w.fileListContextMenu.actions()[-1].trigger()
+        with patch.object(self.w.fileListContextMenu,'exec_',side_effect=choose):
+            self.w.showFileListContextMenu(last)
+        self.assertEqual(3,self.call('task_status')['staged_count'])
+        self.assertEqual('0.png',Path(self.w.filePath).name)
+        for row in (1,2,3):
+            self.assertFalse(self.w.fileModel.index(row).flags() & Qt.ItemIsSelectable)
+        self.assertFalse(self.w.openNextImg())
+        a=self.start(use_staged=True)
+        self.assertEqual('1.png',a['image'])
+        self.s.monitor.hide()
+        b=self.submit(a,'empty')
+        self.assertFalse(self.s.monitor.isVisible())
+        self.assertEqual('2.png',b['image'])
+        self.s.stop_task()
+        self.assertTrue(self.w.openNextImg())
+        self.assertTrue((self.labels/'1.txt').exists())
+        self.assertFalse((self.labels/'2.txt').exists())
+        with self.assertRaises(ValueError):
+            self.submit(b,'empty')
+
+    def test_candidate_filters_no_locks_and_cannot_open_external_paths(self):
+        (self.labels/'1.txt').write_bytes(b'')
+        self.assertEqual(['0.png','2.png'],[r['image'] for r in self.call(
+            'list_images',unlabeled_only=True,limit=2)['images']])
+        with self.assertRaises(ValueError):
+            self.call('inspect_image',image='../test.sqlite3')
+        with self.assertRaises(ValueError):
+            self.start(images=['0.png','../x.png'])
+        self.assertFalse(self.s.has_reservations)
+        self.assertTrue(self.w.fileModel.index(0).flags() & Qt.ItemIsSelectable)
+        a=self.start(images=['2.png','2.png','1.png','3.png'])
+        self.assertFalse(self.w.loadFile(str(self.images/'2.png')))
+        self.assertEqual('0.png',Path(self.w.filePath).name)
+        self.w.dirty=True
+        b=self.submit(a,'annotated',boxes=[self.box])
+        self.assertEqual('3.png',b['image'])
+        self.assertTrue(self.w.dirty)
+        self.w.dirty=False
+        done=self.submit(b,'empty')
+        self.assertEqual((3,1,1),(done['total'],done['skipped'],done['annotated']))
+        self.assertTrue(self.w.fileModel.index(2).flags() & Qt.ItemIsSelectable)
+        self.assertEqual(1,self.w.fileModel.annotationCount(self.w.fileModel.index(2)))
+
+    def test_one_dirty_manual_image_cannot_be_reserved(self):
+        self.w.dirty=True
+        try:
+            with self.assertRaisesRegex(ValueError,'manual edit'):
+                self.start(images=['0.png','2.png'])
+            self.assertFalse(self.s.has_reservations)
+            self.assertEqual('0.png',Path(self.w.filePath).name)
+        finally:
+            self.w.dirty=False
 
     def test_batch_skip_existing_mark_review_empty_and_retry(self):
         old=self.labels/'0.xml'
@@ -149,23 +219,18 @@ class AgentTests(unittest.TestCase):
         for box in (dict(self.box,class_id=0),dict(self.box,cx=-1),dict(self.box,w=0)):
             with self.assertRaises(ValueError):
                 self.submit(a,'annotated',boxes=[box])
-        self.w.dirty=True
-        with self.assertRaises(ValueError):
-            self.submit(a,'empty')
-        self.w.dirty=False
-        self.w.openNextImg()
-        with self.assertRaises(ValueError):
-            self.submit(a,'empty')
         self.s.stop()
         with self.assertRaises(ValueError):
             self.submit(a,'empty')
         self.s.queue=AgentQueue(self.db,self.s.context())
         self.assertEqual(a['task_id'],self.call('task_status')['task_id'])
-        self.call('start_task',resume_task_id=a['task_id'])
+        new_a=self.call('start_task',resume_task_id=a['task_id'])
+        with self.assertRaises(ValueError):
+            self.submit(a,'empty')
         path=self.labels/'0.txt'
         path.write_bytes(b'')
         with self.assertRaises(ValueError):
-            self.submit(a,'empty')
+            self.submit(new_a,'empty')
         b=self.call('start_task',resume_task_id=a['task_id'])
         self.assertEqual('1.png',b['image'])
         original_stamp=b['image_revision']
@@ -257,9 +322,12 @@ class AgentTests(unittest.TestCase):
                 try:
                     rpc('initialize',{'protocolVersion':'2025-11-25'})
                     proc.stdin.write(b'{"jsonrpc":"2.0","method":"notifications/initialized"}\n')
-                    self.assertEqual({'start_task','task_status','submit_and_next','preview_box'},
+                    self.assertEqual({'start_task','task_status','submit_and_next','preview_box','list_images','inspect_image'},
                                      {t['name'] for t in rpc('tools/list',{})['tools']})
-                    blocks=tool('start_task',count=2,instructions='QA')
+                    page=json.loads(tool('list_images',limit=2,unlabeled_only=True)[0]['text'])
+                    names=[item['image'] for item in page['images']]
+                    self.assertEqual('image',tool('inspect_image',image=names[0])[1]['type'])
+                    blocks=tool('start_task',images=names,instructions='QA')
                     for idx in range(2):
                         self.assertEqual('image',blocks[1]['type'])
                         meta=json.loads(blocks[0]['text'])

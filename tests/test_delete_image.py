@@ -105,6 +105,84 @@ class DeleteImageTests(unittest.TestCase):
             u'删除图片及对应标签...',
             self.window.actions.deleteImage.text())
 
+    def test_multi_selection_menu_has_delete_flag_and_unflag(self):
+        w=self.window
+        w.show()
+        self.app.processEvents()
+        second=w.fileModel.index(1)
+        w.filesm.select(second,QItemSelectionModel.Select)
+        pos=w.fileListView.visualRect(second).center()
+        tr=w.agentSession.tr_ui
+        def choose(*_):
+            actions={a.text():a for a in w.fileListContextMenu.actions()}
+            for text in ('Mark %d selected image(s) for review','Unmark %d selected image(s)',
+                         'Recycle %d selected image(s) and labels…','Add %d image(s) to Agent Task'):
+                self.assertIn(tr(text) % 2,actions)
+            actions[tr('Mark %d selected image(s) for review') % 2].trigger()
+        with mock.patch.object(w.fileListContextMenu,'exec_',side_effect=choose):
+            w.showFileListContextMenu(pos)
+        self.assertTrue(w.fileModel.isFlagged(w.fileModel.index(0)))
+        self.assertTrue(w.fileModel.isFlagged(w.fileModel.index(1)))
+        w.fileModel.setAgentLockedPaths([self.secondImage],'MCP')
+        self.assertTrue(w.setImageBatchFlagged([self.firstImage,self.secondImage],False))
+        self.assertFalse(w.fileModel.isFlagged(w.fileModel.index(0)))
+        self.assertTrue(w.fileModel.isFlagged(w.fileModel.index(1)))
+        self.assertEqual(w.fileModel.flaggedPaths(),w.settings[labelImg.SETTING_FLAGGED_IMAGES])
+
+    def test_batch_recycles_only_selected_paths_and_keeps_current_manual_edit(self):
+        w=self.window
+        third=self.createImage('three.jpg')
+        w.fileModel.setStringList([self.firstImage,self.secondImage,third],scanAnnotations=False)
+        current=w.fileModel.index(1)
+        with w.restoringFileRow():
+            w.filesm.setCurrentIndex(current,QItemSelectionModel.ClearAndSelect)
+        w.loadFile(self.secondImage)
+        w.dirty=True
+        xml,txt=self.createBothLabels()
+        w.fileModel.setData(current,6,Qt.BackgroundRole)
+        with mock.patch.object(QMessageBox,'question',return_value=QMessageBox.Yes) as question, \
+                mock.patch.object(labelImg,'move_to_trash',side_effect=self.fakeTrash):
+            self.assertTrue(w.recycleImageBatch([self.firstImage,third]))
+        question.assert_called_once()
+        self.assertEqual([self.secondImage],w.fileModel.stringList())
+        self.assertEqual(self.secondImage,w.filePath)
+        self.assertTrue(w.dirty)
+        self.assertEqual(6,w.fileModel.annotationCount(w.fileModel.index(0)))
+        self.assertTrue(w.fileModel.dispList[0][2])
+        self.assertTrue(os.path.isfile(self.secondImage))
+        self.assertFalse(any(os.path.exists(p) for p in (self.firstImage,third,xml,txt)))
+
+    def test_batch_preserves_shared_sidecars_and_failed_images(self):
+        w=self.window
+        alias=self.createImage('one.png')  # one.jpg and one.png map to the same label basename.
+        w.fileModel.setStringList([self.firstImage,self.secondImage,alias],scanAnnotations=False)
+        xml,txt=self.createBothLabels()
+        def trash(paths):
+            if paths==[alias]:
+                raise labelImg.TrashError('locked image')
+            self.fakeTrash(paths)
+        with mock.patch.object(QMessageBox,'question',return_value=QMessageBox.Yes), \
+                mock.patch.object(QMessageBox,'warning') as warning, \
+                mock.patch.object(labelImg,'move_to_trash',side_effect=trash):
+            self.assertTrue(w.recycleImageBatch([self.firstImage,alias]))
+        warning.assert_called_once()
+        self.assertTrue(os.path.isfile(alias))
+        self.assertTrue(os.path.isfile(xml))
+        self.assertTrue(os.path.isfile(txt))
+        self.assertFalse(os.path.exists(self.firstImage))
+
+    def test_batch_rechecks_mcp_lock_after_confirmation(self):
+        w=self.window
+        xml,txt=self.createBothLabels()
+        def confirm(*_):
+            w.fileModel.setAgentLockedPaths([self.firstImage],'MCP')
+            return QMessageBox.Yes
+        with mock.patch.object(QMessageBox,'question',side_effect=confirm), \
+                mock.patch.object(labelImg,'move_to_trash',side_effect=self.fakeTrash) as trash:
+            self.assertTrue(w.recycleImageBatch([self.firstImage,self.secondImage]))
+        trash.assert_called_once_with([self.secondImage])
+        self.assertTrue(all(os.path.isfile(p) for p in (self.firstImage,xml,txt)))
+
     def test_right_click_keeps_row_in_place_and_anchors_menu_to_cursor(self):
         self.window.show()
         self.app.processEvents()

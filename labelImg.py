@@ -53,6 +53,8 @@ from libs.i18n import LANGUAGES, LanguageManager, translate as translateUi
 from libs.userGuide import UserGuideDialog
 from libs.welcome import WelcomePage
 from libs.agent_session import AgentSession
+from libs.window_motion import WindowMotion, menu_rect
+from libs.release_tour import ReleaseTourController
 
 from libs.labelView import (CLabelView, HashableQStandardItem,
                             label_search_keys)
@@ -707,7 +709,8 @@ class MainWindow(QMainWindow, WindowMixin):
             'Shortcuts, basic operation, and advanced workflows')
         self.welcomePage.openFolder.clicked.connect(opendir.trigger)
         self.welcomePage.openImage.clicked.connect(open.trigger)
-        self.welcomePage.help.clicked.connect(self.userGuideAction.trigger)
+        self.welcomePage.help.clicked.connect(
+            lambda:self.showUserGuide(anchor=self.welcomePage.help))
         self.welcomePage.recentOpened.connect(self.loadRecent)
         addActions(self.menus.help, (self.userGuideAction, showInfo))
         self.updateController = UpdateController(self, settings)
@@ -891,7 +894,22 @@ class MainWindow(QMainWindow, WindowMixin):
             self.autoAnnotationCancelButton)
         self.setAutoAnnotationWidgetsVisible(False)
 
+        self.windowMotion = WindowMotion(self,settings)
+        self.interfaceAnimationsAction = QAction('Interface Animations',self)
+        self.interfaceAnimationsAction.setCheckable(True)
+        self.interfaceAnimationsAction.setChecked(self.windowMotion.enabled())
+        self.interfaceAnimationsAction.toggled.connect(self.windowMotion.setEnabled)
+        self.menus.settings.addAction(self.interfaceAnimationsAction)
         self.agentSession = AgentSession(self)
+        self.releaseTour = ReleaseTourController(self,settings,__version__)
+        self.newFeaturesAction=QAction('New Features Guide',self)
+        self.newFeaturesAction.triggered.connect(self.releaseTour.show)
+        self.menus.help.addAction(self.newFeaturesAction)
+        self.autoTourAction=QAction('Show Guide After Updates',self)
+        self.autoTourAction.setCheckable(True)
+        self.autoTourAction.setChecked(settings.get('showReleaseTours',True))
+        self.autoTourAction.toggled.connect(self.releaseTour.setAutomatic)
+        self.menus.settings.addAction(self.autoTourAction)
         self.languageManager.apply()
 
         # If only a saved labels directory is available, inspect its format in
@@ -1526,9 +1544,10 @@ class MainWindow(QMainWindow, WindowMixin):
             __appname__, __version__)
         QMessageBox.information(self, u'About', msg)
 
-    def showUserGuide(self, _checked=False):
+    def showUserGuide(self, _checked=False, anchor=None):
         dialog = UserGuideDialog(
             self.settings.get(SETTING_LANGUAGE, 'en'), self)
+        dialog.motionAnchor=anchor or (lambda:menu_rect(self,self.menus.help))
         self.languageManager.apply()
         dialog.exec_()
 
@@ -1635,9 +1654,9 @@ class MainWindow(QMainWindow, WindowMixin):
     def showFileListContextMenu(self, position):
         """Open the image menu for the row that was right-clicked."""
         index = self.fileListView.indexAt(position)
-        if not index.isValid():
+        if not index.isValid() or self.fileModel.isAgentLocked(index):
             return
-        if index != self.filesm.currentIndex():
+        if not self.filesm.isSelected(index):
             # Selecting a row normally centers it, but doing that here moves
             # the row away from the mouse just before its menu opens.
             self._suppressFileListCenter = True
@@ -1646,21 +1665,70 @@ class MainWindow(QMainWindow, WindowMixin):
                     index, QItemSelectionModel.ClearAndSelect)
             finally:
                 self._suppressFileListCenter = False
-        if self.filesm.currentIndex() != index:
+        if not self.filesm.isSelected(index):
             return
+        indexes=sorted((idx for idx in self.filesm.selectedIndexes()
+                        if not self.fileModel.isAgentLocked(idx)),key=lambda idx:idx.row())
+        paths=[self.fileModel.data(idx,Qt.EditRole) for idx in indexes]
+        agent=self.agentSession
+        add_task=QAction(agent.tr_ui('Add %d image(s) to Agent Task') % len(paths),self)
+        add_task.triggered.connect(lambda:agent.stage_selection(paths))
+        self.fileListContextMenu.addAction(add_task)
         self.actions.flagImage.setText(
             u'取消待确认标记' if self.fileModel.isFlagged(index)
             else u'标记该图（待确认）')
-        self.actions.deleteImage.setEnabled(True)
+        single=len(paths)==1 and self.filesm.currentIndex()==index
+        batch_actions=[]
+        if single:
+            self.actions.deleteImage.setEnabled(True)
+        else:
+            for text,icon,callback in (
+                    ('Mark %d selected image(s) for review','tags.svg',
+                     lambda:self.setImageBatchFlagged(paths,True)),
+                    ('Unmark %d selected image(s)','tags.svg',
+                     lambda:self.setImageBatchFlagged(paths,False)),
+                    ('Recycle %d selected image(s) and labels…','cancel2.svg',
+                     lambda:self.recycleImageBatch(paths))):
+                item=QAction(newIcon(icon),agent.tr_ui(text) % len(paths),self)
+                item.triggered.connect(callback)
+                self.fileListContextMenu.insertAction(add_task,item)
+                batch_actions.append(item)
         # The signal position is only for looking up the list row.  On some
         # Windows/Qt display setups, converting it with mapToGlobal places
         # the popup far from the actual right-click.  Use the mouse's global
         # position directly for the popup anchor.
-        self.fileListContextMenu.exec_(QCursor.pos())
+        try:
+            if not single:
+                self.fileListContextMenu.removeAction(self.actions.flagImage)
+                self.fileListContextMenu.removeAction(self.actions.deleteImage)
+            self.fileListContextMenu.exec_(QCursor.pos())
+        finally:
+            for item in [add_task]+batch_actions:
+                self.fileListContextMenu.removeAction(item)
+                item.deleteLater()
+            if not single:
+                self.fileListContextMenu.addActions([self.actions.flagImage,self.actions.deleteImage])
+
+    def _eligibleBatchImages(self, paths):
+        wanted={self.fileModel._pathKey(p) for p in paths}
+        return [p for p in self.fileModel.stringList() if
+                self.fileModel._pathKey(p) in wanted and not self.fileModel.isAgentLockedPath(p)]
+
+    def setImageBatchFlagged(self, paths, flagged):
+        paths=self._eligibleBatchImages(paths)
+        if not paths:
+            return False
+        flags=set(self.fileModel.flaggedPaths())
+        keys={self.fileModel._pathKey(p) for p in paths}
+        flags=flags | keys if flagged else flags - keys
+        self.fileModel.setFlaggedPaths(flags)
+        self.settings[SETTING_FLAGGED_IMAGES]=self.fileModel.flaggedPaths()
+        self.settings.save()
+        return True
 
     def toggleSelectedImageFlag(self, _checked=False):
         index = self.filesm.currentIndex()
-        if not index.isValid():
+        if not index.isValid() or self.fileModel.isAgentLocked(index):
             return False
         flagged = not self.fileModel.isFlagged(index)
         self.fileModel.setFlagged(index, flagged)
@@ -1797,6 +1865,8 @@ class MainWindow(QMainWindow, WindowMixin):
     def openClassFileManager(self, _checked=False):
         dialog = ClassFileDialog(
             self.classFilePath, self.classFileHistory, self)
+        dialog.motionAnchor=(self.classFileButton if self.sender() is self.classFileButton
+                             else lambda:menu_rect(self,self.menus.file))
         self.languageManager.apply()
         if not dialog.exec_():
             return False
@@ -1932,6 +2002,9 @@ class MainWindow(QMainWindow, WindowMixin):
             self.labelShortcutSettingsAction.setToolTip(details)
 
     def openLabelShortcutSettings(self, _value=False):
+        button=self.labelShortcutSettingsButton
+        from_button=button.isVisible() and (
+            button.hasFocus() or button.rect().contains(button.mapFromGlobal(QCursor.pos())))
         previousStates = [
             shortcutAction.isEnabled()
             for shortcutAction in self.labelShortcutActions]
@@ -1942,6 +2015,7 @@ class MainWindow(QMainWindow, WindowMixin):
             self.predefinedClasses,
             self.labelShortcutReservedKeys(),
             self)
+        dialog.motionAnchor=button if from_button else lambda:menu_rect(self,self.menus.settings)
         self.languageManager.apply()
         if dialog.exec_():
             self.setLabelShortcutMappings(dialog.validatedMappings)
@@ -2036,6 +2110,10 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def fileCurrentChanged(self, current, previous):
         if self._restoringFileRow or not current.isValid():
+            return
+        if self.fileModel.isAgentLocked(current):
+            with self.restoringFileRow():
+                self.filesm.setCurrentIndex(previous,QItemSelectionModel.ClearAndSelect)
             return
         # File-list clicks and navigation shortcuts change the selection
         # before this slot runs. When auto-save is disabled, give the user a
@@ -2592,6 +2670,8 @@ class MainWindow(QMainWindow, WindowMixin):
 
     def loadFile(self, filePath=None):
         """Load the specified file, or the last opened file if None."""
+        if self.fileModel.isAgentLockedPath(filePath or self.settings.get(SETTING_FILENAME)):
+            return False
         self.resetState(showWelcome=False)
         self.canvas.setEnabled(False)
         if filePath is None:
@@ -2850,6 +2930,9 @@ class MainWindow(QMainWindow, WindowMixin):
         return True
 
     def startSingleAutoAnnotation(self, _value=False):
+        if self.agentSession.has_reservations:
+            self.status(self.agentSession.tr_ui('Stop the agent task before running the local model.'))
+            return False
         if (self.autoAnnotationThread is not None and
                 self.autoAnnotationThread.isRunning()):
             self.status(u'自动标注正在运行。', 5000)
@@ -2923,6 +3006,9 @@ class MainWindow(QMainWindow, WindowMixin):
         self.startAutoAnnotationJobs([job], mode='single')
 
     def startAutoAnnotation(self, _value=False):
+        if self.agentSession.has_reservations:
+            self.status(self.agentSession.tr_ui('Stop the agent task before running the local model.'))
+            return False
         if (self.autoAnnotationThread is not None and
                 self.autoAnnotationThread.isRunning()):
             self.status(u'自动标注正在运行。', 5000)
@@ -3285,6 +3371,8 @@ class MainWindow(QMainWindow, WindowMixin):
             event.ignore()
             return
         self.updateController.stop()
+        self.releaseTour.timer.stop()
+        self.windowMotion.finishAll()
         self.agentSession.stop()
         settings = self.settings
         # Remember the current image so directory-based sessions can resume.
@@ -3650,7 +3738,9 @@ class MainWindow(QMainWindow, WindowMixin):
                     targetRow = imagePaths.index(currentFile)
                 else:
                     targetRow = min(previousRow, len(imagePaths) - 1)
-                targetIndex = self.fileModel.index(targetRow)
+                targetIndex = self.availableFileIndex(targetRow,1)
+                if not targetIndex.isValid():
+                    targetIndex = self.availableFileIndex(targetRow,-1)
                 self.filesm.setCurrentIndex(
                     targetIndex, QItemSelectionModel.ClearAndSelect)
 
@@ -3714,6 +3804,9 @@ class MainWindow(QMainWindow, WindowMixin):
         return jobs
 
     def convertExistingAnnotations(self, targetFormat):
+        if self.agentSession.has_reservations:
+            self.status(self.agentSession.tr_ui('Stop the agent task before converting annotations.'))
+            return False
         jobs = self.collectAnnotationConversionJobs()
         summary = {
             'total': len(jobs),
@@ -3998,12 +4091,18 @@ class MainWindow(QMainWindow, WindowMixin):
             self.paintCanvas()
             self.saveFile()
 
+    def availableFileIndex(self,row,step):
+        while 0<=row<self.fileModel.rowCount():
+            index=self.fileModel.index(row)
+            if not self.fileModel.isAgentLocked(index):
+                return index
+            row+=step
+        return QModelIndex()
+
     def openPrevImg(self, _value=False):
-        currIndex = self.filesm.currentIndex()
-        if currIndex.row() - 1 < 0:
+        prevIndex=self.availableFileIndex(self.filesm.currentIndex().row()-1,-1)
+        if not prevIndex.isValid():
             return False
-        
-        prevIndex = self.fileModel.index(currIndex.row() - 1)
       
         self.filesm.setCurrentIndex(prevIndex, QItemSelectionModel.ClearAndSelect)
         changed = self.filesm.currentIndex() == prevIndex
@@ -4023,11 +4122,9 @@ class MainWindow(QMainWindow, WindowMixin):
         return False
 
     def openNextImg(self, _value=False):
-        currIndex = self.filesm.currentIndex()
-        if currIndex.row() + 1 >= self.fileModel.rowCount():
+        nextIndex=self.availableFileIndex(self.filesm.currentIndex().row()+1,1)
+        if not nextIndex.isValid():
             return False
-
-        nextIndex = self.fileModel.index(currIndex.row() + 1)      
         self.filesm.setCurrentIndex(nextIndex, QItemSelectionModel.ClearAndSelect)
         changed = self.filesm.currentIndex() == nextIndex
         if changed:
@@ -4091,7 +4188,7 @@ class MainWindow(QMainWindow, WindowMixin):
         return None
 
     def saveFile(self, _value=False):
-        if not self.filePath:
+        if not self.filePath or self.fileModel.isAgentLockedPath(self.filePath):
             return False
         if self.defaultSaveDir is not None and len(self.defaultSaveDir):
             return self._saveFile(
@@ -4117,7 +4214,10 @@ class MainWindow(QMainWindow, WindowMixin):
             self, _value=False, requireConfirmation=True):
         """Delete the File List selection and all matching label formats."""
         selectedIndex = self.filesm.currentIndex()
-        if not selectedIndex.isValid():
+        if not selectedIndex.isValid() or self.fileModel.isAgentLocked(selectedIndex):
+            return False
+        selected=self.filesm.selectedIndexes()
+        if selected and selected!=[selectedIndex]:
             return False
         selectedPath = self.fileModel.data(selectedIndex, Qt.EditRole)
         if not selectedPath or not os.path.isfile(str(selectedPath)):
@@ -4130,13 +4230,8 @@ class MainWindow(QMainWindow, WindowMixin):
             return False
 
         imagePath = os.path.abspath(str(selectedPath))
-        currentPath = (os.path.abspath(self.filePath)
-                       if self.filePath else None)
-        deletingCurrent = (
-            currentPath is not None and
-            os.path.normcase(currentPath) == os.path.normcase(imagePath))
-
-        annotationPaths = self.annotationSidecarPathsForImage(imagePath)
+        targets,protected = self.annotationRecyclePlan([imagePath])
+        annotationPaths = sorted(targets)
         if requireConfirmation:
             if annotationPaths:
                 annotationSummary = u'\n'.join(
@@ -4153,14 +4248,10 @@ class MainWindow(QMainWindow, WindowMixin):
                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
             if answer != QMessageBox.Yes:
                 return False
-
-        selectedRow = selectedIndex.row()
-        imageKey = self.imageSessionKey(imagePath)
-        deletedSessionCount = 0
-        if deletingCurrent:
-            deletedSessionCount = sum(
-                1 for shape in self.canvas.shapes
-                if getattr(shape, 'sessionCreated', False))
+            if not self._eligibleBatchImages([imagePath]) or not os.path.isfile(imagePath):
+                return False
+            refreshed,_ = self.annotationRecyclePlan([imagePath])
+            annotationPaths = [p for p in annotationPaths if p in refreshed]
 
         # Move the image first. If this fails, keep every label untouched.
         try:
@@ -4182,82 +4273,7 @@ class MainWindow(QMainWindow, WindowMixin):
             except TrashError as error:
                 labelTrashErrors.append((annotationPath, str(error)))
 
-        self.sessionLabelCount = max(
-            0, self.sessionLabelCount - deletedSessionCount)
-        self._sessionShapeRegistry.pop(imageKey, None)
-        self._pendingAutoSessionCounts.pop(imageKey, None)
-        self.recentFiles = [
-            path for path in self.recentFiles
-            if os.path.normcase(os.path.abspath(str(path))) != imageKey]
-        self.fileModel.setFlagged(selectedIndex, False)
-        self.settings[SETTING_FLAGGED_IMAGES] = self.fileModel.flaggedPaths()
-        self.settings.save()
-
-        scanWasActive = self.annotationScanTimer.isActive()
-        self.annotationScanTimer.stop()
-        remainingImages = list(self.fileModel.stringList())
-        del remainingImages[selectedRow]
-
-        # Rebuild only the in-memory list. Existing counts and green states are
-        # preserved below, avoiding a synchronous scan in very large projects.
-        remainingDisplay = [
-            list(info) for row, info in enumerate(self.fileModel.dispList)
-            if row != selectedRow]
-        with self.restoringFileRow():
-            self.fileModel.dispList = remainingDisplay
-            self.fileModel._totalAnnotationCount = sum(
-                info[1] for info in remainingDisplay
-                if isinstance(info[1], int) and info[1] > 0)
-            QStringListModel.setStringList(
-                self.fileModel, remainingImages)
-            nextIndex = QModelIndex()
-            if remainingImages:
-                nextIndex = self.fileModel.index(
-                    min(selectedRow, len(remainingImages) - 1))
-                self.filesm.setCurrentIndex(
-                    nextIndex, QItemSelectionModel.ClearAndSelect)
-
-        if deletingCurrent or not self.filePath:
-            # Avoid recording deleted current-image shapes during resetState.
-            self.filePath = None
-            self.resetState()
-            if remainingImages:
-                nextPath = self.fileModel.data(nextIndex, Qt.EditRole)
-                self.loadFile(nextPath)
-                self.centerFileListIndex(nextIndex)
-            else:
-                self.setClean()
-                self.toggleActions(False)
-                self.canvas.setEnabled(False)
-                self.actions.saveAs.setEnabled(False)
-        elif self.filePath in remainingImages:
-            currentRow = remainingImages.index(self.filePath)
-            currentIndex = self.fileModel.index(currentRow)
-            with self.restoringFileRow():
-                self.filesm.setCurrentIndex(
-                    currentIndex, QItemSelectionModel.ClearAndSelect)
-            self.centerFileListIndex(currentIndex)
-
-        if self.fileModel.rowCount():
-            current = self.filesm.currentIndex()
-            self.statFile.setText('{0}/{1}'.format(
-                current.row() + 1, self.fileModel.rowCount()))
-        else:
-            self.statFile.clear()
-        self.actions.deleteImage.setEnabled(
-            self.filesm.currentIndex().isValid())
-        self.updateLabelStatistics()
-
-        if scanWasActive and remainingImages:
-            self.fileModel.resetAnnotationCounts()
-            self.startAnnotationScan(remainingImages, False)
-        else:
-            self.annotationScanIterator = None
-            self.annotationScanner = None
-
-        # loadFile focuses the canvas. Keep Delete routed to File List for
-        # subsequent presses, including after deleting the final row.
-        self.fileListView.setFocus(Qt.ShortcutFocusReason)
+        self.removeTrashedImages([imagePath])
 
         if labelTrashErrors:
             details = u'\n'.join(
@@ -4269,11 +4285,157 @@ class MainWindow(QMainWindow, WindowMixin):
             self.status(
                 u'图片已进入回收站；有 %d 个标签文件移动失败。' %
                 len(labelTrashErrors), 10000)
+        elif protected:
+            self.status(self.agentSession.tr_ui('Shared labels were kept.'),10000)
         else:
             self.status(
                 u'图片及 %d 个对应标签文件已移入回收站。' %
                 trashedLabelCount, 10000)
         return True
+
+    def annotationRecyclePlan(self, paths):
+        """Only offer sidecars that do not also belong to a surviving image."""
+        path_key=self.fileModel._pathKey
+        requested={path_key(p) for p in paths}
+        candidates={}
+        candidate_paths={}
+        protected=set()
+        presets={os.path.normcase(os.path.realpath(p)) for p in
+                 [self.classFilePath]+list(self.classFileHistory) if isinstance(p,str) and p}
+        normalized=lambda p:os.path.normcase(os.path.realpath(p))
+        for image in paths:
+            for label in self.annotationSidecarPathsForImage(image):
+                key=normalized(label)
+                if os.path.islink(label) or key in presets:
+                    protected.add(label)
+                else:
+                    path=candidate_paths.setdefault(key,label)
+                    candidates.setdefault(path,set()).add(path_key(image))
+        names={os.path.normcase(os.path.basename(p)) for p in candidates}
+        for image in self.fileModel.stringList():
+            # The annotation resolver preserves the image stem. Check only
+            # possible owners, even when the project has many thousands of rows.
+            stem=os.path.splitext(os.path.basename(image))[0]
+            if not any(os.path.normcase(stem+ext) in names for ext in (XML_EXT,YOLO_EXT)):
+                continue
+            for label in self.annotationSidecarPathsForImage(image):
+                candidate=candidate_paths.get(normalized(label))
+                if candidate is not None:
+                    candidates[candidate].add(path_key(image))
+        for label,owners in list(candidates.items()):
+            if not owners<=requested:
+                protected.add(label)
+                del candidates[label]
+        return candidates,protected
+
+    def recycleImageBatch(self, paths):
+        tr=self.agentSession.tr_ui
+        if self.autoAnnotationThread is not None:
+            self.status(tr('Stop annotation before recycling images.'),8000)
+            return False
+        selected=self._eligibleBatchImages(paths)
+        if not selected:
+            return False
+        targets,protected=self.annotationRecyclePlan(selected)
+        message=tr('Move %d image(s) and %d matching label file(s) to the Recycle Bin?') % (
+            len(selected),len(targets))
+        if protected:
+            message+='\n'+tr('Shared or protected label files will be kept.')
+        if QMessageBox.question(self,tr('Recycle selected images'),message,
+                                QMessageBox.Yes|QMessageBox.No,QMessageBox.No)!=QMessageBox.Yes:
+            return False
+        # A modal confirmation can process MCP requests. Never move an image
+        # that became reserved, or a label that was not in the confirmed plan.
+        selected=self._eligibleBatchImages(selected)
+        current,now_protected=self.annotationRecyclePlan(selected)
+        protected.update(now_protected)
+        removed,failed=[],[]
+        for path in selected:
+            try:
+                if not os.path.isfile(path):
+                    raise TrashError(tr('File is no longer available.'))
+                move_to_trash([path])
+                removed.append(path)
+            except TrashError as error:
+                failed.append((path,str(error)))
+        removed_keys={self.fileModel._pathKey(p) for p in removed}
+        label_count=0
+        for label in sorted(set(targets) & set(current)):
+            if not (targets[label]|current[label]) <= removed_keys:
+                continue
+            try:
+                move_to_trash([label])
+                label_count+=1
+            except TrashError as error:
+                failed.append((label,str(error)))
+        if removed:
+            self.removeTrashedImages(removed)
+        summary=tr('Recycled %d image(s) and %d label file(s).') % (len(removed),label_count)
+        if protected:
+            summary+=' '+tr('Shared labels were kept.')
+        self.status(summary,10000)
+        if failed:
+            details='\n'.join('%s: %s' % item for item in failed[:10])
+            QMessageBox.warning(self,tr('Recycle selected images'),
+                                summary+'\n'+(tr('%d file(s) could not be recycled.') % len(failed))
+                                +'\n\n'+details)
+        return bool(removed)
+
+    def removeTrashedImages(self, paths):
+        model=self.fileModel
+        key=model._pathKey
+        removed={key(p) for p in paths}
+        rows=list(zip(model.stringList(),model.dispList))
+        selected_row=min(row for row,(p,_) in enumerate(rows) if key(p) in removed)
+        # Account for labels created this session on the current and other rows.
+        self.rememberCurrentSessionShapes()
+        for image_key in removed:
+            count=sum(self._sessionShapeRegistry.pop(image_key,{}).values())
+            self.sessionLabelCount=max(0,self.sessionLabelCount-count)
+            self._pendingAutoSessionCounts.pop(image_key,None)
+        self.recentFiles=[p for p in self.recentFiles if key(p) not in removed]
+        remaining=[(p,info) for p,info in rows if key(p) not in removed]
+        selection=next((i for i,(p,_) in enumerate(remaining) if self.filePath and
+                        key(p)==key(self.filePath)),None)
+        paths=[p for p,_ in remaining]
+        restart_scan=self.annotationScanTimer.isActive()
+        self.annotationScanTimer.stop()
+        with self.restoringFileRow():
+            model.dispList=[info for _,info in remaining]
+            model._totalAnnotationCount=sum(info[1] for _,info in remaining
+                                            if isinstance(info[1],int) and info[1]>0)
+            QStringListModel.setStringList(model,paths)
+            pos=selection if selection is not None else min(selected_row,len(paths)-1)
+            index=self.availableFileIndex(pos,1)
+            if not index.isValid():
+                index=self.availableFileIndex(pos,-1)
+            self.filesm.setCurrentIndex(index,QItemSelectionModel.ClearAndSelect)
+        model.setFlaggedPaths(set(model.flaggedPaths())-removed)
+        self.settings[SETTING_FLAGGED_IMAGES]=model.flaggedPaths()
+        self.settings.save()
+        if selection is None:
+            self.filePath=None   # Don't record the deleted image during reset.
+            self.resetState()
+            if index.isValid():
+                self.loadFile(model.data(index,Qt.EditRole))
+            else:
+                self.setClean()
+                self.toggleActions(False)
+                self.canvas.setEnabled(False)
+                self.actions.saveAs.setEnabled(False)
+        if index.isValid():
+            self.centerFileListIndex(index)
+            self.statFile.setText('%d/%d' % (index.row()+1,len(paths)))
+        else:
+            self.statFile.clear()
+        self.actions.deleteImage.setEnabled(index.isValid())
+        self.updateLabelStatistics()
+        if restart_scan and paths:
+            self.startAnnotationScan(paths,False)
+        else:
+            self.annotationScanIterator=None
+            self.annotationScanner=None
+        self.fileListView.setFocus(Qt.ShortcutFocusReason)
             
     def removeFile(self):
         if not self.filePath:

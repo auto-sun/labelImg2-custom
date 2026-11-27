@@ -36,6 +36,30 @@ class CFileListModel(QStringListModel):
         self.dispList = []
         self._totalAnnotationCount = 0
         self._flaggedPaths = set()
+        self._agentLocked = set()
+        self._agentLockText = ''
+
+    def setAgentLockedPaths(self, paths, tooltip):
+        locked = {self._pathKey(p) for p in paths}
+        if locked == self._agentLocked and tooltip == self._agentLockText:
+            return
+        self._agentLocked = locked
+        self._agentLockText = tooltip
+        if self.rowCount():
+            self.dataChanged.emit(self.index(0),self.index(self.rowCount()-1),
+                                  [Qt.DisplayRole,Qt.ForegroundRole,Qt.BackgroundRole,Qt.ToolTipRole])
+
+    def isAgentLockedPath(self,path):
+        return bool(path) and bool(self._agentLocked) and self._pathKey(path) in self._agentLocked
+
+    def isAgentLocked(self,index):
+        return index.isValid() and self.isAgentLockedPath(super().data(index,Qt.EditRole))
+
+    def flags(self,index):
+        flags=super().flags(index)
+        if self.isAgentLocked(index):
+            return flags & ~(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+        return flags
 
     @staticmethod
     def _pathKey(path):
@@ -181,6 +205,7 @@ class CFileListModel(QStringListModel):
             return None
         item = self.dispList[index.row()]
         pathname, count = item[0], item[1]
+        locked = role in (Qt.DisplayRole,Qt.ToolTipRole,Qt.BackgroundRole) and self.isAgentLocked(index)
         if role == Qt.DisplayRole:
             if count == PENDING_ANNOTATION_COUNT:
                 res_str = '%s […]' % (pathname,)
@@ -191,12 +216,16 @@ class CFileListModel(QStringListModel):
                     res_str = '%s [BG]' % (pathname,)
                 else:
                     res_str = '%s [%d]' % (pathname, count)
-            return res_str
+            return ('[MCP] ' if locked else '') + res_str
         elif role == Qt.ToolTipRole:
             path = super(CFileListModel, self).data(index, Qt.EditRole)
+            if locked:
+                return self._agentLockText + '\n' + path
             return (u'待确认标签\n%s' % path
                     if self.isFlagged(index) else path)
         elif role == Qt.BackgroundRole:
+            if locked:
+                return QBrush(QColor(218,218,218))
             if self.isFlagged(index):
                 return QBrush(QColor(255, 210, 210))
             if item[1] is None: # or item[1] == 0:
@@ -240,7 +269,7 @@ class CFileItemEditDelegate(QStyledItemDelegate):
         return editor
 
     def paint(self, painter, option, index):
-        if index.model().isFlagged(index):
+        if index.model().isFlagged(index) and not index.model().isAgentLocked(index):
             # Keep the review color visible even while this row is selected.
             option = QStyleOptionViewItem(option)
             option.palette.setColor(
@@ -268,6 +297,12 @@ class CFileView(QListView):
         self.rightClickSelectionInProgress = False
         self._leftPressActive = False
         self._pendingCenter = False
+        self._dragOrigin = None
+        self._dragAnchor = None
+        self._dragSelection = None
+        self._dragAdd = False
+        self._band = QRubberBand(QRubberBand.Rectangle,self.viewport())
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         
         model = CFileListModel(self)
@@ -290,15 +325,74 @@ class CFileView(QListView):
             self.scrollTo(index, QAbstractItemView.PositionAtCenter)
 
     def mouseReleaseEvent(self, event):
-        super(CFileView, self).mouseReleaseEvent(event)
-        if event.button() == Qt.LeftButton:
-            self._leftPressActive = False
-            if self._pendingCenter:
-                self._pendingCenter = False
-                index = self.currentIndex()
-                if index.isValid():
-                    self.selectionModel().select(index, QItemSelectionModel.ClearAndSelect)
-                    self.centerCurrentRow(index)
+        if event.button() != Qt.LeftButton or self._dragOrigin is None:
+            super().mouseReleaseEvent(event)
+            return
+        index = self.indexAt(self._dragOrigin)
+        dragged = self._band.isVisible() or (
+            (event.pos()-self._dragOrigin).manhattanLength() >= QApplication.startDragDistance())
+        modifiers=event.modifiers()
+        if dragged:
+            self.updateRubberSelection(event.pos())
+        elif index.isValid() and index.flags() & Qt.ItemIsSelectable:
+            sm=self.selectionModel()
+            if modifiers & Qt.ShiftModifier and self.currentIndex().isValid():
+                self.selectRowsBetween(self.currentIndex().row(),index.row(),self._dragAdd)
+            elif modifiers & Qt.ControlModifier:
+                sm.select(index,QItemSelectionModel.Toggle)
+            else:
+                sm.setCurrentIndex(index,QItemSelectionModel.ClearAndSelect)
+        self._band.hide()
+        self._dragOrigin=self._dragAnchor=self._dragSelection=None
+        self._leftPressActive=False
+        if self._pendingCenter:
+            self._pendingCenter=False
+            self.centerCurrentRow(self.currentIndex())
+        self.setFocus(Qt.MouseFocusReason)
+        event.accept()
+
+    def selectRowsBetween(self,first,last,add=False):
+        model=self.model()
+        selection=QItemSelection()
+        begin=None
+        for row in range(min(first,last),max(first,last)+2):
+            idx=model.index(row)
+            selectable=row<=max(first,last) and bool(idx.flags() & Qt.ItemIsSelectable)
+            if selectable and begin is None:
+                begin=idx
+            elif not selectable and begin is not None:
+                selection.select(begin,model.index(row-1))
+                begin=None
+        sm=self.selectionModel()
+        if add and self._dragSelection is not None:
+            sm.select(self._dragSelection,QItemSelectionModel.ClearAndSelect)
+            sm.select(selection,QItemSelectionModel.Select)
+        else:
+            sm.select(selection,QItemSelectionModel.ClearAndSelect)
+
+    def rowAtVertical(self,pos):
+        if not self.model().rowCount():
+            return None
+        point=QPoint(self.viewport().rect().center().x(),
+                     max(0,min(self.viewport().height()-1,pos.y())))
+        index=self.indexAt(point)
+        return index.row() if index.isValid() else self.model().rowCount()-1
+
+    def updateRubberSelection(self,pos):
+        row=self.rowAtVertical(pos)
+        if self._dragAnchor is not None and row is not None:
+            self.selectRowsBetween(self._dragAnchor,row,self._dragAdd)
+        self._band.setGeometry(QRect(self._dragOrigin,pos).normalized())
+        self._band.show()
+
+    def mouseMoveEvent(self,event):
+        if self._dragOrigin is not None:
+            if (self._band.isVisible() or
+                    (event.pos()-self._dragOrigin).manhattanLength()>=QApplication.startDragDistance()):
+                self.updateRubberSelection(event.pos())
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
 
     def event(self, event):
         # The main window also uses Delete for removing selected boxes.  Claim
@@ -323,10 +417,27 @@ class CFileView(QListView):
             self.setFocus(Qt.ShortcutFocusReason)
 
     def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._leftPressActive=True
+            self._pendingCenter=False
+            self._dragOrigin=event.pos()
+            self._dragAnchor=self.rowAtVertical(event.pos())
+            self._dragAdd=bool(event.modifiers() & Qt.ControlModifier)
+            self._dragSelection=self.selectionModel().selection() if self._dragAdd else None
+            self.setFocus(Qt.MouseFocusReason)
+            event.accept()
+            return
         # Loading a newly clicked image gives focus to the canvas. Restore it
         # after the synchronous selection change so a following Delete key is
         # handled by File List, as the user expects.
         self.rightClickSelectionInProgress = event.button() == Qt.RightButton
+        if self.rightClickSelectionInProgress:
+            index=self.indexAt(event.pos())
+            if self.selectionModel().isSelected(index) or self.model().isAgentLocked(index):
+                self.rightClickSelectionInProgress=False
+                self.setFocus(Qt.MouseFocusReason)
+                event.accept()
+                return
         self._leftPressActive = event.button() == Qt.LeftButton
         self._pendingCenter = False
         try:

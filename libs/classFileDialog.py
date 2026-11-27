@@ -7,12 +7,13 @@ from __future__ import absolute_import
 import os
 
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtWidgets import (QAbstractItemView, QDialog, QDialogButtonBox,
+from PyQt5.QtWidgets import (QAbstractItemView, QDialogButtonBox,
                              QFileDialog, QHBoxLayout, QHeaderView, QLabel,
                              QMessageBox, QPushButton, QComboBox,
                              QTableWidget, QTableWidgetItem, QVBoxLayout)
 
 from .ui_geometry import available_screen_geometry, responsive_dialog_size
+from .window_motion import MotionDialog
 
 
 class ClassFileError(ValueError):
@@ -64,7 +65,7 @@ def read_class_file(path):
     return class_names
 
 
-class ClassFileDialog(QDialog):
+class ClassFileDialog(MotionDialog):
     """Choose a class file from disk or a persisted recent list."""
     MAX_HISTORY = 12
 

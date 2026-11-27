@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
-from PyQt5.QtWidgets import (QDialog, QDialogButtonBox, QTextBrowser,
+from PyQt5.QtWidgets import (QDialogButtonBox, QTextBrowser,
                              QVBoxLayout)
+from .window_motion import MotionDialog
 
 
 _GUIDES = {
@@ -150,7 +151,7 @@ _ZOOM_GUIDE = {
 }
 
 
-class UserGuideDialog(QDialog):
+class UserGuideDialog(MotionDialog):
     def __init__(self, language='en', parent=None):
         super(UserGuideDialog, self).__init__(parent)
         self.setMinimumSize(520, 420)

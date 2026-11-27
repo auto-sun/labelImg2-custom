@@ -22,6 +22,15 @@ NUM={'type':'number'}
 BOX=obj(dict(class_id={'type':'integer','minimum':0},cx=NUM,cy=NUM,w=NUM,h=NUM,angle_deg=NUM),
         ['class_id','cx','cy','w','h'])
 TOOLS={
+    'list_images':('List candidate images in the authorized project without locking or opening them. '
+                   'Use folder (project-relative), contains (filename substring), unlabeled_only or staged_only. '
+                   'Continue with next_offset until null; an empty page can still have a next offset.',
+                   obj(dict(folder=STR,contains=STR,unlabeled_only={'type':'boolean'},
+                            staged_only={'type':'boolean'},offset={'type':'integer','minimum':0},
+                            limit={'type':'integer','minimum':1,'maximum':200}))),
+    'inspect_image':('Read one candidate image to decide whether to include it. Use the exact relative '
+                     'image path returned by list_images. Does not lock, submit, or move either canvas.',
+                     obj(dict(image=STR), ['image'])),
     'preview_box':('Show ONE detected box immediately on the current LabelImg2 canvas. Call as soon as '
                    'you locate each target, before looking for the next. Use a per-image box_id (1..2000); '
                    'repeat the same ID to correct it. Live preview only: does not save or advance. '
@@ -29,10 +38,13 @@ TOOLS={
                    obj(dict(task_id=STR,image_token=STR,image_revision=STR,
                             box_id={'type':'integer','minimum':1,'maximum':2000},box=BOX),
                        ['task_id','image_token','image_revision','box_id','box'])),
-    'start_task':('Start at the current image. Supply instructions and count (or all_remaining:true). '
-                  'Use resume_task_id alone to resume a saved task. Existing labels are always skipped.',
+    'start_task':('Supply instructions and either images (exact relative paths from list_images), '
+                  'use_staged:true (UI right-click selection), count, or all_remaining:true. '
+                  'Only one running task; the human annotates other images in the main window. '
+                  'Use resume_task_id alone to resume. Existing labels are always skipped.',
                   obj(dict(instructions=STR,count={'type':'integer','minimum':1},all_remaining={'type':'boolean'},
-                           classes={'type':'array','items':STR},resume_task_id=STR))),
+                           images={'type':'array','items':STR,'minItems':1,'maxItems':10000},
+                           use_staged={'type':'boolean'},classes={'type':'array','items':STR},resume_task_id=STR))),
     'submit_and_next':('Submit the issued image exactly once and receive the next image. Geometry in original '
                        'oriented image pixels, clockwise angle_deg. Use exact class IDs. '
                        'annotated requires boxes; empty means confirmed background; review requires reason and writes no label.',
@@ -89,7 +101,10 @@ def serve(instream=None,outstream=None,call=request_gui):
                 ver=params.get('protocolVersion')
                 result=dict(protocolVersion=ver if ver in VERSIONS else VERSIONS[0],
                             capabilities={'tools':{}},serverInfo=dict(name='labelimg2',version=__version__),
-                            instructions='Follow user task instructions. For live annotation, call preview_box '
+                            instructions='Follow user task instructions. To pick images, call list_images; '
+                            'use inspect_image when the filter depends on visual contents, then pass selected '
+                            'relative paths to start_task. Use use_staged:true for the human\'s file-list selection. '
+                            'For live annotation, call preview_box '
                             'immediately for each target as you identify it; do not wait until the image is done. '
                             'Then submit_and_next with the full final list (previews are not saved); loop until complete. '
                             'If continuation_required, call start_task with resume_task_id. Never invent empty images.')

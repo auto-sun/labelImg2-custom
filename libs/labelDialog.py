@@ -7,6 +7,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 
 from .lib import newIcon, labelValidator
+from .window_motion import MotionDialog
 
 BB = QDialogButtonBox
 
@@ -37,7 +38,7 @@ class CMyListModel(QStringListModel):
         return flags
 
 
-class LabelDialog(QDialog):
+class LabelDialog(MotionDialog):
     defaultLabelChanged = pyqtSignal(str)
 
     def __init__(self, text="Enter object label", parent=None, listItem=None,
