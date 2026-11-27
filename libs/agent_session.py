@@ -12,7 +12,8 @@ from PyQt5.QtNetwork import QLocalServer
 from PyQt5.QtWidgets import QAction, QApplication, QLabel, QMessageBox, QPushButton
 
 from .agent_mcp import TOOLS, endpoint
-from .agent_tasks import AgentQueue, box_geometry, canonical, exists_label, inside, stamp
+from .agent_tasks import (AgentQueue, box_geometry, canonical, exists_label, inside,
+                          project_image_name, stamp)
 from .agent_window import AgentTaskWindow
 from .window_motion import menu_rect
 from .constants import SETTING_FLAGGED_IMAGES
@@ -272,10 +273,16 @@ class AgentSession(QObject):
         return row
 
     def relative(self,path):
-        return os.path.relpath(path,self.queue.ctx['images']).replace(os.sep,'/')
+        return project_image_name(path,self.w.dirname)
 
     def catalog(self):
-        return {self.relative(p):p for p in self.w.fileModel.stringList()}
+        images={}
+        for path in self.w.fileModel.stringList():
+            try:
+                images[self.relative(path)]=path
+            except (ValueError,OSError):
+                continue
+        return images
 
     def candidate(self,name,catalog):
         path=catalog.get(name.replace('\\','/'))
@@ -330,7 +337,10 @@ class AgentSession(QObject):
         while cursor<end and len(items)<limit:
             path=paths[cursor]
             cursor+=1
-            name=self.relative(path)
+            try:
+                name=self.relative(path)
+            except (ValueError,OSError):
+                continue
             if folder and not name.casefold().startswith(folder.casefold()+'/'):
                 continue
             if match and match not in os.path.basename(name).casefold():

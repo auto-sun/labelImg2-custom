@@ -15,9 +15,26 @@ from PyQt5.QtGui import QImage
 from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication
 import labelImg
-from libs.agent_tasks import AgentQueue, digest
+from libs.agent_tasks import AgentQueue, digest, project_image_name
 from libs.pascal_voc_io import PascalVocReader
 from test_delete_image import MemorySettings
+
+
+class ProjectImageNameTests(unittest.TestCase):
+    def test_mixed_short_and_long_roots_preserve_relative_case_and_folders(self):
+        absolute = os.path.abspath(os.sep)
+        root = os.path.join(absolute,'Users','runneradmin','images')
+        short = os.path.join(absolute,'Users','RUNNER~1','images','nested','Photo.JPG')
+        normalized = os.path.join(root,'nested','Photo.JPG')
+        with patch('libs.agent_tasks.os.path.realpath',
+                   side_effect=lambda p:normalized if p==short else p):
+            self.assertEqual('nested/Photo.JPG',project_image_name(short,root))
+
+    def test_outside_image_never_gets_a_parent_relative_name(self):
+        root = os.path.abspath('project/images')
+        other = os.path.abspath('project/private/Photo.JPG')
+        with self.assertRaisesRegex(ValueError,'relative to the project'):
+            project_image_name(other,root)
 
 
 class AgentTests(unittest.TestCase):
@@ -180,6 +197,27 @@ class AgentTests(unittest.TestCase):
         self.assertEqual((3,1,1),(done['total'],done['skipped'],done['annotated']))
         self.assertTrue(self.w.fileModel.index(2).flags() & Qt.ItemIsSelectable)
         self.assertEqual(1,self.w.fileModel.annotationCount(self.w.fileModel.index(2)))
+
+    @unittest.skipUnless(os.name=='nt','Windows short path aliases only')
+    def test_windows_short_image_root_through_listing_task_and_review(self):
+        import ctypes
+        buffer=ctypes.create_unicode_buffer(32768)
+        if not ctypes.windll.kernel32.GetShortPathNameW(str(self.images),buffer,len(buffer)):
+            self.skipTest('Windows could not supply a short path for this test volume')
+        short=buffer.value
+        if os.path.normcase(short)==os.path.normcase(os.path.realpath(self.images)):
+            self.skipTest('8.3 aliases are not enabled for this temporary directory')
+        self.s.stop()
+        self.w.importDirImages(short,annotationDir=str(self.labels))
+        self.w.annotationScanTimer.stop()
+        self.s.queue=AgentQueue(self.db,self.s.context())
+        items=self.call('list_images')['images']
+        self.assertEqual(['0.png','1.png','2.png','3.png'],[p['image'] for p in items])
+        first=self.start(images=['2.png'])
+        self.assertEqual('2.png',first['image'])
+        done=self.submit(first,'review',reason='ambiguous')
+        self.assertTrue(done['complete'])
+        self.assertEqual([{'image':'2.png','reason':'ambiguous'}],done['review'])
 
     def test_one_dirty_manual_image_cannot_be_reserved(self):
         self.w.dirty=True

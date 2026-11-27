@@ -22,6 +22,31 @@ def inside(path, root):
     return path
 
 
+def project_image_name(path, root):
+    """Return an MCP image name, handling Windows path aliases without I/O in the common case.
+
+    Keep the project's displayed subdirectory names when both paths use
+    the same spelling. If they do not (e.g. RUNNER~1 vs runneradmin),
+    resolve both before attempting to compute the relative name again.
+    This is for display/lookup; callers still use inside() for file access.
+    """
+    def relative(candidate, start):
+        try:
+            name = os.path.relpath(candidate, start)
+        except ValueError:
+            return None
+        if name in (os.curdir, os.pardir) or name.startswith(os.pardir + os.sep):
+            return None
+        return name
+
+    name = relative(path, root)
+    if name is None:
+        name = relative(os.path.realpath(path), os.path.realpath(root))
+    if name is None:
+        raise ValueError('Image is not relative to the project')
+    return name.replace(os.sep, '/')
+
+
 def stamp(path):
     stat = os.stat(path)
     return '%s:%s:%s' % (stat.st_ino, stat.st_size, stat.st_mtime_ns)
@@ -221,7 +246,7 @@ class AgentQueue:
         counts=Counter({r[0]:r[1] for r in self.db.execute(
             'SELECT state,count(*) FROM frame WHERE job=? GROUP BY state',(job,))})
         remaining=counts['pending']+counts['writing']
-        review=([{'image':os.path.relpath(r[0],self.ctx['images']),'reason':r[1]}
+        review=([{'image':project_image_name(r[0],self.ctx['images']),'reason':r[1]}
                 for r in self.db.execute("SELECT image,reason FROM frame WHERE job=? AND state='review' ORDER BY seq",(job,))]
                 if details or not remaining else [])
         return dict(task_id=job,total=sum(counts.values()),annotated=counts['annotated'],
