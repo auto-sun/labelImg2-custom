@@ -1259,11 +1259,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.canvas.line.points = []
                 self.createCancel()
 
-            self.labelModel.clear()
-            self.labelModel.setHorizontalHeaderLabels(
-                ["Label", "Extra Info"])
-            if hasattr(self, 'languageManager'):
-                self.languageManager.applyWidget(self.labelList)
+            self.labelList.clearLabels()
             self.ShapeItemDict.clear()
             self.ItemShapeDict.clear()
             self.canvas.visible.clear()
@@ -1362,10 +1358,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self._pendingLabelShortcut = None
         self.rememberCurrentSessionShapes()
         self.resetUndoHistory()
-        self.labelModel.clear()
-        self.labelModel.setHorizontalHeaderLabels(["Label", "Extra Info"])
-        if hasattr(self, 'languageManager'):
-            self.languageManager.applyWidget(self.labelList)
+        self.labelList.clearLabels()
         self.ShapeItemDict.clear()
         self.ItemShapeDict.clear()
         self.filePath = None
@@ -1416,8 +1409,7 @@ class MainWindow(QMainWindow, WindowMixin):
     def colorLabelRow(self, item, shape):
         color = generateColorByText(shape.label)
         shape.line_color = shape.fill_color = color
-        item.setBackground(color)
-        item.parent().child(item.row(), 1).setBackground(color)
+        self.labelList.styleBoxItem(item, color)
 
     def updateLabelShowing(self, index, text):
         first = self.labelModel.itemFromIndex(index.sibling(index.row(), 0))
@@ -2219,8 +2211,7 @@ class MainWindow(QMainWindow, WindowMixin):
         item0 = HashableQStandardItem(shape.label)
         item1 = QStandardItem(shape.extra_label)
         color = generateColorByText(shape.label)
-        item0.setBackground(color)
-        item1.setBackground(color)
+        self.labelList.styleBoxItem(item0, color)
         item0.setCheckable(True)
         item0.setCheckState(Qt.Checked)
         with self.changingGroups():
@@ -2268,7 +2259,7 @@ class MainWindow(QMainWindow, WindowMixin):
             1 for shape in self.canvas.shapes
             if getattr(shape, 'sessionCreated', False))
         self.canvas.deleteAll()
-        self.labelModel.clear()
+        self.labelList.clearLabels()
         self.ShapeItemDict.clear()
         self.ItemShapeDict.clear()
         if removedSessionCount:

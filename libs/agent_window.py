@@ -1,10 +1,10 @@
 """Non-modal, read-only task monitor; never edits the manual annotation canvas."""
-from PyQt5.QtCore import QEvent, QPointF, QRectF, QSize, Qt, QTimer
+from PyQt5.QtCore import QEvent, QPointF, QRect, QRectF, QSize, Qt, QTimer
 from PyQt5.QtGui import QColor, QGuiApplication, QPainter, QPen, QPolygonF
 from PyQt5.QtWidgets import (QAbstractScrollArea, QHBoxLayout, QLabel, QListWidget,
                              QPushButton, QSizePolicy, QSplitter, QVBoxLayout, QWidget)
 from .ui_geometry import (available_screen_geometry, reachable_window_title, recover_window_frame,
-                          screen_work_areas)
+                          screen_work_areas, squashed_task_window)
 from .window_motion import MotionDialog
 from .windows_window_placement import windows_window_placement
 
@@ -58,6 +58,7 @@ class AgentTaskWindow(MotionDialog):
         super().__init__(window, Qt.Window)
         self.setModal(False)
         self.resize(self._PREFERRED_SIZE)
+        self._last_normal_size = QSize(self._PREFERRED_SIZE)
         self._placement_window = None
         self._placement_timer = QTimer(self, singleShot=True, interval=120)
         self._placement_timer.timeout.connect(self.ensureOnScreen)
@@ -105,26 +106,58 @@ class AgentTaskWindow(MotionDialog):
         if self.isMaximized():
             self.showNormal()
 
+    def _rememberNormalSize(self, frame, area, scale, maximized):
+        if maximized or self._placement_timer.isActive() or not area.contains(frame):
+            return
+        # Keep a logical size, not the previous monitor's physical pixels.
+        # Ignore undersized transition frames before they can replace it.
+        if (frame.width() >= min(round(450 * scale), area.width() // 2)
+                and frame.height() >= min(round(300 * scale), area.height() // 2)):
+            self._last_normal_size = QSize(round(frame.width() / scale),
+                                           round(frame.height() / scale))
+
     def ensureOnScreen(self):
         owner = self.parentWidget()
         if not self.isVisible() or self.isMinimized() or (owner is not None and owner.isMinimized()):
             return False
+        maximized = self.isMaximized() or self.isFullScreen()
         native = windows_window_placement() if QGuiApplication.platformName() == 'windows' else None
         if native is not None and owner is not None:
             hwnd = int(self.winId())
-            reachable = native.title_reachable(hwnd)
-            if reachable or native.dragging():
-                return False
-            if reachable is False:
-                self._prepareForRecovery()
-                if native.center_on_owner(hwnd, int(owner.winId()), self._PREFERRED_SIZE):
-                    return True
+            geometry = native.geometry(hwnd)
+            if geometry is not None:
+                if native.dragging():
+                    return False
+                maximized = maximized or geometry.maximized
+                if geometry.title_reachable:
+                    if not maximized and squashed_task_window(
+                            geometry.frame, geometry.work_area, geometry.scale):
+                        self._prepareForRecovery()
+                        if native.center_on_window_screen(hwnd, hwnd, self._last_normal_size):
+                            return True
+                    else:
+                        self._rememberNormalSize(geometry.frame, geometry.work_area,
+                                                 geometry.scale, maximized)
+                        return False
+                else:
+                    self._prepareForRecovery()
+                    if native.center_on_window_screen(hwnd, int(owner.winId()), self._PREFERRED_SIZE):
+                        return True
 
         frame = self.frameGeometry()
         areas = screen_work_areas()
-        if reachable_window_title(frame, areas) or QGuiApplication.mouseButtons() & Qt.LeftButton:
+        if QGuiApplication.mouseButtons() & Qt.LeftButton:
             return False
-        destination = recover_window_frame(frame, areas, available_screen_geometry(self))
+        if reachable_window_title(frame, areas):
+            handle = self.windowHandle()
+            screen = handle.screen() if handle is not None else None
+            area = screen.availableGeometry() if screen else available_screen_geometry(self)
+            if maximized or not squashed_task_window(frame, area):
+                self._rememberNormalSize(frame, area, 1, maximized)
+                return False
+            destination = recover_window_frame(QRect(), (), area, self._last_normal_size)
+        else:
+            destination = recover_window_frame(frame, areas, available_screen_geometry(self))
         if destination == frame:
             return False
 

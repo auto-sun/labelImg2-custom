@@ -100,7 +100,14 @@ class CCommonOrderComboBox(QComboBox):
         super(CCommonOrderComboBox, self).keyPressEvent(event)
 
 
-class CComboBoxDelegate(QStyledItemDelegate):
+class CLabelRowDelegate(QStyledItemDelegate):
+    def sizeHint(self, option, index):
+        size = super(CLabelRowDelegate, self).sizeHint(option, index)
+        size.setHeight(max(size.height(), option.fontMetrics.height() + 8))
+        return size
+
+
+class CComboBoxDelegate(CLabelRowDelegate):
     editingActiveChanged = pyqtSignal(bool)
     labelChosen = pyqtSignal(str)
 
@@ -154,7 +161,7 @@ class CComboBoxDelegate(QStyledItemDelegate):
         editor.setGeometry(option.rect)
 
 
-class CEditDelegate(QStyledItemDelegate):
+class CEditDelegate(CLabelRowDelegate):
     def __init__(self, parent):
         super(CEditDelegate, self).__init__(parent)
         self.editor = None
@@ -196,6 +203,11 @@ class CLabelView(QTreeView):
         self.setUniformRowHeights(True)
         self.setExpandsOnDoubleClick(False)
         self.setIndentation(16)
+        self.setIconSize(QSize(11, 11))
+        self.setAllColumnsShowFocus(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._preferredExtraWidth = None
+        self._fittingColumns = False
 
         self.label_delegate = CComboBoxDelegate(self, labelHist)
         self.setItemDelegateForColumn(0, self.label_delegate)
@@ -203,21 +215,66 @@ class CLabelView(QTreeView):
         self.setItemDelegateForColumn(1, self.extra_delegate)
 
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.setStyleSheet("selection-background-color: rgb(0,90,140)")
 
         model = QStandardItemModel(self)
         model.setColumnCount(2)
         model.setHorizontalHeaderLabels(["Label", "Extra Info"])
 
         self.setModel(model)
-        self.header().setStretchLastSection(False)
-        self.header().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.header().setSectionResizeMode(1, QHeaderView.Interactive)
-        self.header().resizeSection(1, 78)
+        self._configureColumns()
+        self.header().sectionResized.connect(self._rememberExtraWidth)
+        model.columnsInserted.connect(self._configureColumns)
+        model.headerDataChanged.connect(self._fitExtraColumn)
         self.groups = {}
         model.modelReset.connect(self.groups.clear)
         
         self.sm = self.selectionModel()
+
+    def _configureColumns(self, *_):
+        header = self.header()
+        if header.count() < 2:
+            return
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.Interactive)
+        self._fitExtraColumn()
+
+    def _fitExtraColumn(self, *_):
+        header = self.header()
+        if header.count() < 2 or self._fittingColumns:
+            return
+        custom_width = self._preferredExtraWidth
+        heading = self.model().headerData(1, Qt.Horizontal, Qt.DisplayRole) or ''
+        default_width = max(84, header.fontMetrics().horizontalAdvance(str(heading)) + 18)
+        limit = int(self.viewport().width() * (0.40 if custom_width else 0.30))
+        width = max(header.minimumSectionSize(), min(custom_width or default_width, limit))
+        if header.sectionSize(1) != width:
+            self._fittingColumns = True
+            try:
+                header.resizeSection(1, width)
+            finally:
+                self._fittingColumns = False
+
+    def _rememberExtraWidth(self, column, old_width, new_width):
+        if column == 1 and old_width > 0 and not self._fittingColumns and self.header().count() == 2:
+            self._preferredExtraWidth = new_width
+
+    def resizeEvent(self, event):
+        super(CLabelView, self).resizeEvent(event)
+        self._fitExtraColumn()
+
+    def clearLabels(self):
+        # Clearing the model itself also removes its columns. Qt then
+        # recreates them with default widths on the next image.
+        self.groups.clear()
+        model = self.model()
+        if model.rowCount():
+            model.removeRows(0, model.rowCount())
+
+    @staticmethod
+    def styleBoxItem(item, color):
+        item.setData(color, Qt.DecorationRole)
+        item.setToolTip(item.text())
 
     def focusInEvent(self, event):
         super(CLabelView, self).focusInEvent(event)
@@ -253,12 +310,16 @@ class CLabelView(QTreeView):
             group.setEditable(False)
             group.setCheckable(True)
             group.setCheckState(Qt.Checked)
+            group.setToolTip(label)
             font = group.font()
             font.setBold(True)
             group.setFont(font)
             menu = QStandardItem('⋯  ▾')
             menu.setEditable(False)
             menu.setTextAlignment(Qt.AlignCenter)
+            header_brush = self.palette().alternateBase()
+            group.setBackground(header_brush)
+            menu.setBackground(header_brush)
             self.groups[label] = group
             self.model().appendRow([group, menu])
         return group

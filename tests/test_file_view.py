@@ -6,10 +6,29 @@ import tempfile
 import unittest
 from unittest import mock
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QEvent, QObject, QPoint, QPointF, Qt
+from PyQt5.QtGui import QRegion, QWheelEvent
+from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication
 
 from libs.fileView import CFileListModel, CFileView
+
+
+class ViewportPaintLog(QObject):
+    def __init__(self):
+        super().__init__()
+        self.regions = []
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Paint:
+            self.regions.append(QRegion(event.region()))
+        return False
+
+    def repainted(self, rect):
+        painted = QRegion()
+        for region in self.regions:
+            painted |= region
+        return QRegion(rect).subtracted(painted).isEmpty()
 
 
 class FileListConfirmationStateTests(unittest.TestCase):
@@ -115,6 +134,43 @@ class FileListConfirmationStateTests(unittest.TestCase):
             color = image.pixelColor(rect.right() - 10, rect.center().y())
             self.assertGreater(color.red(), color.green() + 20)
             view.close()
+
+    def test_wheel_and_scrollbar_repaint_rows_after_hit_positions_move(self):
+        view = CFileView()
+        self.addCleanup(view.close)
+        view.resize(260, 260)
+        view.model().setStringList(['file_%03d.png' % i for i in range(150)],
+                                   scanAnnotations=False)
+        viewport = view.viewport()
+        paint_log = ViewportPaintLog()
+        viewport.installEventFilter(paint_log)
+        view.show()
+        QTest.qWait(30)
+        point = viewport.rect().center()
+        before = view.indexAt(point).row()
+        paint_log.regions.clear()
+        wheel = QWheelEvent(
+            QPointF(point), QPointF(viewport.mapToGlobal(point)), QPoint(),
+            QPoint(0, -120), Qt.NoButton, Qt.NoModifier, Qt.NoScrollPhase, False)
+        QApplication.sendEvent(viewport, wheel)
+        QTest.qWait(30)
+        after = view.indexAt(point)
+        self.assertGreater(after.row(), before)
+        self.assertTrue(paint_log.repainted(viewport.rect()))
+
+        paint_log.regions.clear()
+        bar = view.verticalScrollBar()
+        bar.setValue(bar.value() + 1)
+        QTest.qWait(30)
+        clicked = view.indexAt(point)
+        self.assertGreater(clicked.row(), after.row())
+        self.assertTrue(paint_log.repainted(viewport.rect()))
+
+        paint_log.regions.clear()
+        QTest.mouseClick(viewport, Qt.LeftButton, Qt.NoModifier, point)
+        QTest.qWait(30)
+        self.assertEqual(clicked, view.currentIndex())
+        self.assertTrue(paint_log.repainted(viewport.rect()))
 
 
 if __name__ == '__main__':

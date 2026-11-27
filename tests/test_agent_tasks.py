@@ -274,6 +274,25 @@ class AgentTests(unittest.TestCase):
         self.assertFalse(monitor._placement_watch.isActive())
         self.assertEqual(current['task_id'], self.s.active)
 
+    def test_squashed_visible_monitor_recovers_without_resetting_the_task(self):
+        self.w.show()
+        current = self.start(images=['2.png', '3.png'])
+        monitor = self.s.monitor
+        self.preview(current, 1, self.box)
+        monitor.move(40, 30)
+        monitor.resize(640, 380)
+        QTest.qWait(180)
+        normal_size = monitor.frameGeometry().size()
+        monitor.resize(1934, 283)
+        self.assertNotEqual(normal_size, monitor.frameGeometry().size())
+        deadline = time.monotonic() + 1.5
+        while monitor.frameGeometry().size() != normal_size:
+            self.assertLess(time.monotonic(), deadline, monitor.frameGeometry())
+            QTest.qWait(30)
+        self.assertEqual(current['task_id'], self.s.active)
+        self.assertEqual(1, len(monitor.preview.boxes))
+        self.assertEqual('3.png', self.submit(current, 'annotated', boxes=[self.box])['image'])
+
     def test_batch_skip_existing_mark_review_empty_and_retry(self):
         old=self.labels/'0.xml'
         old.write_bytes(b'<keep/>')

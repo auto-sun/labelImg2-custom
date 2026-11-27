@@ -11,6 +11,7 @@ from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication, QWidget
 
 from libs.agent_window import AgentTaskWindow
+from libs.ui_geometry import squashed_task_window
 from libs.windows_window_placement import _rect, windows_window_placement
 
 
@@ -80,6 +81,32 @@ class NativeTaskWindowPlacementTests(unittest.TestCase):
                     self.assertTrue(placement.title_reachable(hwnd))
                     window.showNormal()
                     QTest.qWait(220)
+
+                    # Set a user-sized normal rectangle, then simulate the
+                    # on-screen wide/short native frame seen after switching.
+                    dpi_scale = placement._dpi(hwnd) / 96
+                    good_width = min(round(700 * dpi_scale), area.width() - 48)
+                    good_height = min(round(430 * dpi_scale), area.height() - 48)
+                    move_physical(area.center().x() - good_width // 2,
+                                  area.center().y() - good_height // 2,
+                                  good_width, good_height)
+                    QTest.qWait(220)
+                    last_good = read_frame().size()
+                    short_height = min(round(283 * dpi_scale), area.width() // 5,
+                                       area.height() // 3)
+                    move_physical(area.x() - 6, area.bottom() - short_height - 30,
+                                  area.width() + 6, short_height)
+                    damaged = placement.geometry(hwnd)
+                    self.assertTrue(damaged.title_reachable)
+                    self.assertTrue(squashed_task_window(damaged.frame, area, dpi_scale),
+                                    damaged.frame)
+                    self.assertFalse(window.isMaximized())
+                    for _ in range(20):
+                        QTest.qWait(80)
+                        if read_frame().size() == last_good:
+                            break
+                    self.assertTrue(area.contains(read_frame()), read_frame())
+                    self.assertEqual(last_good, read_frame().size())
 
                     x = max(3606, max(work.right() for _, work in areas) + 100)
                     move_physical(x, 907, 866, 519)

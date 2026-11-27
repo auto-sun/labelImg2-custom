@@ -35,6 +35,14 @@ def reachable_window_title(frame, work_areas, title_height=36, grip_width=96, gr
     return False
 
 
+def squashed_task_window(frame, work_area, scale=1.0):
+    """Detect an unusually wide, shallow normal frame without treating snapped halves as broken."""
+    return (frame.isValid() and work_area.isValid()
+            and frame.width() * 4 >= work_area.width() * 3
+            and frame.width() >= frame.height() * 4
+            and frame.height() <= min(round(340 * scale), work_area.height() // 2))
+
+
 def recover_window_frame(frame, work_areas, owner_area, preferred=QSize(860, 530)):
     """Fit a lost frame to a single monitor, not to the virtual desktop union."""
     areas = [area for area in work_areas if area.isValid()]

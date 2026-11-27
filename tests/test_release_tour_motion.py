@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QApplication, QPushButton, QWidget
 
 import labelImg
 from libs.release_tour import should_offer_tour
-from libs.ui_geometry import reachable_window_title, recover_window_frame
+from libs.ui_geometry import reachable_window_title, recover_window_frame, squashed_task_window
 from libs.window_motion import MotionDialog, WindowMotion, widget_rect
 from test_delete_image import MemorySettings
 
@@ -123,6 +123,14 @@ class MonitorPlacementTests(unittest.TestCase):
         self.assertFalse(reachable_window_title(QRect(50, -50, 600, 500), areas))
         self.assertTrue(reachable_window_title(QRect(-100, 50, 800, 520), areas))
         self.assertTrue(reachable_window_title(QRect(-8, -8, 1936, 1056), areas))
+
+    def test_squashed_window_uses_current_screen_dimensions_and_scale(self):
+        primary = QRect(0, 0, 1920, 1032)
+        secondary = QRect(-2560, -374, 2560, 1504)
+        self.assertTrue(squashed_task_window(QRect(-18, 695, 1934, 283), primary))
+        self.assertTrue(squashed_task_window(QRect(-2550, 300, 2520, 530), secondary, 2))
+        self.assertFalse(squashed_task_window(QRect(0, 516, 1920, 516), primary))
+        self.assertFalse(squashed_task_window(QRect(10, 400, 900, 283), primary))
 
 
 class ReleaseTourTests(unittest.TestCase):

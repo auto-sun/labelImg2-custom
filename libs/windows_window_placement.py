@@ -3,6 +3,7 @@
 import ctypes
 from ctypes import wintypes
 from functools import lru_cache
+from typing import NamedTuple
 
 from PyQt5.QtCore import QRect, QSize
 
@@ -12,6 +13,14 @@ from .ui_geometry import reachable_window_title
 class _MonitorInfo(ctypes.Structure):
     _fields_ = [('size', wintypes.DWORD), ('monitor', wintypes.RECT),
                 ('work', wintypes.RECT), ('flags', wintypes.DWORD)]
+
+
+class WindowGeometry(NamedTuple):
+    frame: QRect
+    work_area: QRect
+    scale: float
+    title_reachable: bool
+    maximized: bool
 
 
 def _rect(rect):
@@ -40,6 +49,7 @@ class _WindowPlacement:
         self._dpi_context = bind('SetThreadDpiAwarenessContext', ctypes.c_void_p, ctypes.c_void_p)
         self._dpi = bind('GetDpiForWindow', wintypes.UINT, hwnd)
         self._get_rect = bind('GetWindowRect', wintypes.BOOL, hwnd, ctypes.POINTER(wintypes.RECT))
+        self._is_zoomed = bind('IsZoomed', wintypes.BOOL, hwnd)
         self._monitor_from_rect = bind('MonitorFromRect', wintypes.HMONITOR,
                                       ctypes.POINTER(wintypes.RECT), wintypes.DWORD)
         self._monitor_from_window = bind('MonitorFromWindow', wintypes.HMONITOR, hwnd, wintypes.DWORD)
@@ -53,7 +63,7 @@ class _WindowPlacement:
         info = _MonitorInfo(size=ctypes.sizeof(_MonitorInfo))
         return _rect(info.work) if monitor and self._info(monitor, ctypes.byref(info)) else QRect()
 
-    def title_reachable(self, window):
+    def geometry(self, window):
         # Do not compare Qt logical coordinates with Windows' physical pixels.
         old_context = self._dpi_context(-4)  # PER_MONITOR_AWARE_V2
         try:
@@ -65,24 +75,31 @@ class _WindowPlacement:
             title_height = round(36 * scale)
             native.bottom = min(native.bottom, native.top + title_height)
             monitor = self._monitor_from_rect(ctypes.byref(native), 0)  # no match for a lost window
-            return reachable_window_title(frame, [self._work_area(monitor)], title_height,
-                                          round(96 * scale), round(12 * scale))
+            title_area = self._work_area(monitor)
+            reachable = reachable_window_title(frame, [title_area], title_height,
+                                               round(96 * scale), round(12 * scale))
+            work_area = self._work_area(self._monitor_from_window(window, 2))
+            return WindowGeometry(frame, work_area, scale, reachable, bool(self._is_zoomed(window)))
         finally:
             if old_context:
                 self._dpi_context(old_context)
+
+    def title_reachable(self, window):
+        geometry = self.geometry(window)
+        return geometry.title_reachable if geometry is not None else None
 
     def dragging(self):
         # Qt does not always see the button while Windows is handling a title-bar drag.
         return bool(self._key_state(1) & 0x8000)
 
-    def center_on_owner(self, window, owner, preferred):
+    def center_on_window_screen(self, window, reference, preferred):
         old_context = self._dpi_context(-4)
         try:
-            monitor = self._monitor_from_window(owner, 2)  # nearest, also handles a minimized owner
+            monitor = self._monitor_from_window(reference, 2)
             area = self._work_area(monitor)
             if not area.isValid():
                 return False
-            target_dpi = self._dpi(owner) or 96
+            target_dpi = self._dpi(reference) or 96
             original_dpi = self._dpi(window)
             scale = target_dpi / 96
             margin = round(12 * scale)

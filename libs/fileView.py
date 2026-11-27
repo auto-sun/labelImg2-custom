@@ -316,6 +316,19 @@ class CFileView(QListView):
         super(CFileView, self).focusInEvent(event)
         disable_ime_for_shortcuts(self)
 
+    def scrollContentsBy(self, dx, dy):
+        super(CFileView, self).scrollContentsBy(dx, dy)
+        if dx or dy:
+            # Qt normally copies the cached pixels and only repaints the
+            # newly exposed strip. Redraw visible rows from the model as
+            # well, so a stale Windows backing store cannot show old rows
+            # at positions that already hit-test to new images.
+            self.viewport().update()
+
+    def currentChanged(self, current, previous):
+        super(CFileView, self).currentChanged(current, previous)
+        self.viewport().update()
+
     def centerCurrentRow(self, index):
         # QListView finishes its click selection on release. Moving the row
         # out from under the pointer before then can select a different row.
