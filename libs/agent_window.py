@@ -1,10 +1,12 @@
 """Non-modal, read-only task monitor; never edits the manual annotation canvas."""
 from PyQt5.QtCore import QEvent, QPointF, QRectF, QSize, Qt, QTimer
-from PyQt5.QtGui import QColor, QPainter, QPen, QPolygonF
+from PyQt5.QtGui import QColor, QGuiApplication, QPainter, QPen, QPolygonF
 from PyQt5.QtWidgets import (QAbstractScrollArea, QHBoxLayout, QLabel, QListWidget,
                              QPushButton, QSizePolicy, QSplitter, QVBoxLayout, QWidget)
-from .ui_geometry import available_screen_geometry, recover_window_frame, screen_work_areas
+from .ui_geometry import (available_screen_geometry, reachable_window_title, recover_window_frame,
+                          screen_work_areas)
 from .window_motion import MotionDialog
+from .windows_window_placement import windows_window_placement
 
 
 class AgentPreview(QWidget):
@@ -50,12 +52,19 @@ class AgentPreview(QWidget):
 
 
 class AgentTaskWindow(MotionDialog):
+    _PREFERRED_SIZE = QSize(860, 530)
+
     def __init__(self, window, stop):
         super().__init__(window, Qt.Window)
         self.setModal(False)
-        self.resize(860, 530)
-        self._placement_timer = QTimer(self, singleShot=True)
+        self.resize(self._PREFERRED_SIZE)
+        self._placement_window = None
+        self._placement_timer = QTimer(self, singleShot=True, interval=120)
         self._placement_timer.timeout.connect(self.ensureOnScreen)
+        # A native DPI restore can move the frame again after Qt's last geometry
+        # event. Watch only while visible so even that move gets picked up.
+        self._placement_watch = QTimer(self, interval=750, timerType=Qt.CoarseTimer)
+        self._placement_watch.timeout.connect(self.ensureOnScreen)
         self.title = QLabel()
         self.title.setTextFormat(Qt.PlainText)
         self.title.setWordWrap(True)
@@ -88,26 +97,38 @@ class AgentTaskWindow(MotionDialog):
         main.addLayout(controls)
         self._paths = []
 
-    def ensureOnScreen(self):
-        if not self.isVisible() or self.isMinimized():
-            return False
-        frame = self.frameGeometry()
-        areas = screen_work_areas()
-        # Windows can extend the invisible resize border of a genuine
-        # maximized window a few logical pixels beyond the work area.
-        if self.isMaximized() and any(area.adjusted(-16, -16, 16, 16).contains(frame)
-                                     for area in areas):
-            return False
-        destination = recover_window_frame(frame, areas, available_screen_geometry(self))
-        if destination == frame:
-            return False
-
+    def _prepareForRecovery(self):
         animator = self.animator()
         if animator is not None:
             animator.finish(self)
         self.setWindowOpacity(1)
         if self.isMaximized():
             self.showNormal()
+
+    def ensureOnScreen(self):
+        owner = self.parentWidget()
+        if not self.isVisible() or self.isMinimized() or (owner is not None and owner.isMinimized()):
+            return False
+        native = windows_window_placement() if QGuiApplication.platformName() == 'windows' else None
+        if native is not None and owner is not None:
+            hwnd = int(self.winId())
+            reachable = native.title_reachable(hwnd)
+            if reachable or native.dragging():
+                return False
+            if reachable is False:
+                self._prepareForRecovery()
+                if native.center_on_owner(hwnd, int(owner.winId()), self._PREFERRED_SIZE):
+                    return True
+
+        frame = self.frameGeometry()
+        areas = screen_work_areas()
+        if reachable_window_title(frame, areas) or QGuiApplication.mouseButtons() & Qt.LeftButton:
+            return False
+        destination = recover_window_frame(frame, areas, available_screen_geometry(self))
+        if destination == frame:
+            return False
+
+        self._prepareForRecovery()
         decorations = self.frameSize() - self.size()
         content = destination.size() - decorations
         self.resize(content.expandedTo(QSize(1, 1)))
@@ -124,8 +145,7 @@ class AgentTaskWindow(MotionDialog):
             self.setWindowState(self.windowState() & ~Qt.WindowMinimized)
         self.show()
         moved = self.ensureOnScreen()
-        # Recheck once after native maximize/restore and DPI events settle.
-        self._placement_timer.start(0)
+        self._schedulePlacementCheck()
         if interactive:
             self.raise_()
             self.activateWindow()
@@ -135,10 +155,36 @@ class AgentTaskWindow(MotionDialog):
     def showAnimated(self):
         self.present(interactive=True)
 
+    def _schedulePlacementCheck(self, *_):
+        if self.isVisible() and not self.isMinimized():
+            self._placement_timer.start()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        handle = self.windowHandle()
+        if handle is not None and handle is not self._placement_window:
+            handle.screenChanged.connect(self._schedulePlacementCheck)
+            self._placement_window = handle
+        self._placement_watch.start()
+        self._schedulePlacementCheck()
+
+    def hideEvent(self, event):
+        self._placement_watch.stop()
+        self._placement_timer.stop()
+        super().hideEvent(event)
+
+    def moveEvent(self, event):
+        super().moveEvent(event)
+        self._schedulePlacementCheck()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._schedulePlacementCheck()
+
     def changeEvent(self, event):
         super().changeEvent(event)
         if event.type() == QEvent.WindowStateChange and hasattr(self, '_placement_timer'):
-            self._placement_timer.start(0)
+            self._schedulePlacementCheck()
 
     def setFiles(self, relative_paths):
         self._paths = list(relative_paths)

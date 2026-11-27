@@ -253,6 +253,27 @@ class AgentTests(unittest.TestCase):
         self.assertEqual('3.png',nxt['image'])
         self.assertEqual('0.png',Path(self.w.filePath).name)
 
+    def test_late_off_screen_move_recovers_without_reopening_window(self):
+        self.w.show()
+        current = self.start(images=['2.png', '3.png'])
+        monitor = self.s.monitor
+        self.preview(current, 1, self.box)
+        QTest.qWait(180)  # Let the initial show/restore checks finish first.
+        monitor.move(3606, 907)
+        self.assertFalse(any(area.intersects(monitor.frameGeometry())
+                             for area in screen_work_areas()))
+        deadline = time.monotonic() + 1.5
+        while not any(area.contains(monitor.frameGeometry()) for area in screen_work_areas()):
+            self.assertLess(time.monotonic(), deadline, monitor.frameGeometry())
+            QTest.qWait(30)
+        self.assertEqual(current['task_id'], self.s.active)
+        self.assertEqual(1, len(monitor.preview.boxes))
+        monitor.collapseAnimated()
+        self.assertFalse(monitor.isVisible())
+        self.assertFalse(monitor._placement_timer.isActive())
+        self.assertFalse(monitor._placement_watch.isActive())
+        self.assertEqual(current['task_id'], self.s.active)
+
     def test_batch_skip_existing_mark_review_empty_and_retry(self):
         old=self.labels/'0.xml'
         old.write_bytes(b'<keep/>')

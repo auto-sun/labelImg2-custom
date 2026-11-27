@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QApplication, QPushButton, QWidget
 
 import labelImg
 from libs.release_tour import should_offer_tour
-from libs.ui_geometry import recover_window_frame
+from libs.ui_geometry import reachable_window_title, recover_window_frame
 from libs.window_motion import MotionDialog, WindowMotion, widget_rect
 from test_delete_image import MemorySettings
 
@@ -116,6 +116,13 @@ class MonitorPlacementTests(unittest.TestCase):
         result=self.fit(clipped)
         self.assertTrue(self.secondary.contains(result))
         self.assertEqual(clipped.size(),result.size())
+
+    def test_title_bar_reachability_does_not_confuse_visible_body_with_reachable_title(self):
+        areas = [self.secondary, self.main]
+        self.assertFalse(reachable_window_title(QRect(3606, 907, 866, 519), areas))
+        self.assertFalse(reachable_window_title(QRect(50, -50, 600, 500), areas))
+        self.assertTrue(reachable_window_title(QRect(-100, 50, 800, 520), areas))
+        self.assertTrue(reachable_window_title(QRect(-8, -8, 1936, 1056), areas))
 
 
 class ReleaseTourTests(unittest.TestCase):

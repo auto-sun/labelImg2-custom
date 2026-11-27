@@ -16,14 +16,16 @@
 
 ## 下载与安装
 
-[下载 Windows 安装包 v2.8.4（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.8.4/LabelImg2Custom-2.8.4-Setup.exe)
+[下载 Windows 安装包 v2.8.6（64 位 EXE）](https://github.com/auto-sun/labelImg2-custom/releases/download/v2.8.6/LabelImg2Custom-2.8.6-Setup.exe)
+
+v2.8.6 修复混合缩放双屏下智能体任务窗口再次跑出屏幕的问题。窗口会自动回到主窗口所在的屏幕，任务和预览不会重置。
 
 v2.8.4 支持框选图片后批量标记或移入回收站。智能体可在独立窗口逐框预览，你可以同时手工标其他图片。更新后的新功能导览可跳过，也可从帮助菜单重看。
 
 v2.7.6 在打开图片目录后自动提示选择同级的 `labels`、`label` 或其他标签目录。没有上次工作可恢复时，欢迎页提供打开图片、打开图片目录和最近工作入口。
 例如在 `a/b/img/c` 标注并保存到 `a/b/labels`，以后打开 `a/b/img` 仍能读取原标签。
 “帮助 → 检查更新”可下载并升级安装版；“启动时自动检查更新”默认勾选，可随时关闭。
-更新先询问、可取消下载，安装前验证 SHA256。详见 [v2.8.4 发行说明](docs/releases/v2.8.4.md)。
+更新先询问、可取消下载，安装前验证 SHA256。详见 [v2.8.6 发行说明](docs/releases/v2.8.6.md)。
 
 双击安装后从开始菜单启动即可，无需配置 Python、Conda 或其他运行环境。
 安装包包含 CPU 版模型推理依赖，但不包含 `.pt` 模型权重；自动标注时请选择自己的模型。

@@ -24,7 +24,10 @@ Interface preview
 Downloads
 ---------
 
-`Download the v2.8.4 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.8.4/LabelImg2Custom-2.8.4-Setup.exe>`__.
+`Download the v2.8.6 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.8.6/LabelImg2Custom-2.8.6-Setup.exe>`__.
+
+Version 2.8.6 recovers the agent task window if it ends up off-screen on a
+mixed-DPI Windows desktop. Recovery keeps the active task and live preview.
 
 Version 2.8.4 adds batch review marks and recycling from the file list, animated window transitions, and a replayable guide after updates. The MCP task window previews agent annotations separately, so you can label other images at the same time.
 

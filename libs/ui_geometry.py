@@ -22,6 +22,19 @@ def screen_work_areas():
     return [screen.availableGeometry() for screen in QGuiApplication.screens()]
 
 
+def reachable_window_title(frame, work_areas, title_height=36, grip_width=96, grip_height=12):
+    """A window spanning monitors is usable if its title bar can still be grabbed."""
+    if not frame.isValid():
+        return False
+    title = QRect(frame.x(), frame.y(), frame.width(), min(frame.height(), title_height))
+    for area in work_areas:
+        visible = area.intersected(title)
+        if (visible.width() >= min(grip_width, title.width())
+                and visible.height() >= min(grip_height, title.height())):
+            return True
+    return False
+
+
 def recover_window_frame(frame, work_areas, owner_area, preferred=QSize(860, 530)):
     """Fit a lost frame to a single monitor, not to the virtual desktop union."""
     areas = [area for area in work_areas if area.isValid()]
