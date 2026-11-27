@@ -1,0 +1,130 @@
+name: Windows 打包发布
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '要打包的版本，例如 v2.8.4'
+        required: true
+        default: 'v2.8.4'
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: labelimg2-windows-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      RELEASE_TAG: ${{ inputs.version }}
+      PYTHONNOUSERSITE: '1'
+      PYTHONIOENCODING: utf-8
+      YOLO_AUTOINSTALL: 'false'
+
+    steps:
+      - name: 取源码
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 检查发版版本
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+            throw '请输入 v2.8.4 这样的版本号'
+          }
+          $version = $env:RELEASE_TAG.Substring(1)
+          $source = Get-Content -Raw libs/version.py
+          if ($source -notmatch ("__version__\s*=\s*['`"]" + [regex]::Escape($version) + "['`"]")) {
+            throw '仓库源码版本不符。请先推送对应版本的源码。'
+          }
+          if (!(Test-Path "docs/releases/$env:RELEASE_TAG.md")) {
+            throw '缺少对应版本的发行说明'
+          }
+          if (git tag --list $env:RELEASE_TAG) {
+            $tagCommit = git rev-parse "$env:RELEASE_TAG^{commit}"
+            if ($tagCommit -ne $env:GITHUB_SHA) {
+              throw '此版本标签已指向另一份源码，不能覆盖'
+            }
+          }
+
+      - name: 安装依赖、测试并制作安装包
+        run: |
+          $conda = Join-Path $env:CONDA 'Scripts\conda.exe'
+          $prefix = Join-Path $env:RUNNER_TEMP 'labelimg2-build'
+          & $conda create -y -p $prefix --override-channels -c conda-forge python=3.10.20 pip
+          if ($LASTEXITCODE -ne 0) { throw '创建 Python 环境失败' }
+
+          $env:PATH = "$prefix;$prefix\Library\bin;$prefix\Scripts;$env:PATH"
+          $python = Join-Path $prefix 'python.exe'
+          & $python -m pip install --index-url https://download.pytorch.org/whl/cpu `
+            'torch==2.13.0+cpu' 'torchvision==0.28.0+cpu'
+          if ($LASTEXITCODE -ne 0) { throw '安装 CPU 版 PyTorch 失败' }
+
+          & $python -m pip install -r requirements.txt `
+            'numpy==2.2.6' 'opencv-python==5.0.0.93' 'lxml==6.1.1' `
+            'PyQt5==5.15.11' 'PyQt5-Qt5==5.15.2' 'ultralytics==8.4.117' `
+            'setuptools==83.0.0' 'pyinstaller==6.22.3' 'pyinstaller-hooks-contrib==2026.7'
+          if ($LASTEXITCODE -ne 0) { throw '安装项目依赖失败' }
+
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          & $python -m unittest discover -s tests
+          if ($LASTEXITCODE -ne 0) { throw '回归测试未通过' }
+          Remove-Item Env:QT_QPA_PLATFORM
+
+          & .\packaging\build_windows.ps1 -PythonExe $python
+
+      - name: 上传到 Release 草稿并校验
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:RELEASE_TAG
+          $name = "LabelImg2Custom-$($tag.Substring(1))-Setup.exe"
+          $file = Get-Item "dist/installer/$name"
+          $sha = (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'User-Agent' = 'LabelImg2Custom-Release'
+          }
+          $base = "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY"
+          $draft = Invoke-RestMethod "$base/releases?per_page=100" -Headers $headers |
+            Where-Object tag_name -CEQ $tag | Select-Object -First 1
+          $data = @{
+            tag_name = $tag
+            target_commitish = $env:GITHUB_SHA
+            name = "LabelImg2 Custom $tag"
+            body = Get-Content -Raw -Encoding UTF8 "docs/releases/$tag.md"
+            draft = $true
+            prerelease = $false
+          } | ConvertTo-Json
+
+          if ($draft) {
+            if (!$draft.draft) { throw '这个版本已正式发布，不会覆盖' }
+            if ($draft.assets | Where-Object name -CEQ $name) {
+              throw '草稿已有同名附件，请先检查该附件'
+            }
+            $draft = Invoke-RestMethod "$base/releases/$($draft.id)" -Method Patch `
+              -Headers $headers -ContentType 'application/json; charset=utf-8' -Body $data
+          } else {
+            $draft = Invoke-RestMethod "$base/releases" -Method Post `
+              -Headers $headers -ContentType 'application/json; charset=utf-8' -Body $data
+          }
+
+          $url = ($draft.upload_url -split '\{', 2)[0] + "?name=$name"
+          $asset = Invoke-RestMethod $url -Method Post -Headers $headers `
+            -ContentType 'application/octet-stream' -InFile $file.FullName -TimeoutSec 300
+          if ($asset.state -ne 'uploaded' -or $asset.size -ne $file.Length -or
+              $asset.digest -ne "sha256:$sha") {
+            throw '附件校验失败，请勿发布草稿'
+          }
+          Write-Host "草稿附件校验通过：$name"
+          Write-Host "SHA-256：$sha"
