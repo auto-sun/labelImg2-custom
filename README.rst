@@ -24,7 +24,7 @@ Interface preview
 Downloads
 ---------
 
-`Download the v2.8.8 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.8.8/LabelImg2Custom-2.8.8-Setup.exe>`__.
+`Download the v2.8.9 Windows installer (64-bit EXE) <https://github.com/auto-sun/labelImg2-custom/releases/download/v2.8.9/LabelImg2Custom-2.8.9-Setup.exe>`__.
 
 Version 2.8.8 adds total and average agent task times, class editing by
 double-click, and a keyboard shortcut to toggle the current image's review
@@ -37,7 +37,7 @@ the task window when it becomes too wide and shallow on mixed-DPI desktops.
 Version 2.8.4 adds batch review marks and recycling from the file list, animated window transitions, and a replayable guide after updates. The MCP task window previews agent annotations separately, so you can label other images at the same time.
 
 With no box selected, the wheel (or Ctrl+wheel) zooms the image in or out by
-4 percentage points per notch. Fit Window leaves at least 20 px on each side
+8 percentage points per notch. Fit Window leaves at least 40 px on each side
 of the image. Double-click a box on the canvas
 or a class group heading in Box Labels to choose a class with initials,
 pinyin, or a configured shortcut. Press Enter to apply to the selected boxes

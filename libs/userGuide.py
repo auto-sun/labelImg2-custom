@@ -142,13 +142,13 @@ _WORKFLOW_SHORTCUTS = {
 
 
 _ZOOM_GUIDE = {
-    'en': '<li>Fit Window leaves at least 20 px on each side of the image. The wheel zooms the image in or out by 4 percentage points per notch. Selected boxes resize by about 2% instead.</li><li><b>Ctrl + wheel</b> also zooms the image when no box is selected.</li>',
-    'zh': '<li>打开图片默认适应窗口，四边各至少留 20 px。滚轮每格放大或缩小图片 4 个百分点；已选中框时每格调整框大小约 2%。</li><li><b>Ctrl + 滚轮</b>：未选中框时也可缩放图片。</li>',
-    'ja': '<li>画像を開くと四辺にそれぞれ 20 px 以上の余白を残します。ホイールで 1 目盛りあたり 4 ポイント拡大または縮小します。選択枠は約 2% ずつサイズ変更します。</li><li><b>Ctrl + ホイール</b>も未選択時に画像を拡大縮小します。</li>',
-    'es': '<li>Al abrir, se dejan al menos 20 px en cada uno de los cuatro lados. La rueda aumenta o reduce el zoom 4 puntos porcentuales por paso. Si hay cuadros seleccionados, cambia su tamaño aproximadamente un 2%.</li><li><b>Ctrl + rueda</b> también ajusta el zoom sin selección.</li>',
-    'ar': '<li>عند الفتح يُترك هامش لا يقل عن 20 بكسل على كل جانب من جوانب الصورة. تكبر العجلة الصورة أو تصغرها بمقدار 4 نقاط مئوية لكل درجة. عند تحديد إطارات، يتغير حجمها بنحو 2% بدلاً من ذلك.</li><li><b>Ctrl + العجلة</b> يغير تكبير الصورة أيضًا دون تحديد إطار.</li>',
-    'fr': '<li>À l’ouverture, une marge d’au moins 20 px est conservée sur chacun des quatre côtés. Par cran, la molette augmente ou réduit le zoom de 4 points de pourcentage. Si des cadres sont sélectionnés, leur taille change d’environ 2 %.</li><li><b>Ctrl + molette</b> ajuste aussi le zoom sans sélection.</li>',
-    'ko': '<li>이미지를 열면 네 방향 모두 각각 최소 20 px의 여백을 둡니다. 휠 한 칸으로 이미지 확대율을 4%포인트 높이거나 낮춥니다. 상자가 선택되면 크기가 약 2%씩 바뀝니다.</li><li><b>Ctrl + 휠</b>도 선택된 상자가 없으면 이미지를 확대/축소합니다.</li>',
+    'en': '<li>Fit Window leaves at least 40 px on each side of the image. The wheel zooms the image in or out by 8 percentage points per notch. Selected boxes resize by about 2% instead.</li><li><b>Ctrl + wheel</b> also zooms the image when no box is selected.</li>',
+    'zh': '<li>打开图片默认适应窗口，四边各至少留 40 px。滚轮每格放大或缩小图片 8 个百分点；已选中框时每格调整框大小约 2%。</li><li><b>Ctrl + 滚轮</b>：未选中框时也可缩放图片。</li>',
+    'ja': '<li>画像を開くと四辺にそれぞれ 40 px 以上の余白を残します。ホイールで 1 目盛りあたり 8 ポイント拡大または縮小します。選択枠は約 2% ずつサイズ変更します。</li><li><b>Ctrl + ホイール</b>も未選択時に画像を拡大縮小します。</li>',
+    'es': '<li>Al abrir, se dejan al menos 40 px en cada uno de los cuatro lados. La rueda aumenta o reduce el zoom 8 puntos porcentuales por paso. Si hay cuadros seleccionados, cambia su tamaño aproximadamente un 2%.</li><li><b>Ctrl + rueda</b> también ajusta el zoom sin selección.</li>',
+    'ar': '<li>عند الفتح يُترك هامش لا يقل عن 40 بكسل على كل جانب من جوانب الصورة. تكبر العجلة الصورة أو تصغرها بمقدار 8 نقاط مئوية لكل درجة. عند تحديد إطارات، يتغير حجمها بنحو 2% بدلاً من ذلك.</li><li><b>Ctrl + العجلة</b> يغير تكبير الصورة أيضًا دون تحديد إطار.</li>',
+    'fr': '<li>À l’ouverture, une marge d’au moins 40 px est conservée sur chacun des quatre côtés. Par cran, la molette augmente ou réduit le zoom de 8 points de pourcentage. Si des cadres sont sélectionnés, leur taille change d’environ 2 %.</li><li><b>Ctrl + molette</b> ajuste aussi le zoom sans sélection.</li>',
+    'ko': '<li>이미지를 열면 네 방향 모두 각각 최소 40 px의 여백을 둡니다. 휠 한 칸으로 이미지 확대율을 8%포인트 높이거나 낮춥니다. 상자가 선택되면 크기가 약 2%씩 바뀝니다.</li><li><b>Ctrl + 휠</b>도 선택된 상자가 없으면 이미지를 확대/축소합니다.</li>',
 }
 
 _DOUBLE_CLICK_GUIDE = {

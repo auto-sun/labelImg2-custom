@@ -91,8 +91,8 @@ class WindowMixin(object):
 class MainWindow(QMainWindow, WindowMixin):
     FIT_WINDOW, FIT_WIDTH, MANUAL_ZOOM = list(range(3))
     UNDO_LIMIT = 50
-    WHEEL_ZOOM_STEP = 4
-    FIT_IMAGE_MARGIN = 20
+    WHEEL_ZOOM_STEP = 8
+    FIT_IMAGE_MARGIN = 40
 
     def __init__(self, defaultFilename=None, defaultPrefdefClassFile=None, defaultSaveDir=None):
         super(MainWindow, self).__init__()
