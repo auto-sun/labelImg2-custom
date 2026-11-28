@@ -9,6 +9,14 @@ from .window_motion import MotionDialog
 from .windows_window_placement import windows_window_placement
 
 
+def format_duration(seconds, tenths=False):
+    total, tenth = divmod(round(seconds * 10) if tenths else int(seconds) * 10, 10)
+    hours, remainder = divmod(total, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    text = '%02d:%02d:%02d' % (hours, minutes, seconds)
+    return '%s.%d' % (text, tenth) if tenths else text
+
+
 class AgentPreview(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -70,6 +78,10 @@ class AgentTaskWindow(MotionDialog):
         self.title.setTextFormat(Qt.PlainText)
         self.title.setWordWrap(True)
         self.title.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self.timing = QLabel()
+        self.timing.setTextFormat(Qt.PlainText)
+        self.timing.setWordWrap(True)
+        self.timing.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self.files = QListWidget()
         self.files.setUniformItemSizes(True)
         self.files.setSelectionMode(QListWidget.NoSelection)
@@ -94,9 +106,18 @@ class AgentTaskWindow(MotionDialog):
         controls.addWidget(self.stop)
         main = QVBoxLayout(self)
         main.addWidget(self.title)
+        main.addWidget(self.timing)
         main.addWidget(splitter, 1)
         main.addLayout(controls)
         self._paths = []
+
+    def setTiming(self, elapsed, average, translate):
+        total_text = translate('Total elapsed: {time}').format(time=format_duration(elapsed))
+        avg_text = translate('Average per image: {time}').format(
+            time=format_duration(average, tenths=True) if average is not None else '—')
+        text = total_text + '   ·   ' + avg_text
+        if self.timing.text() != text:
+            self.timing.setText(text)
 
     def _prepareForRecovery(self):
         animator = self.animator()

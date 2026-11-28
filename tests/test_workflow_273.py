@@ -209,14 +209,16 @@ class WorkflowTests(unittest.TestCase):
             Qt.NoScrollPhase, False)
         QApplication.sendEvent(canvas, event)
 
-    def test_image_wheel_zoom_uses_two_percentage_points_and_ctrl_still_works(self):
+    def test_image_wheel_zooms_four_points_per_notch_with_or_without_ctrl(self):
         self.window.setZoom(100)
+        self.wheel(120)
+        self.assertEqual(104, self.window.zoomWidget.value())
         self.wheel(-120)
-        self.assertEqual(98, self.window.zoomWidget.value())
-        self.wheel(120, Qt.ControlModifier)
         self.assertEqual(100, self.window.zoomWidget.value())
         self.wheel(-120, Qt.ControlModifier)
-        self.assertEqual(98, self.window.zoomWidget.value())
+        self.assertEqual(96, self.window.zoomWidget.value())
+        self.wheel(120, Qt.ControlModifier)
+        self.assertEqual(100, self.window.zoomWidget.value())
 
     def test_selected_box_wheel_resize_is_finer_without_zooming_image(self):
         box = make_box('person', 30, 30)
@@ -230,7 +232,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertAlmostEqual(original_width, box.boundingRect().width())
         self.assertEqual(zoom, self.window.zoomWidget.value())
 
-    def test_initial_image_load_has_ten_pixels_on_all_sides_after_previous_panning(self):
+    def test_initial_image_load_has_20px_margins_on_all_sides(self):
         with tempfile.TemporaryDirectory() as directory:
             for index, (width, height, size) in enumerate((
                     (1366, 768, (2000, 1000)),
@@ -257,11 +259,14 @@ class WorkflowTests(unittest.TestCase):
                 right = area.viewport().width() - left - size[0] * canvas.scale
                 bottom = area.viewport().height() - top - size[1] * canvas.scale
                 for margin in (left, right, top, bottom):
-                    self.assertGreaterEqual(margin, 10, (
+                    self.assertGreaterEqual(margin, 20, (
                         width, height, size, canvas.scale,
                         (left, right, top, bottom),
                         area.horizontalScrollBar().value(),
                         area.verticalScrollBar().value()))
+                expected_scale = min((area.viewport().width() - 40) / size[0],
+                                     (area.viewport().height() - 40) / size[1])
+                self.assertEqual(int(100 * expected_scale), self.window.zoomWidget.value())
 
     def test_all_four_margins_survive_layout_resize_zoom_and_image_switch(self):
         canvas = self.window.canvas

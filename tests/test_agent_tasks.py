@@ -15,7 +15,7 @@ from PyQt5.QtGui import QImage
 from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication
 import labelImg
-from libs.agent_tasks import AgentQueue, digest, project_image_name
+from libs.agent_tasks import AgentQueue, AgentTaskClock, digest, project_image_name
 from libs.pascal_voc_io import PascalVocReader
 from libs.ui_geometry import screen_work_areas
 from test_delete_image import MemorySettings
@@ -315,6 +315,52 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(b'',(self.labels/'3.txt').read_bytes())
         self.assertEqual(b'<keep/>',old.read_bytes())
         self.assertEqual(original,path.read_bytes())
+
+    def test_timing_survives_stop_resume_and_ignores_skipped_or_duplicate_images(self):
+        now = [100.0]
+        self.s.task_clock = AgentTaskClock(now=lambda: now[0])
+        (self.labels/'0.txt').write_bytes(b'')
+        self.w.show()
+        first = self.start(images=['0.png', '2.png', '3.png'])
+        self.assertEqual('2.png', first['image'])
+        self.assertIsNone(self.s.task_clock.average)
+        self.assertIn('—', self.s.monitor.timing.text())
+
+        self.s.monitor.collapseAnimated()
+        self.assertTrue(self.s.timing_timer.isActive())
+        now[0] += 12.5
+        self.s.show_monitor()
+        self.assertIn('00:00:12', self.s.monitor.timing.text())
+        next_image = self.submit(first, 'annotated', boxes=[self.box])
+        self.assertEqual('3.png', next_image['image'])
+        self.assertIn('00:00:12.5', self.s.monitor.timing.text())
+        now[0] += 4.5
+        self.assertEqual(next_image, self.submit(first, 'annotated', boxes=[self.box]))
+        self.assertEqual(12.5, self.s.task_clock.average)
+
+        self.s.stop()
+        self.assertFalse(self.s.timing_timer.isActive())
+        self.assertEqual((17.0, 12.5, 1), self.s.task_clock.snapshot())
+        now[0] += 1000
+        self.s.task_clock = AgentTaskClock(now=lambda: now[0])
+        self.s.queue = AgentQueue(self.db, self.s.context())
+        resumed = self.call('start_task', resume_task_id=first['task_id'])
+        self.assertEqual('3.png', resumed['image'])
+        self.assertEqual(17.0, self.s.task_clock.elapsed)
+        now[0] += 3
+        result = self.submit(resumed, 'review', reason='uncertain')
+        self.assertTrue(result['complete'])
+        self.assertEqual(1, result['skipped'])
+        self.assertFalse(self.s.timing_timer.isActive())
+        self.assertEqual((20.0, 20.0, 2), self.s.queue.load_timing(first['task_id']))
+        now[0] += 10
+        self.s.refresh_timing()
+        self.assertIn('00:00:20', self.s.monitor.timing.text())
+        self.assertIn('00:00:10.0', self.s.monitor.timing.text())
+
+        self.start(images=['1.png'])
+        self.assertEqual((0.0, 0.0, 0), self.s.task_clock.snapshot())
+        self.assertIn('—', self.s.monitor.timing.text())
 
     def test_stop_resume_stale_rejections_and_existing_file_race(self):
         a=self.start(count=2)

@@ -2,7 +2,9 @@
 import base64
 from collections import Counter
 import json
+import logging
 import os
+import sqlite3
 import sys
 import uuid
 from PyQt5.QtCore import (QBuffer, QIODevice, QItemSelectionModel, QLockFile,
@@ -12,7 +14,7 @@ from PyQt5.QtNetwork import QLocalServer
 from PyQt5.QtWidgets import QAction, QApplication, QLabel, QMessageBox, QPushButton
 
 from .agent_mcp import TOOLS, endpoint
-from .agent_tasks import (AgentQueue, box_geometry, canonical, exists_label, inside,
+from .agent_tasks import (AgentQueue, AgentTaskClock, box_geometry, canonical, exists_label, inside,
                           project_image_name, stamp)
 from .agent_window import AgentTaskWindow
 from .window_motion import menu_rect
@@ -52,6 +54,9 @@ class AgentSession(QObject):
         window.menus.settings.addAction(self.monitor_action)
         self.monitor=AgentTaskWindow(window,self.stop_task)
         self.monitor.setAttribute(Qt.WA_ShowWithoutActivating,True)
+        self.task_clock = AgentTaskClock()
+        self.timing_timer = QTimer(self, interval=1000, timerType=Qt.CoarseTimer)
+        self.timing_timer.timeout.connect(self.refresh_timing)
         self.monitor_button=QPushButton('Agent Task Window')
         self.monitor.motionAnchor=self.monitor_button
         self.monitor_button.clicked.connect(self.show_monitor)
@@ -64,6 +69,23 @@ class AgentSession(QObject):
 
     def tr_ui(self,text):
         return translate(text,self.w.languageManager.language)
+
+    def refresh_timing(self):
+        self.monitor.setTiming(self.task_clock.elapsed, self.task_clock.average, self.tr_ui)
+
+    def checkpoint_timing(self):
+        if self.queue is not None and self.task_clock.job is not None:
+            try:
+                self.queue.save_timing(self.task_clock.job, self.task_clock.snapshot())
+            except sqlite3.Error:
+                # Display-only statistics must not prevent saving labels or stopping a task.
+                logging.getLogger(__name__).warning("Unable to save agent task timing", exc_info=True)
+
+    def pause_timing(self):
+        self.timing_timer.stop()
+        if self.task_clock.running:
+            self.task_clock.pause()
+            self.checkpoint_timing()
 
     def copy_config(self):
         if getattr(sys,'frozen',False):
@@ -121,6 +143,7 @@ class AgentSession(QObject):
         self.progress.show()
         self.stop_button.show()
         self.monitor_button.show()
+        self.task_clock.reset()
         self.update_monitor('Waiting for a task')
 
     def stop(self):
@@ -155,6 +178,7 @@ class AgentSession(QObject):
         self.monitor.stop.setEnabled(bool(self.active or self.staged))
         self.monitor.title.setText(self.tr_ui(self.window_state)+(' · '+progress if progress else ''))
         self.monitor_button.setText(title+(' · '+progress if progress else ''))
+        self.refresh_timing()
 
     def show_monitor(self):
         self.update_monitor()
@@ -197,6 +221,7 @@ class AgentSession(QObject):
     def stop_task(self):
         if self.active and self.queue:
             self.update_task_rows(None)
+        self.pause_timing()
         had_work=self.has_reservations
         self.active=self.issued=None
         self.claimed.clear()
@@ -219,6 +244,7 @@ class AgentSession(QObject):
             available=[(path,base) for path,base in entries if not exists_label(base)]
             self.check_reservation(path for path,_ in available)
             self.staged.update(available)
+            self.task_clock.reset()
             self.monitor.setFiles(self.relative(path) for path in self.staged)
             self.sync_reservations()
             self.update_monitor('Waiting for the agent',str(len(self.staged)))
@@ -410,6 +436,9 @@ class AgentSession(QObject):
             self.active=q.create(entries,args.get('instructions'),args.get('classes',q.ctx['classes']))
             frames=list(q.frames(self.active))
             self.staged.clear()
+        self.task_clock.start(self.active, q.load_timing(self.active))
+        if not self.timing_timer.isActive():
+            self.timing_timer.start()
         self.claimed=claimed
         self.issued=None
         self.rendered_seq=0
@@ -476,7 +505,9 @@ class AgentSession(QObject):
             count = self.monitor.preview.showBox(slot,label,points)
             return self.content(dict(box_id=slot, preview_count=count, saved=False))
         boxes=args.get('boxes',[])
-        q.submit(job,token,args['outcome'],boxes,args.get('reason',''))
+        if q.submit(job,token,args['outcome'],boxes,args.get('reason','')):
+            self.task_clock.record_submission()
+            self.checkpoint_timing()
         self.monitor.preview.clearBoxes()
         self.issued=None
         row=self.row_for(r['image'])
@@ -544,6 +575,7 @@ class AgentSession(QObject):
         self.progress.setText('MCP: '+progress)
         self.update_monitor('Agent annotation in progress',progress)
         if r is None:
+            self.pause_timing()
             if summary['remaining']:
                 summary['continuation_required']=True
             else:
@@ -554,6 +586,7 @@ class AgentSession(QObject):
                 self.monitor.preview.setImage()
                 self.sync_reservations(relocate=False)
                 self.update_monitor('Agent task completed',progress)
+            self.refresh_timing()
             return self.content(summary)
         path=r['image']
         row=self.row_for(path)
@@ -572,6 +605,8 @@ class AgentSession(QObject):
                 raise
             q.finish(r,'review','unreadable image')
             self.mark_review(row)
+            self.pause_timing()
+            self.refresh_timing()
             return self.content(dict(task_id=job,continuation_required=True))
         same_image=(self.issued and self.issued[:2]==(job,r['token']) and self.issued[3]==signature)
         revision=self.issued[2] if same_image else uuid.uuid4().hex

@@ -56,7 +56,7 @@ from libs.agent_session import AgentSession
 from libs.window_motion import WindowMotion, menu_rect
 from libs.release_tour import ReleaseTourController
 
-from libs.labelView import (CLabelView, HashableQStandardItem,
+from libs.labelView import (CCommonOrderComboBox, CLabelView, HashableQStandardItem,
                             label_search_keys)
 from libs.fileView import CFileView, natural_path_key
 
@@ -91,8 +91,8 @@ class WindowMixin(object):
 class MainWindow(QMainWindow, WindowMixin):
     FIT_WINDOW, FIT_WIDTH, MANUAL_ZOOM = list(range(3))
     UNDO_LIMIT = 50
-    WHEEL_ZOOM_STEP = 2
-    FIT_IMAGE_MARGIN = 10
+    WHEEL_ZOOM_STEP = 4
+    FIT_IMAGE_MARGIN = 20
 
     def __init__(self, defaultFilename=None, defaultPrefdefClassFile=None, defaultSaveDir=None):
         super(MainWindow, self).__init__()
@@ -223,6 +223,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.labelsm.currentChanged.connect(self.labelCurrentChanged)
 
         self.labelList.clicked.connect(self.labelGroupClicked)
+        self.labelList.groupClassEditRequested.connect(self.editGroupClassFromIndex)
         self.labelList.setContextMenuPolicy(Qt.CustomContextMenu)
         self.labelList.customContextMenuRequested.connect(
             lambda pos: self.showLabelGroupMenu(self.labelList.indexAt(pos),
@@ -334,6 +335,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.canvas.shapeVisibilityChanged.connect(
             self.updateShapeVisibilityCheckbox)
         self.canvas.selectionChanged.connect(self.shapeSelectionChanged)
+        self.canvas.shapeClassEditRequested.connect(self.editCanvasBoxClass)
         self.canvas.drawingPolygon.connect(self.toggleDrawingSensitive)
         self.canvas.cancelDraw.connect(self.createCancel)
         self.canvas.toggleEdit.connect(self.toggleExtraEditing)
@@ -443,6 +445,11 @@ class MainWindow(QMainWindow, WindowMixin):
             u'标记该图（待确认）', self.toggleSelectedImageFlag,
             None, 'tags.svg',
             u'将当前图片标为待确认，或取消待确认标记')
+        flagCurrentImage = action(
+            'Mark or Unmark Current Image', self.toggleCurrentImageFlag,
+            'Ctrl+Shift+M', 'tags.svg',
+            u'将当前图片标为待确认，或取消待确认标记', enabled=False)
+        flagCurrentImage.setAutoRepeat(False)
 
         resetAll = action('&ResetAll', self.resetAll, None, 'reset.svg', u'Reset all')
 
@@ -595,6 +602,7 @@ class MainWindow(QMainWindow, WindowMixin):
         self.actions = struct(save=save, saveAs=saveAs, open=open, close=close,
                               restart=restart,
                               deleteImage=deleteImage, flagImage=flagImage,
+                              flagCurrentImage=flagCurrentImage,
                               resetAll = resetAll,
                               create=create, createSo=createSo, createRo=createRo,
                               drawSelectedBox=drawSelectedBox,
@@ -626,7 +634,7 @@ class MainWindow(QMainWindow, WindowMixin):
                                         cutToClipboard, copyToClipboard,
                                         pasteFromClipboard,
                                         copy, delete,
-                                        None),
+                                        None, flagCurrentImage),
                               beginnerContext=(undo, None,
                                                cutToClipboard, copyToClipboard,
                                                pasteFromClipboard, None,
@@ -634,7 +642,7 @@ class MainWindow(QMainWindow, WindowMixin):
                                                delete, labelAsBack, deleteLabel),
                               onLoadActive=(
                                   close, create, drawSelectedBox,
-                                  singleAutoAnnotate,
+                                  singleAutoAnnotate, flagCurrentImage,
                                   createEmptyAnnotation),
                                onShapesPresent=(saveAs,))
         self._labelNavigationStates = None
@@ -1471,9 +1479,16 @@ class MainWindow(QMainWindow, WindowMixin):
     def changeBoxGroupClass(self, group, target):
         if target not in self.predefinedClasses or target == group.data(Qt.UserRole):
             return False
+        return self.changeBoxClasses(self.groupShapes(group), target)
+
+    def changeBoxClasses(self, shapes, target):
+        changes = [shape for shape in shapes
+                   if shape in self.ShapeItemDict and shape.label != target]
+        if not changes:
+            return False
         self.beginUndoOperation()
         with self.changingGroups():
-            for shape in self.groupShapes(group):
+            for shape in changes:
                 shape.label = target
                 item = self.ShapeItemDict[shape]
                 item.setText(target)
@@ -1482,6 +1497,67 @@ class MainWindow(QMainWindow, WindowMixin):
         self.setDirty()
         self.canvas.update()
         return True
+
+    def editBoxClasses(self, shapes, current):
+        if (self._labelEditorActive or not self.filePath or
+                not self.canvas.editing() or
+                self.fileModel.isAgentLockedPath(self.filePath)):
+            return False
+        shapes = tuple(shapes)
+        classes = self.labelSelectionOrder()
+        if not shapes or not classes:
+            return False
+
+        language = self.languageManager.language
+        dialog = QDialog(self)
+        dialog.setObjectName('boxClassPicker')
+        title = (translateUi('Change box class', language) if len(shapes) == 1
+                 else translateUi('Change class for %d boxes', language) % len(shapes))
+        dialog.setWindowTitle(title)
+        layout = QVBoxLayout(dialog)
+        hint = QLabel(translateUi(
+            'Type a class initial or use a class shortcut.', language))
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        combo = CCommonOrderComboBox(dialog)
+        combo.addItems(classes)
+        combo.setShortcutMappings(self.labelShortcutMappings)
+        combo.setCurrentIndex(classes.index(current) if current in classes else 0)
+        layout.addWidget(combo)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText(translateUi('OK', language))
+        buttons.button(QDialogButtonBox.Ok).setDefault(True)
+        buttons.button(QDialogButtonBox.Cancel).setText(translateUi('Cancel', language))
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.setMinimumWidth(360)
+
+        path = self.filePath
+        self.setLabelEditorActive(True)
+        combo.setFocus(Qt.OtherFocusReason)
+        try:
+            accepted = dialog.exec_() == QDialog.Accepted
+            target = combo.currentText()
+        finally:
+            self.setLabelEditorActive(False)
+            dialog.deleteLater()
+        if (accepted and target and path == self.filePath and
+                not self.fileModel.isAgentLockedPath(path) and
+                self.changeBoxClasses(shapes, target)):
+            self.recordLabelUsage(target)
+            return True
+        return False
+
+    def editCanvasBoxClass(self, shape):
+        shapes = self.canvas.selectedShapes
+        return self.editBoxClasses(shapes if shape in shapes else [shape], shape.label)
+
+    def editGroupClassFromIndex(self, index):
+        group = self.labelModel.itemFromIndex(index)
+        if group is not None:
+            return self.editBoxClasses(self.groupShapes(group), group.data(Qt.UserRole))
+        return False
 
     def labelGroupClicked(self, index):
         if not index.parent().isValid() and index.column() == 1:
@@ -1551,6 +1627,8 @@ class MainWindow(QMainWindow, WindowMixin):
         for code, action in self.languageActions.items():
             action.setChecked(code == language)
         self.languageManager.apply(language)
+        if hasattr(self, 'agentSession'):
+            self.agentSession.update_monitor()
         self.statusBar().showMessage(
             LANGUAGES[language][0], 3000)
         return True
@@ -1719,7 +1797,16 @@ class MainWindow(QMainWindow, WindowMixin):
         return True
 
     def toggleSelectedImageFlag(self, _checked=False):
-        index = self.filesm.currentIndex()
+        return self.toggleImageFlag(self.filesm.currentIndex())
+
+    def toggleCurrentImageFlag(self, _checked=False):
+        if self._labelEditorActive or isinstance(
+                QApplication.focusWidget(),
+                (QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox)):
+            return False
+        return self.toggleImageFlag(self.currentImageFileModelIndex())
+
+    def toggleImageFlag(self, index):
         if not index.isValid() or self.fileModel.isAgentLocked(index):
             return False
         flagged = not self.fileModel.isFlagged(index)
@@ -2632,8 +2719,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         # zoom in
         units = delta / (8 * 15)
-        scale = self.WHEEL_ZOOM_STEP
-        self.addZoom(scale * units)
+        self.addZoom(self.WHEEL_ZOOM_STEP * units)
 
         # get the difference in scrollbar values
         # this is how far we can move
@@ -2810,8 +2896,8 @@ class MainWindow(QMainWindow, WindowMixin):
     def scaleFitWindow(self):
         """Figure out the size of the pixmap in order to fit the main widget."""
         # Pan margins make both scrollbars appear. Reserve their space even
-        # before the first image's layout completes, then keep 10 logical
-        # screen pixels on each side of the displayed image.
+        # before the first image's layout completes, then inset the image
+        # by the desired horizontal and vertical margins.
         viewport = self.scrollArea.viewport()
         extent = self.scrollArea.style().pixelMetric(QStyle.PM_ScrollBarExtent)
         w1 = viewport.width() - 2 * self.FIT_IMAGE_MARGIN
@@ -4054,33 +4140,33 @@ class MainWindow(QMainWindow, WindowMixin):
             self.openNextImg()
 
     def verifyImg(self, _value=False):
-        # Proceding next image without dialog if having any label
-         if self.filePath is not None:
-            if self.annotationFormat != FORMAT_PASCALVOC:
-                # YOLO text formats have no Pascal VOC-style verified field.
-                # Treat Verify as an explicit save so the action remains safe.
-                self.canvas.verified = True
-                self.fileModel.setData(
-                    self.filesm.currentIndex(), len(self.canvas.shapes),
-                    Qt.BackgroundRole)
-                self.saveFile()
-                self.status(
-                    '%s saved (YOLO formats do not store a verified flag).' %
-                    self.annotationFormatName(),
-                    8000)
-                return
-            try:
-                self.labelFile.toggleVerify()
-            except AttributeError:
-                # If the labelling file does not exist yet, create if and
-                # re-save it with the verified attribute.
-                self.saveFile()
-                self.labelFile.toggleVerify()
+        if not self.filePath or self.fileModel.isAgentLockedPath(self.filePath):
+            return False
+        is_xml = self.annotationFormat == FORMAT_PASCALVOC
+        was_verified = self.canvas.verified
+        # XML persists a toggle. YOLO TXT has no flag, so confirmation is
+        # kept in the list for this session after a successful explicit save.
+        confirmed = not was_verified if is_xml else True
+        self.canvas.verified = confirmed
+        if is_xml and self.labelFile is not None:
+            self.labelFile.verified = confirmed
+        if not self.saveFile():
+            self.canvas.verified = was_verified
+            if is_xml and self.labelFile is not None:
+                self.labelFile.verified = was_verified
+            return False
 
-            self.fileModel.setData(self.filesm.currentIndex(), len(self.canvas.shapes), Qt.BackgroundRole)
-            self.canvas.verified = self.labelFile.verified
+        index = self.currentImageFileModelIndex()
+        if index.isValid():
+            self.fileModel.updateAnnotationCount(index.row(), self.filePath, len(self.canvas.shapes))
+            self.fileModel.setConfirmed(index, confirmed)
+        if is_xml:
             self.paintCanvas()
-            self.saveFile()
+        else:
+            self.status(
+                '%s saved (YOLO formats do not store a verified flag).' %
+                self.annotationFormatName(), 8000)
+        return True
 
     def availableFileIndex(self,row,step):
         while 0<=row<self.fileModel.rowCount():
@@ -4665,6 +4751,7 @@ class MainWindow(QMainWindow, WindowMixin):
         shapes = tVocParseReader.getShapes()
         self.loadLabels(shapes)
         self.canvas.verified = tVocParseReader.verified
+        self.fileModel.setConfirmed(self.currentImageFileModelIndex(), self.canvas.verified)
         return tVocParseReader
 
     def loadYOLOByFilename(self, txtPath):

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from PyQt5.QtWidgets import (QDialogButtonBox, QTextBrowser,
                              QVBoxLayout)
+from .i18n import translate
 from .window_motion import MotionDialog
 
 
@@ -141,13 +142,23 @@ _WORKFLOW_SHORTCUTS = {
 
 
 _ZOOM_GUIDE = {
-    'en': '<li>On opening an image, Fit Window leaves at least 10px on each side. Image wheel zoom uses 2 percentage points per notch; selected box resizing is about 2%.</li><li><b>Ctrl + wheel</b> also zooms the image when no box is selected; selected boxes retain priority for wheel resizing.</li>',
-    'zh': '<li>打开图片默认适应窗口，四边至少留出 10px。图片滚轮每格缩放 2 个百分点，选中框每格缩放约 2%。</li><li><b>Ctrl + 滚轮</b>：未选中框时也可缩放图片；已选中框时仍优先调整框大小，保留原有行为。</li>',
-    'ja': '<li>画像を開くとウィンドウに合わせ、各辺に最低 10px の余白を残します。ホイールは画像を 2 ポイント、選択枠を約 2% ずつ拡大縮小します。</li><li><b>Ctrl + ホイール</b>も未選択時に画像を拡大縮小します。枠選択時は枠サイズの変更が優先です。</li>',
-    'es': '<li>Al abrir, la imagen se ajusta con al menos 10px en cada lado. La rueda cambia el zoom 2 puntos porcentuales o el tamaño de los cuadros seleccionados aproximadamente un 2%.</li><li><b>Ctrl + rueda</b> también amplía la imagen sin selección; con cuadros seleccionados se prioriza su tamaño.</li>',
-    'ar': '<li>عند الفتح تلائم الصورة النافذة مع هامش لا يقل عن 10px من كل جانب. تغير العجلة تكبير الصورة بمقدار نقطتين مئويتين أو حجم الإطارات المحددة بنحو 2%.</li><li><b>Ctrl + العجلة</b> يكبر الصورة أيضًا دون تحديد إطار؛ تظل أولوية العجلة لتغيير حجم الإطارات المحددة.</li>',
-    'fr': '<li>À l’ouverture, l’image s’ajuste avec au moins 10px de marge sur chaque côté. La molette change le zoom de 2 points de pourcentage, ou la taille des boîtes sélectionnées d’environ 2%.</li><li><b>Ctrl + molette</b> zoome aussi l’image sans sélection ; les boîtes sélectionnées restent prioritaires pour le redimensionnement.</li>',
-    'ko': '<li>이미지를 열면 각 변에 최소 10px 여백을 두고 창에 맞춥니다. 휠은 이미지 확대율을 2%포인트씩, 선택 상자 크기를 약 2%씩 조절합니다.</li><li><b>Ctrl + 휠</b>도 선택된 상자가 없으면 이미지를 확대/축소합니다. 상자가 선택되면 상자 크기 조절이 우선입니다.</li>',
+    'en': '<li>Fit Window leaves at least 20 px on each side of the image. The wheel zooms the image in or out by 4 percentage points per notch. Selected boxes resize by about 2% instead.</li><li><b>Ctrl + wheel</b> also zooms the image when no box is selected.</li>',
+    'zh': '<li>打开图片默认适应窗口，四边各至少留 20 px。滚轮每格放大或缩小图片 4 个百分点；已选中框时每格调整框大小约 2%。</li><li><b>Ctrl + 滚轮</b>：未选中框时也可缩放图片。</li>',
+    'ja': '<li>画像を開くと四辺にそれぞれ 20 px 以上の余白を残します。ホイールで 1 目盛りあたり 4 ポイント拡大または縮小します。選択枠は約 2% ずつサイズ変更します。</li><li><b>Ctrl + ホイール</b>も未選択時に画像を拡大縮小します。</li>',
+    'es': '<li>Al abrir, se dejan al menos 20 px en cada uno de los cuatro lados. La rueda aumenta o reduce el zoom 4 puntos porcentuales por paso. Si hay cuadros seleccionados, cambia su tamaño aproximadamente un 2%.</li><li><b>Ctrl + rueda</b> también ajusta el zoom sin selección.</li>',
+    'ar': '<li>عند الفتح يُترك هامش لا يقل عن 20 بكسل على كل جانب من جوانب الصورة. تكبر العجلة الصورة أو تصغرها بمقدار 4 نقاط مئوية لكل درجة. عند تحديد إطارات، يتغير حجمها بنحو 2% بدلاً من ذلك.</li><li><b>Ctrl + العجلة</b> يغير تكبير الصورة أيضًا دون تحديد إطار.</li>',
+    'fr': '<li>À l’ouverture, une marge d’au moins 20 px est conservée sur chacun des quatre côtés. Par cran, la molette augmente ou réduit le zoom de 4 points de pourcentage. Si des cadres sont sélectionnés, leur taille change d’environ 2 %.</li><li><b>Ctrl + molette</b> ajuste aussi le zoom sans sélection.</li>',
+    'ko': '<li>이미지를 열면 네 방향 모두 각각 최소 20 px의 여백을 둡니다. 휠 한 칸으로 이미지 확대율을 4%포인트 높이거나 낮춥니다. 상자가 선택되면 크기가 약 2%씩 바뀝니다.</li><li><b>Ctrl + 휠</b>도 선택된 상자가 없으면 이미지를 확대/축소합니다.</li>',
+}
+
+_DOUBLE_CLICK_GUIDE = {
+    'en': 'Double-click a box to change its class or the classes of all selected boxes. Double-click a class group heading to change the whole group. Choose with initials, pinyin or a class shortcut; press Enter to apply or Esc to cancel.',
+    'zh': '双击画布上的框可修改单个框或已选中的所有框；双击右侧类别组名称可修改整组。用首字母、拼音或类别快捷键选类，按 Enter 应用或 Esc 取消。',
+    'ja': '枠をダブルクリックすると、その枠または選択したすべての枠のクラスを変更できます。グループ名をダブルクリックすると全体を変更できます。頭文字、ピンイン、ショートカットで選び、Enter で適用、Esc で取り消します。',
+    'es': 'Haz doble clic en un cuadro para cambiar su clase o la de todos los cuadros seleccionados. Haz doble clic en el nombre de un grupo para cambiarlo entero. Elige con iniciales, pinyin o un atajo; pulsa Enter para aplicar o Esc para cancelar.',
+    'ar': 'انقر نقرًا مزدوجًا على إطار لتغيير فئته أو فئات كل الإطارات المحددة، أو على اسم مجموعة لتغيير فئة المجموعة كلها. اختر بالحرف الأول أو البينيين أو الاختصار، واضغط Enter للتطبيق أو Esc للإلغاء.',
+    'fr': 'Double-cliquez sur un cadre pour modifier sa classe ou celle de tous les cadres sélectionnés. Double-cliquez sur le nom d’un groupe pour le modifier en entier. Choisissez par initiale, pinyin ou raccourci, puis appuyez sur Entrée pour appliquer ou Échap pour annuler.',
+    'ko': '상자를 두 번 클릭하면 해당 상자 또는 선택한 모든 상자의 클래스를 변경할 수 있습니다. 그룹 이름을 두 번 클릭하면 전체 그룹을 변경합니다. 첫 글자, 병음 또는 단축키로 선택하고 Enter로 적용하거나 Esc로 취소하세요.',
 }
 
 
@@ -159,7 +170,11 @@ class UserGuideDialog(MotionDialog):
         (title, shortcuts, shortcut_body, basic, basic_body,
          advanced, advanced_body) = _GUIDES.get(language, _GUIDES['en'])
         shortcut_body += _WORKFLOW_SHORTCUTS.get(language, _WORKFLOW_SHORTCUTS['en'])
+        shortcut_body += '<li><b>Ctrl+Shift+M</b> — %s</li>' % translate(
+            'Mark or Unmark Current Image', language)
         shortcut_body += _ZOOM_GUIDE.get(language, _ZOOM_GUIDE['en'])
+        shortcut_body += '<li>%s</li>' % _DOUBLE_CLICK_GUIDE.get(
+            language, _DOUBLE_CLICK_GUIDE['en'])
         browser = QTextBrowser(self)
         browser.setOpenExternalLinks(False)
         browser.setHtml(

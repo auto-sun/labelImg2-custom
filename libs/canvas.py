@@ -24,6 +24,7 @@ class Canvas(QWidget):
     panRequest = pyqtSignal(int, int)
     newShape = pyqtSignal(bool)
     selectionChanged = pyqtSignal(bool)
+    shapeClassEditRequested = pyqtSignal(object)
     shapeMoved = pyqtSignal()
     shapeCopied = pyqtSignal(object)
     shapeChangeStarted = pyqtSignal()
@@ -717,6 +718,18 @@ class Canvas(QWidget):
         return self.drawing() and self.current and len(self.current) > 2
 
     def mouseDoubleClickEvent(self, ev):
+        if (ev.button() == Qt.LeftButton and self.editing() and
+                not self._panning and not self._altPressed and
+                ev.modifiers() == Qt.NoModifier):
+            pos = self.transformPos(ev.pos())
+            shape = self.hShape if self.updateVertexHit(pos) else self._shapeAt(pos)
+            if shape is not None:
+                if shape not in self.selectedShapes:
+                    self.selectShape(shape)
+                self.shapeClassEditRequested.emit(shape)
+                ev.accept()
+                return
+
         # We need at least 4 points here, since the mousePress handler
         # adds an extra one before this handler is called.
         if self.canCloseShape() and len(self.current) > 3:
@@ -745,12 +758,13 @@ class Canvas(QWidget):
             )
 
         if self.selectedVertex():  # A vertex is marked for selection.
-            if not multiSelectPressed:
-                self.deSelectShape()
             index, shape = self.hVertex, self.hShape
             shape.highlightVertex(index, shape.MOVE_VERTEX)
             if multiSelectPressed:
                 self._addToSelection(shape)
+            elif (shape in self.selectedShapes and len(self.selectedShapes) > 1 and
+                    self.editing()):
+                self.selectedShape = shape
             else:
                 self.selectShape(shape)
             return

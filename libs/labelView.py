@@ -196,6 +196,7 @@ class CEditDelegate(CLabelRowDelegate):
 class CLabelView(QTreeView):
     extraEditing = pyqtSignal(QModelIndex, str)
     toggleEdit = pyqtSignal(bool)
+    groupClassEditRequested = pyqtSignal(QModelIndex)
     def __init__(self, labelHist, parent = None):
         super(CLabelView, self).__init__(parent)
         disable_ime_for_shortcuts(self)
@@ -279,6 +280,22 @@ class CLabelView(QTreeView):
     def focusInEvent(self, event):
         super(CLabelView, self).focusInEvent(event)
         disable_ime_for_shortcuts(self)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            index = self.indexAt(event.pos())
+            if index.isValid() and not index.parent().isValid() and index.column() == 0:
+                option = self.viewOptions()
+                rect = self.visualRect(index)
+                self.label_delegate.initStyleOption(option, index)
+                option.rect = rect
+                checkbox = self.style().subElementRect(
+                    QStyle.SE_ItemViewItemCheckIndicator, option, self)
+                if rect.contains(event.pos()) and not checkbox.contains(event.pos()):
+                    self.groupClassEditRequested.emit(index)
+                    event.accept()
+                    return
+        super(CLabelView, self).mouseDoubleClickEvent(event)
 
     def extraChanged(self, str):
         self.extraEditing.emit(self.sm.currentIndex(), str)

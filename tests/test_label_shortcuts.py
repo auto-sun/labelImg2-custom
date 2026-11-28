@@ -6,7 +6,7 @@ import unittest
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from PyQt5.QtCore import QPointF, Qt
+from PyQt5.QtCore import QPoint, QPointF, Qt, QTimer
 from PyQt5.QtGui import QColor, QPixmap
 from PyQt5.QtTest import QTest
 from PyQt5.QtWidgets import QApplication, QToolButton
@@ -374,6 +374,120 @@ class LabelShortcutWindowTests(unittest.TestCase):
         self.assertTrue(self.window.canvas.editing())
         self.assertIsNone(self.window._pendingLabelShortcut)
         self.assertFalse(self.window.labelShortcutActions[0].isEnabled())
+
+    def addTestBox(self, label, dx=0, dy=0):
+        shape = make_shape()
+        shape.label = label
+        shape.moveBy(QPointF(dx, dy))
+        shape.close()
+        self.window.canvas.shapes.append(shape)
+        self.window.addLabel(shape)
+        return shape
+
+    def showClassEditingWindow(self):
+        self.window.workspace.setCurrentWidget(self.window.scrollArea)
+        self.window.show()
+        self.window.activateWindow()
+        self.app.setActiveWindow(self.window)
+        self.app.processEvents()
+
+    def doubleClickClassAndType(self, widget, point, keys, accept=True):
+        chosen = []
+
+        def interact():
+            dialog = QApplication.activeModalWidget()
+            if dialog is None or dialog.objectName() != 'boxClassPicker':
+                return
+            try:
+                combo = dialog.findChild(CCommonOrderComboBox)
+                if combo is None:
+                    return
+                QTest.keyClicks(combo, keys)
+                chosen.append(combo.currentText())
+                QTest.keyClick(combo, Qt.Key_Return if accept else Qt.Key_Escape)
+                chosen.append(dialog.isVisible())
+            finally:
+                if dialog.isVisible():
+                    dialog.reject()
+
+        QTimer.singleShot(0, interact)
+        QTest.mouseDClick(widget, Qt.LeftButton, pos=point)
+        self.app.processEvents()
+        self.assertEqual(2, len(chosen), 'Double click did not open the class picker')
+        self.assertFalse(chosen[1], 'Enter or Escape did not close the class picker')
+        return chosen[0]
+
+    def canvasPoint(self, x, y):
+        canvas = self.window.canvas
+        return ((QPointF(x, y) + canvas.offsetToCenter()) * canvas.scale).toPoint()
+
+    def test_double_click_canvas_box_enters_class_picker_and_accepts_initial(self):
+        shape = self.addTestBox('person')
+        self.showClassEditingWindow()
+
+        chosen = self.doubleClickClassAndType(
+            self.window.canvas, self.canvasPoint(40, 35), 'e')
+
+        self.assertEqual('excavator', chosen)
+        self.assertEqual(chosen, shape.label)
+        self.assertTrue(shape.isRotated)
+        self.assertTrue(self.window.canvas.editing())
+        self.assertEqual(1, len(self.window._undoStack))
+
+    def test_double_click_selected_corner_changes_only_selected_boxes_and_undoes_once(self):
+        self.window.setLabelShortcutMappings([{'shortcut': '1', 'label': 'SafeHat'}])
+        first = self.addTestBox('SafeHat')
+        second = self.addTestBox('person', 90)
+        other = self.addTestBox('person', 0, 90)
+        before = [list(shape.points) for shape in (first, second, other)]
+        self.showClassEditingWindow()
+        canvas = self.window.canvas
+        canvas._setSelectedShapes([first, second])
+        corner = self.canvasPoint(10, 10)
+        # Qt sends a regular press/release before the double-click event.
+        QTest.mouseClick(canvas, Qt.LeftButton, pos=corner)
+        self.assertEqual([first, second], canvas.selectedShapes)
+        chosen = self.doubleClickClassAndType(canvas, corner, '1')
+
+        self.assertEqual('SafeHat', chosen)
+        self.assertEqual(['SafeHat', 'SafeHat', 'person'],
+                         [shape.label for shape in canvas.shapes])
+        self.assertEqual(before, [shape.points for shape in canvas.shapes])
+        self.assertEqual(1, len(self.window._undoStack))
+        self.assertTrue(self.window.undoLastOperation())
+        self.assertEqual(['SafeHat', 'person', 'person'],
+                         [shape.label for shape in canvas.shapes])
+
+    def test_double_click_class_group_changes_hidden_boxes_but_other_classes_are_untouched(self):
+        first = self.addTestBox('person')
+        hidden = self.addTestBox('person', 90)
+        other = self.addTestBox('SafeHat', 0, 90)
+        self.showClassEditingWindow()
+        self.window.canvas.setShapeVisible(hidden, False)
+        tree = self.window.labelList
+        group = tree.groups['person']
+        tree.collapse(group.index())
+        rect = tree.visualRect(group.index())
+        point = QPoint(rect.left() + 65, rect.center().y())
+
+        chosen = self.doubleClickClassAndType(tree.viewport(), point, 'e')
+
+        self.assertEqual('excavator', chosen)
+        self.assertEqual([chosen, chosen, 'SafeHat'],
+                         [first.label, hidden.label, other.label])
+        self.assertFalse(self.window.canvas.isVisible(hidden))
+        self.assertEqual(2, tree.groups[chosen].rowCount())
+        self.assertNotIn('person', tree.groups)
+
+    def test_escape_from_canvas_picker_keeps_all_classes_and_undo_history(self):
+        shape = self.addTestBox('person')
+        self.showClassEditingWindow()
+
+        self.assertEqual('excavator', self.doubleClickClassAndType(
+            self.window.canvas, self.canvasPoint(40, 35), 'e', accept=False))
+        self.assertEqual('person', shape.label)
+        self.assertFalse(self.window.dirty)
+        self.assertEqual([], self.window._undoStack)
 
     def test_shortcut_widgets_do_not_accept_ime_composition(self):
         editor = CCommonOrderComboBox(self.window)

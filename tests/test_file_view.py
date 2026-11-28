@@ -135,6 +135,35 @@ class FileListConfirmationStateTests(unittest.TestCase):
             self.assertGreater(color.red(), color.green() + 20)
             view.close()
 
+    def test_explicit_confirmation_overrides_review_color_but_preserves_the_flag(self):
+        view = CFileView()
+        self.addCleanup(view.close)
+        view.resize(260, 100)
+        model = view.model()
+        paths = ['review.jpg', 'other.jpg']
+        model.setStringList(paths, scanAnnotations=False)
+        index = model.index(0)
+        model.setFlagged(index, True)
+        model.setData(index, 2, Qt.BackgroundRole)
+        self.assertEqual('#ffd2d2', model.data(index, Qt.BackgroundRole).color().name())
+        self.assertTrue(model.setConfirmed(index, True))
+        self.assertEqual(Qt.green, model.data(index, Qt.BackgroundRole).color())
+        self.assertTrue(model.isFlagged(index))
+
+        view.setCurrentIndex(index)
+        view.show()
+        self.app.processEvents()
+        rect = view.visualRect(index)
+        color = view.viewport().grab().toImage().pixelColor(rect.right() - 10, rect.center().y())
+        self.assertGreater(color.green(), color.red() + 20)
+
+        model.setStringList(paths[::-1], scanAnnotations=False)
+        index = model.index(1)
+        self.assertTrue(model.isConfirmed(index))
+        self.assertTrue(model.isFlagged(index))
+        model.setConfirmed(index, False)
+        self.assertEqual('#ffd2d2', model.data(index, Qt.BackgroundRole).color().name())
+
     def test_wheel_and_scrollbar_repaint_rows_after_hit_positions_move(self):
         view = CFileView()
         self.addCleanup(view.close)

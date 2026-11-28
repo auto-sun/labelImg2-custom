@@ -2,14 +2,17 @@
 import os
 import tempfile
 import unittest
+from xml.etree import ElementTree
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
 from PyQt5.QtCore import QItemSelectionModel, Qt
 from PyQt5.QtGui import QColor, QImage
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtTest import QTest
+from PyQt5.QtWidgets import QApplication, QLineEdit
 
 import labelImg
+from libs.pascal_voc_io import PascalVocWriter
 
 
 class MemorySettings(object):
@@ -127,6 +130,86 @@ class RefreshProjectTests(unittest.TestCase):
         self.assertTrue(self.window.toggleSelectedImageFlag())
         self.assertEqual([], self.window.settings.get(
             labelImg.SETTING_FLAGGED_IMAGES))
+
+    def test_review_shortcut_toggles_only_the_current_image(self):
+        window = self.window
+        window.show()
+        window.activateWindow()
+        window.canvas.setFocus()
+        QTest.qWait(30)
+        current = window.currentImageFileModelIndex()
+        other = window.fileModel.index(1)
+        window.filesm.select(other, QItemSelectionModel.Select)
+        action = window.actions.flagCurrentImage
+        self.assertEqual('Ctrl+Shift+M', action.shortcut().toString())
+        self.assertEqual('Ctrl+M', window.actions.edit.shortcut().toString())
+        self.assertIn('Ctrl+Shift+M', window.labelShortcutReservedKeys())
+        self.assertFalse(action.autoRepeat())
+
+        modifiers = Qt.ControlModifier | Qt.ShiftModifier
+        QTest.keyClick(window.canvas, Qt.Key_M, modifiers)
+        self.assertTrue(window.fileModel.isFlagged(current))
+        self.assertFalse(window.fileModel.isFlagged(other))
+        self.assertEqual(window.fileModel.flaggedPaths(),
+                         window.settings.get(labelImg.SETTING_FLAGGED_IMAGES))
+        window.fileListView.setFocus()
+        QTest.keyClick(window.fileListView, Qt.Key_M, modifiers)
+        self.assertFalse(window.fileModel.isFlagged(current))
+        self.assertEqual(self.firstImage, window.filePath)
+        self.assertFalse(window.dirty)
+        self.assertEqual([], os.listdir(self.annotationDir))
+
+    def test_review_shortcut_does_not_mark_when_editing_text_or_agent_locked(self):
+        window = self.window
+        window.show()
+        window.activateWindow()
+        text_input = QLineEdit(window)
+        window.statusBar().addPermanentWidget(text_input)
+        text_input.setFocus()
+        QTest.qWait(30)
+        modifiers = Qt.ControlModifier | Qt.ShiftModifier
+        index = window.currentImageFileModelIndex()
+        self.assertTrue(text_input.hasFocus())
+        QTest.keyClick(text_input, Qt.Key_M, modifiers)
+        self.assertFalse(window.fileModel.isFlagged(index))
+        window.canvas.setFocus()
+        window.setLabelEditorActive(True)
+        QTest.keyClick(window.canvas, Qt.Key_M, modifiers)
+        self.assertFalse(window.fileModel.isFlagged(index))
+        window.setLabelEditorActive(False)
+        window.fileModel.setAgentLockedPaths([self.firstImage], 'Reserved')
+        QTest.keyClick(window.canvas, Qt.Key_M, modifiers)
+        self.assertFalse(window.fileModel.isFlagged(index))
+
+    def test_space_green_overrides_review_mark_and_xml_toggle_restores_red(self):
+        window = self.window
+        path = os.path.join(self.annotationDir, '1.xml')
+        writer = PascalVocWriter('images', '1.jpg', [80, 100, 3])
+        writer.addBndBox(10, 10, 40, 40, 'person', False, '')
+        writer.save(path)
+        window.annotationFormat = labelImg.FORMAT_PASCALVOC
+        window.loadFile(self.firstImage)
+        window.show()
+        window.activateWindow()
+        window.canvas.setFocus()
+        QTest.qWait(30)
+        self.assertTrue(window.toggleSelectedImageFlag())
+        index = window.currentImageFileModelIndex()
+        QTest.keyClick(window.canvas, Qt.Key_Space)
+        self.assertTrue(window.fileModel.isFlagged(index))
+        self.assertTrue(window.fileModel.isConfirmed(index))
+        self.assertEqual(Qt.green, window.fileModel.data(index, Qt.BackgroundRole).color())
+        self.assertEqual('yes', ElementTree.parse(path).getroot().get('verified'))
+
+        window.fileModel.setConfirmed(index, False)
+        window.loadFile(self.firstImage)
+        self.assertTrue(window.fileModel.isConfirmed(index))
+        window.canvas.setFocus()
+        QTest.keyClick(window.canvas, Qt.Key_Space)
+        self.assertFalse(window.fileModel.isConfirmed(index))
+        self.assertTrue(window.fileModel.isFlagged(index))
+        self.assertEqual('#ffd2d2', window.fileModel.data(index, Qt.BackgroundRole).color().name())
+        self.assertIsNone(ElementTree.parse(path).getroot().get('verified'))
 
     def test_review_mark_is_restored_in_a_new_window(self):
         self.assertTrue(self.window.toggleSelectedImageFlag())

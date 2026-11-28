@@ -7,6 +7,7 @@ import sqlite3
 import tempfile
 import uuid
 from collections import Counter
+from time import monotonic
 
 from .pascal_voc_io import PascalVocWriter
 from .yolo_obb_io import save_yolo_annotations
@@ -109,6 +110,52 @@ def write_boxes(path, image, width, height, classes, allowed, fmt, boxes):
         save_yolo_annotations(path,shapes,width,height,classes,fmt)
 
 
+class AgentTaskClock:
+    """Count active time and snapshot throughput only after successful submissions."""
+
+    def __init__(self, now=monotonic):
+        self._now = now
+        self.reset()
+
+    def reset(self):
+        self.job = None
+        self._started = None
+        self._elapsed = self._submitted_elapsed = 0.0
+        self._submitted_images = 0
+
+    @property
+    def running(self):
+        return self._started is not None
+
+    @property
+    def elapsed(self):
+        return self._elapsed + (self._now() - self._started if self.running else 0)
+
+    @property
+    def average(self):
+        return (self._submitted_elapsed / self._submitted_images
+                if self._submitted_images else None)
+
+    def start(self, job, saved=(0.0, 0.0, 0)):
+        if self.job != job:
+            self.job = job
+            self._elapsed, self._submitted_elapsed, self._submitted_images = saved
+            self._started = None
+        if not self.running:
+            self._started = self._now()
+
+    def record_submission(self):
+        self._submitted_elapsed = self.elapsed
+        self._submitted_images += 1
+
+    def pause(self):
+        self._elapsed = self.elapsed
+        self._started = None
+
+    def snapshot(self):
+        return self.elapsed, self._submitted_elapsed, self._submitted_images
+
+
 class AgentQueue:
     def __init__(self, db_path, context):
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
@@ -122,7 +169,22 @@ class AgentQueue:
             token TEXT, state TEXT DEFAULT 'pending', stamp TEXT, w INTEGER, h INTEGER,
             expected TEXT, outcome TEXT, reason TEXT, PRIMARY KEY(job,seq), UNIQUE(job,token));
           CREATE INDEX IF NOT EXISTS pending_agent_frames ON frame(job,seq) WHERE state IN ('pending','writing');
+          CREATE TABLE IF NOT EXISTS task_timing(job TEXT PRIMARY KEY, elapsed REAL NOT NULL,
+            submitted_elapsed REAL NOT NULL, submitted_images INTEGER NOT NULL);
         """)
+
+    def load_timing(self, job):
+        row = self.db.execute(
+            'SELECT elapsed, submitted_elapsed, submitted_images FROM task_timing WHERE job=?',
+            (job,)).fetchone()
+        return tuple(row) if row is not None else (0.0, 0.0, 0)
+
+    def save_timing(self, job, values):
+        with self.db:
+            self.db.execute("""INSERT INTO task_timing VALUES(?,?,?,?)
+                ON CONFLICT(job) DO UPDATE SET elapsed=excluded.elapsed,
+                  submitted_elapsed=excluded.submitted_elapsed,
+                  submitted_images=excluded.submitted_images""", (job, *values))
 
     def create(self, entries, rules, allowed):
         if not entries or not isinstance(rules,str) or not rules.strip() or len(rules)>12000:

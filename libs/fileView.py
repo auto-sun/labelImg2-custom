@@ -102,13 +102,14 @@ class CFileListModel(QStringListModel):
                       annotationFormat=FORMAT_PASCALVOC,
                       scanAnnotations=True):
         # Rebuilding the list is necessary after model annotation and format
-        # conversion so counts stay current. Keep the green confirmation
-        # state for images that are still present; it is session UI state and
-        # cannot be reconstructed from YOLO/YOLO OBB TXT files.
-        visitedByPath = {}
+        # conversion so counts stay current. Preserve both ordinary saves
+        # and explicit confirmations for images still in the list.
+        savedByPath = {}
         for path, info in zip(self.stringList(), self.dispList):
-            if len(info) > 2 and info[2]:
-                visitedByPath[self._pathKey(path)] = True
+            saved = info[2]
+            confirmed = len(info) > 3 and info[3]
+            if saved or confirmed:
+                savedByPath[self._pathKey(path)] = saved, confirmed
 
         self.dispList = []
 
@@ -122,7 +123,8 @@ class CFileListModel(QStringListModel):
                 # GUI while every XML/TXT is opened.
                 info = [os.path.split(s)[1],
                         PENDING_ANNOTATION_COUNT, False]
-            info[2] = visitedByPath.get(self._pathKey(s), False)
+            info[2], confirmed = savedByPath.get(self._pathKey(s), (False, False))
+            info.append(confirmed)
             self.dispList.append(info)
 
         self._totalAnnotationCount = sum(
@@ -183,6 +185,21 @@ class CFileListModel(QStringListModel):
     def flaggedPaths(self):
         return sorted(self._flaggedPaths)
 
+    def isConfirmed(self, index):
+        if not index.isValid() or not 0 <= index.row() < len(self.dispList):
+            return False
+        return bool(self.dispList[index.row()][3])
+
+    def setConfirmed(self, index, confirmed):
+        if not index.isValid() or not 0 <= index.row() < len(self.dispList):
+            return False
+        confirmed = bool(confirmed)
+        info = self.dispList[index.row()]
+        if info[3] != confirmed:
+            info[3] = confirmed
+            self.dataChanged.emit(index, index, [Qt.BackgroundRole])
+        return True
+
     def isFlagged(self, index):
         if index is None or not index.isValid():
             return False
@@ -226,6 +243,8 @@ class CFileListModel(QStringListModel):
         elif role == Qt.BackgroundRole:
             if locked:
                 return QBrush(QColor(218,218,218))
+            if self.isConfirmed(index):
+                return QBrush(Qt.green)
             if self.isFlagged(index):
                 return QBrush(QColor(255, 210, 210))
             if item[1] is None: # or item[1] == 0:
@@ -269,22 +288,24 @@ class CFileItemEditDelegate(QStyledItemDelegate):
         return editor
 
     def paint(self, painter, option, index):
-        if index.model().isFlagged(index) and not index.model().isAgentLocked(index):
-            # Keep the review color visible even while this row is selected.
+        model = index.model()
+        locked = model.isAgentLocked(index)
+        confirmed = model.isConfirmed(index) and not locked
+        flagged = model.isFlagged(index) and not locked and not confirmed
+        if confirmed or flagged:
+            # Preserve the dominant status color even on the selected row.
             option = QStyleOptionViewItem(option)
             option.palette.setColor(
-                QPalette.Highlight, QColor(255, 210, 210))
+                QPalette.Highlight, model.data(index, Qt.BackgroundRole).color())
             option.palette.setColor(
-                QPalette.HighlightedText,
-                option.palette.color(QPalette.Text))
+                QPalette.HighlightedText, QColor(Qt.black))
         super(CFileItemEditDelegate, self).paint(painter, option, index)
         if option.state & QStyle.State_Selected:
-            # The active image remains identifiable even when the canvas
-            # takes focus or a review flag uses the same red as other rows.
+            border = (QColor('#17783a') if confirmed else
+                      QColor('#96363d') if flagged else
+                      option.palette.color(QPalette.Active, QPalette.Highlight))
             painter.save()
-            painter.setPen(QPen(option.palette.color(QPalette.Active, QPalette.Highlight), 2)
-                           if not index.model().isFlagged(index)
-                           else QPen(QColor('#96363d'), 2))
+            painter.setPen(QPen(border, 2))
             painter.drawRect(option.rect.adjusted(1, 1, -1, -1))
             painter.restore()
 
